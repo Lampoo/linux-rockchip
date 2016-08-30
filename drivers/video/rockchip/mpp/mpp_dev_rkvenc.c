@@ -21,6 +21,8 @@
 #include <linux/types.h>
 #include <linux/uaccess.h>
 #include <linux/rockchip_ion.h>
+#include <linux/reset.h>
+#include <linux/rockchip/pmu.h>
 
 #include "mpp_dev_common.h"
 #include "mpp_dev_rkvenc.h"
@@ -153,6 +155,78 @@ void rockchip_mpp_rkvenc_deinit(struct rockchip_mpp_dev *mpp)
 {
 }
 
+static int rockchip_mpp_rkvenc_reset_init(struct rockchip_mpp_dev *mpp)
+{
+	struct mpp_service *pservice = mpp->srv;
+
+	mpp_debug(DEBUG_RESET, "reset init in:\n");
+	pservice->rst_a = devm_reset_control_get(pservice->dev, "video_a");
+	pservice->rst_h = devm_reset_control_get(pservice->dev, "video_h");
+	pservice->rst_v = devm_reset_control_get(pservice->dev, "video_c");
+
+	if (IS_ERR_OR_NULL(pservice->rst_a)) {
+		mpp_debug(DEBUG_RESET, "No aclk reset resource define\n");
+		pservice->rst_a = NULL;
+	}
+
+	if (IS_ERR_OR_NULL(pservice->rst_h)) {
+		mpp_debug(DEBUG_RESET, "No hclk reset resource define\n");
+		pservice->rst_h = NULL;
+	}
+
+	if (IS_ERR_OR_NULL(pservice->rst_v)) {
+		mpp_debug(DEBUG_RESET, "No core reset resource define\n");
+		pservice->rst_v = NULL;
+	}
+
+	return 0;
+}
+
+static int rockchip_mpp_rkvenc_reset(struct rockchip_mpp_dev *mpp)
+{
+	struct mpp_service *pservice = mpp->srv;
+
+	if (pservice->rst_a && pservice->rst_h) {
+		mpp_debug(DEBUG_RESET, "reset in\n");
+		/* pre-reset */
+		if (pservice->rst_v)
+			reset_control_assert(pservice->rst_v);
+		if (pservice->rst_a)
+			reset_control_assert(pservice->rst_a);
+		if (pservice->rst_h)
+			reset_control_assert(pservice->rst_h);
+		udelay(5);
+
+		if (pservice->rst_h)
+			reset_control_deassert(pservice->rst_h);
+		if (pservice->rst_v)
+			reset_control_deassert(pservice->rst_v);
+		udelay(1);
+
+		/* mpp_write_relaxed(mpp, 0x1ff, RKVENC_INT_EN); */
+
+		mpp_write_relaxed(mpp, 0x00000000, RKVENC_ENC_START);
+		udelay(1);
+
+		/* reset */
+		if (pservice->rst_v)
+			reset_control_assert(pservice->rst_v);
+		if (pservice->rst_a)
+			reset_control_assert(pservice->rst_a);
+		if (pservice->rst_h)
+			reset_control_assert(pservice->rst_h);
+		udelay(1);
+
+		if (pservice->rst_v)
+			reset_control_deassert(pservice->rst_v);
+		if (pservice->rst_a)
+			reset_control_deassert(pservice->rst_a);
+		if (pservice->rst_h)
+			reset_control_deassert(pservice->rst_h);
+	}
+	return 0;
+}
+
 static void status_check(struct rockchip_mpp_dev *mpp)
 {
 	u32 lkt_status;
@@ -234,6 +308,7 @@ int rockchip_mpp_rkvenc_prepare(struct rockchip_mpp_dev *mpp)
 
 int rockchip_mpp_rkvenc_run(struct rockchip_mpp_dev *mpp)
 {
+	static int first_run = 1;
 	struct mpp_service *pservice = mpp->srv;
 	struct rkvenc_ctx *ctx =
 		container_of(pservice->current_ctx, struct rkvenc_ctx, ictx);
@@ -248,8 +323,13 @@ int rockchip_mpp_rkvenc_run(struct rockchip_mpp_dev *mpp)
 	case RKVENC_MODE_ONEFRAME: {
 		u32 *src = ctx->cfg.elem[0].reg;
 
-		for (i = (LINK_TABLE_START + LINK_TABLE_LEN) - 1; i > 0; i--)
+		if (first_run)
+			rockchip_mpp_rkvenc_reset(mpp);
+
+		mpp_write_relaxed(mpp, 0x1ff, RKVENC_INT_EN);
+		for (i = 2; i < (LINK_TABLE_START + LINK_TABLE_LEN); i++)
 			mpp_write_relaxed(mpp, src[i], i * 4);
+		mpp_write_relaxed(mpp, 0x00010100, RKVENC_ENC_START);
 
 		dsb(sy);
 
@@ -279,6 +359,7 @@ int rockchip_mpp_rkvenc_run(struct rockchip_mpp_dev *mpp)
 		break;
 	}
 
+	first_run = 0;
 	mpp_debug_leave();
 
 	return 0;
@@ -354,9 +435,9 @@ int rockchip_mpp_rkvenc_irq(struct rockchip_mpp_dev *mpp)
 	if (irq_status) {
 		mpp_write_relaxed(mpp, 0xffffffff, RKVENC_INT_CLR);
 
-		mpp_debug(DEBUG_IRQ_STATUS, "interrupt status %08x\n",
-			  irq_status);
-
+		mpp_debug(DEBUG_IRQ_STATUS,
+				  "interrupt status %08x\n",
+				  irq_status);
 		enc->irq_status = irq_status;
 
 		mpp_debug_leave();
@@ -365,26 +446,6 @@ int rockchip_mpp_rkvenc_irq(struct rockchip_mpp_dev *mpp)
 	} else {
 		return -1;
 	}
-}
-
-int rockchip_mpp_rkvenc_reset(struct rockchip_mpp_dev *mpp)
-{
-	struct mpp_service *pservice = mpp->srv;
-	struct mpp_mem_region *mem_region = NULL, *n;
-
-	struct mpp_ctx *ctx = pservice->current_ctx;
-
-	/* release memory region attach to this registers table. */
-	list_for_each_entry_safe(mem_region, n,
-				 &ctx->mem_region_list, reg_lnk) {
-		ion_free(pservice->ion_client, mem_region->hdl);
-		list_del_init(&mem_region->reg_lnk);
-		kfree(mem_region);
-	}
-
-	kfree(ctx);
-
-	return 0;
 }
 
 int rockchip_mpp_rkvenc_result(struct rockchip_mpp_dev *mpp,
@@ -535,6 +596,8 @@ int rockchip_mpp_rkvenc_probe(struct rockchip_mpp_dev *mpp)
 	clk_prepare_enable(enc->aclk);
 	clk_prepare_enable(enc->hclk);
 	clk_prepare_enable(enc->core);
+
+	rockchip_mpp_rkvenc_reset_init(mpp);
 
 	return 0;
 

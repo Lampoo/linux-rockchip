@@ -41,12 +41,6 @@ struct rkvenc_result {
 
 struct rkvenc_ctx {
 	struct mpp_ctx ictx;
-	/* link table hardware access address */
-	//unsigned long lkt_dma_addr;
-	//void *lkt_cpu_addr;
-	//unsigned long lkt_size;
-	//u32 lkt_index;
-	//struct ion_handle *lkt_hdl;
 	enum RKVENC_MODE mode;
 
 	struct rkvenc_config cfg;
@@ -62,9 +56,14 @@ struct rockchip_rkvenc_dev {
 	void *lkt_cpu_addr;
 	u32 lkt_index;
 	u32 irq_status;
+
 	struct clk *aclk;
 	struct clk *hclk;
 	struct clk *core;
+
+	struct reset_control *rst_a;
+	struct reset_control *rst_h;
+	struct reset_control *rst_v;
 };
 
 struct link_table_elem {

@@ -53,6 +53,8 @@ extern int debug;
 #define DEBUG_IRQ_CHECK				0x00008000
 #define DEBUG_CACHE_32B				0x00010000
 
+#define DEBUG_RESET				0x00100000
+
 #define PRINT_FUNCTION				0x80000000
 #define PRINT_LINE				0x40000000
 
@@ -98,14 +100,6 @@ enum RKVENC_MODE {
 struct rockchip_mpp_dev;
 struct mpp_service;
 struct mpp_ctx;
-
-struct vcodec_hw_ops {
-	void (*power_on)(struct mpp_service *pservice);
-	void (*power_off)(struct mpp_service *pservice);
-	void (*get_freq)(struct rockchip_mpp_dev *data, struct mpp_ctx *reg);
-	void (*set_freq)(struct mpp_service *pservice, struct mpp_ctx *reg);
-	void (*reduce_freq)(struct mpp_service *pservice);
-};
 
 /**
  * struct for process session which connect to vpu
@@ -194,10 +188,14 @@ struct rockchip_mpp_dev_variant {
 	u32 data_len;
 
 	int (*hw_probe)(struct rockchip_mpp_dev *mpp);
+	void (*power_on)(struct rockchip_mpp_dev *mpp);
+	void (*power_off)(struct rockchip_mpp_dev *mpp);
 };
 
 struct rockchip_mpp_dev {
 	struct mpp_dev_ops *ops;
+
+	struct delayed_work power_off_work;
 
 	struct cdev cdev;
 	dev_t dev_t;
@@ -227,7 +225,6 @@ struct rockchip_mpp_dev {
 
 struct mpp_service {
 	struct wake_lock wake_lock;
-	struct delayed_work power_off_work;
 	ktime_t last; /* record previous power-on time */
 	/* vpu service structure global lock */
 	struct mutex lock;
@@ -237,6 +234,7 @@ struct mpp_service {
 	struct list_head done;
 	/* link to list_session in struct vpu_session */
 	struct list_head session;
+	atomic_t total_running;
 	atomic_t enabled;
 	atomic_t power_on_cnt;
 	atomic_t power_off_cnt;
@@ -258,8 +256,6 @@ struct mpp_service {
 
 	u32 subcnt;
 	struct list_head subdev_list;
-
-	struct vcodec_hw_ops *hw_ops;
 };
 
 /* Ops for common vcodec hardware */
@@ -276,14 +272,12 @@ int rockchip_mpp_common_result(struct rockchip_mpp_dev *mpp,
 int vcodec_common_get_clk(struct mpp_service *pservice);
 
 /* Ops for rkvenc */
-int rockchip_mpp_rkvenc_probe(struct rockchip_mpp_dev *mpp);
 void rockchip_mpp_rkvenc_remove(struct rockchip_mpp_dev *data);
 struct mpp_ctx *rockchip_mpp_rkvenc_init(struct rockchip_mpp_dev *data,
 					 void __user *src, u32 size);
 int rockchip_mpp_rkvenc_prepare(struct rockchip_mpp_dev *data);
 int rockchip_mpp_rkvenc_run(struct rockchip_mpp_dev *data);
 int rockchip_mpp_rkvenc_done(struct rockchip_mpp_dev *data);
-int rockchip_mpp_rkvenc_reset(struct rockchip_mpp_dev *mpp);
 int rockchip_mpp_rkvenc_result(struct rockchip_mpp_dev *mpp,
 			       struct mpp_ctx *ctx,
 			       u32 __user *dst);

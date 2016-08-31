@@ -122,11 +122,12 @@
 			<&hclk_bus_pre 150000000>, <&pclk_bus_pre 75000000>,
 			<&aclk_peri 150000000>, <&hclk_peri 150000000>,
 			<&pclk_peri 75000000>, <&aclk_vio0_pre 300000000>,
-			<&aclk_vio1_pre 300000000>, <&hclk_vio_pre 150000000>,
-			<&pclk_vio_pre 150000000>, <&aclk_rkvdec_pre 300000000>,
+			<&aclk_vio1_pre 300000000>, <&hclk_vio_pre 75000000>,
+			<&pclk_vio_pre 75000000>, <&aclk_rkvdec_pre 300000000>,
 			<&aclk_vpu_pre 300000000>, <&clk_hevc_cabac 300000000>,
 			<&clk_hevc_core 300000000>, <&aclk_rkvenc_pre 300000000>,
-			<&clk_venc_core 300000000>;
+			<&clk_venc_core 300000000>, <&clk_crypto 150000000>,
+			<&clk_nandc 150000000>;
 	};
 
 	rockchip_clocks_enable: clocks-enable {
@@ -181,7 +182,10 @@
 			<&clk_gates16 6>, /* aclk_dsp_edp_niu */
 			<&clk_gates16 7>, /* pclk_dsp_dbg_niu */
 			<&clk_gates16 8>, /* pclk_dsp_cfg_niu */
-			<&clk_gates16 9>, /* pclk_ceva_pfm_mon */
+			<&clk_gates16 9>, /* pclk_dsp_pfm_mon */
+			<&clk_gates16 10>, /* pclk_intc */
+			<&clk_gates16 11>, /* pclk_dsp_grf */
+			<&clk_gates16 12>, /* pclk_mailbox */
 			<&clk_gates16 14>, /* aclk_dsp_edap_niu */
 			<&clk_gates16 15>, /* aclk_dsp_epp_perf */
 
@@ -210,6 +214,18 @@
 						816000 1000000
 						>;
 					status = "disabled";
+				};
+			};
+			pd_dsp {
+				clk_dsp_dvfs_table: clk_dsp {
+					operating-points = <
+						/* KHz    uV */
+						300000 850000
+						400000 900000
+						600000 1100000
+						//700000 1200000
+						>;
+					status = "okay";
 				};
 			};
 		};
@@ -889,10 +905,10 @@
 		reg = <0x33800000 0x10000>,
 		      <0x33000000 0x800000>,
 		      <0x33810000 0x10000>;
-		clocks = <&clk_dsp>,
+		clocks = <&clk_dsp>, <&clk_gates16 13>,
 			 <&clk_dsp_iop>, <&clk_dsp_epp>,
 			 <&clk_dsp_edp>, <&clk_dsp_edap>;
-		clock-names = "clk_dsp",
+		clock-names = "clk_dsp", "clk_dsp_free",
 			      "clk_dsp_iop", "clk_dsp_epp",
 			      "clk_dsp_edp", "clk_dsp_edap";
 		resets = <&reset RK1108_RST_DSP_CORE>, <&reset RK1108_RST_DSP_SYS>,

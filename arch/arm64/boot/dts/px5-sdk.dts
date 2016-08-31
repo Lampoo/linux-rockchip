@@ -30,7 +30,7 @@
 		* rtl8188eu, rtl8723bs, rtl8723bu
 		* esp8089
 		*/
-		wifi_chip_type = "rtl8723bs";
+		wifi_chip_type = "rtl8723bs_vq0";
 
 		sdio_vref = <3300>; //1800mv or 3300mv
 
@@ -134,6 +134,22 @@
 
 	codec_hdmi_spdif: codec-hdmi-spdif {
 		compatible = "hdmi-spdif";
+	};
+
+	gpio-det {
+		compatible = "gpio-detection";
+		status = "okay";
+		car-reverse {
+			gpios = <&gpio3 GPIO_B2 GPIO_ACTIVE_LOW>;
+			label = "car-reverse";
+			gpio,wakeup;
+		};
+
+		car-acc {
+			gpios = <&gpio3 GPIO_B1 GPIO_ACTIVE_LOW>;
+			label = "car-acc";
+			gpio,wakeup;
+		};
 	};
 
 	rockchip-hdmi-i2s {
@@ -704,8 +720,6 @@
 		1008000 1050000
 		1200000 1150000
 		1296000 1225000
-		1416000 1300000
-		1512000 1350000
 	>;
 	support-pvtm = <1>;
 	pvtm-operating-points = <
@@ -719,8 +733,6 @@
 		1008000 1050000 25000
 		1200000 1150000 25000
 		1296000 1225000 25000
-		1416000 1300000 25000
-		1512000 1350000 25000
 	>;
 	status = "okay";
 };
@@ -735,7 +747,6 @@
 		696000 975000
 		816000 1025000
 		1008000 1125000
-		1200000 1225000
 	>;
 	support-pvtm = <1>;
 	pvtm-operating-points = <
@@ -747,7 +758,6 @@
 		696000 975000   25000
 		816000 1025000  25000
 		1008000 1125000 25000
-		1200000 1225000 25000
 	>;
 	status = "okay";
 };

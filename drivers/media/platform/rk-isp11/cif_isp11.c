@@ -3429,8 +3429,8 @@ static int cif_isp11_config_cif(
 		cif_isp11_pltfrm_pr_dbg(dev->dev,
 			"CIF_ID 0x%08x\n", cif_id);
 
-		//cif_iowrite32(CIF_IRCL_CIF_SW_RST,
-			//dev->config.base_addr + CIF_IRCL);
+		cif_iowrite32(CIF_IRCL_CIF_SW_RST,
+			dev->config.base_addr + CIF_IRCL);
 
 		cif_isp11_config_clk(dev);
 

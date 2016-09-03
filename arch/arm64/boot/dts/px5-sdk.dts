@@ -84,6 +84,14 @@
 		irq-gpio = <&gpio0 GPIO_C0 IRQ_TYPE_EDGE_BOTH>;
 	};
 
+	modem {
+		compatible = "rockchip,modem";
+		status = "okay";
+		power-en_gpio = <&gpio3 GPIO_B3 GPIO_ACTIVE_HIGH>;
+		power-on_gpio = <&gpio3 GPIO_B4 GPIO_ACTIVE_HIGH>;
+		reset_gpio = <&gpio3 GPIO_C2 GPIO_ACTIVE_HIGH>;
+	};
+
 	backlight: backlight {
 		compatible = "pwm-backlight";
 		pwms = <&pwm0 0 25000>;
@@ -139,14 +147,19 @@
 	gpio-det {
 		compatible = "gpio-detection";
 		status = "okay";
+
+		pinctrl-0 = <&gpio3_b1 &gpio3_b2>;
+		pinctrl-names = "default";
 		car-reverse {
 			gpios = <&gpio3 GPIO_B2 GPIO_ACTIVE_LOW>;
+			linux,debounce-ms = <5>;
 			label = "car-reverse";
 			gpio,wakeup;
 		};
 
 		car-acc {
 			gpios = <&gpio3 GPIO_B1 GPIO_ACTIVE_LOW>;
+			linux,debounce-ms = <5>;
 			label = "car-acc";
 			gpio,wakeup;
 		};
@@ -283,6 +296,14 @@
 		gpio2_c3: gpio2-c3 {
 			rockchip,pins = <2 GPIO_C3 RK_FUNC_GPIO &pcfg_pull_up>;
 		};
+
+		gpio3_b1: gpio3-b1 {
+			rockchip,pins = <3 GPIO_B1 RK_FUNC_GPIO &pcfg_pull_up>;
+		};
+
+		gpio3_b2: gpio3-b2 {
+			rockchip,pins = <3 GPIO_B2 RK_FUNC_GPIO &pcfg_pull_up>;
+		};
 		//to add
 	};
 
@@ -413,10 +434,6 @@
 		enable_dma = <0>;
 	};
 	*/
-};
-
-&uart_dbg {
-	status = "okay";
 };
 
 &uart_bt {
@@ -817,6 +834,8 @@
 
 /include/ "../../../arm/boot/dts/rk808.dtsi"
 &rk808 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pmic_int>;
 	gpios = <&gpio0 GPIO_A5 GPIO_ACTIVE_HIGH>,<&gpio0 GPIO_A0 GPIO_ACTIVE_LOW>;
 	rk808,system-power-controller;
 
@@ -831,7 +850,7 @@
 			regulator-initial-state = <3>;
 			regulator-state-mem {
 				regulator-state-mode = <0x2>;
-				regulator-state-enabled;
+				regulator-state-disabled;
 				regulator-state-uv = <900000>;
 			};
 		};
@@ -902,7 +921,7 @@
 			regulator-boot-on;
 			regulator-initial-state = <3>;
 			regulator-state-mem {
-				regulator-state-enabled;
+				regulator-state-disabled;
 				regulator-state-uv = <3300000>;
 			};
 		};
@@ -928,7 +947,7 @@
 			regulator-boot-on;
 			regulator-initial-state = <3>;
 			regulator-state-mem {
-				regulator-state-enabled;
+				regulator-state-disabled;
 				regulator-state-uv = <3300000>;
 			};
 		};

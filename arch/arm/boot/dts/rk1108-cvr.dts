@@ -51,7 +51,7 @@
 
 	memory {
 		device_type = "memory";
-		reg = <0x60000000 0x20000000>;
+		reg = <0x60000000 0x08000000>;
 	};
 
 	fiq-debugger {
@@ -76,7 +76,7 @@
 		ion_cma: rockchip,ion-heap@4 { /* CMA HEAP */
 			compatible = "rockchip,ion-heap";
 			rockchip,ion_heap = <4>;
-			reg = <0x00000000 0x10000000>; /* 64MB */
+			reg = <0x00000000 0x04000000>; /* 64MB */
 		};
 		rockchip,ion-heap@0 { /* VMALLOC HEAP */
 			compatible = "rockchip,ion-heap";

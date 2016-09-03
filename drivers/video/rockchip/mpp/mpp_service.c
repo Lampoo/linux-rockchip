@@ -535,7 +535,7 @@ static irqreturn_t mpp_isr(int irq, void *dev_id)
 
 #if defined(CONFIG_OF)
 static const struct of_device_id mpp_service_dt_ids[] = {
-	{.compatible = "rockchip,rkvenc", .data = &rkvenc_variant, },
+	{.compatible = "rockchip,rkvenc",},
 	{},
 };
 #endif

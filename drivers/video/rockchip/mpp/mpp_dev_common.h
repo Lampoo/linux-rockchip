@@ -275,20 +275,6 @@ int rockchip_mpp_common_result(struct rockchip_mpp_dev *mpp,
 			       u32 __user *dst);
 int vcodec_common_get_clk(struct mpp_service *pservice);
 
-/* Ops for rkvenc */
-int rockchip_mpp_rkvenc_probe(struct rockchip_mpp_dev *mpp);
-void rockchip_mpp_rkvenc_remove(struct rockchip_mpp_dev *data);
-struct mpp_ctx *rockchip_mpp_rkvenc_init(struct rockchip_mpp_dev *data,
-					 void __user *src, u32 size);
-int rockchip_mpp_rkvenc_prepare(struct rockchip_mpp_dev *data);
-int rockchip_mpp_rkvenc_run(struct rockchip_mpp_dev *data);
-int rockchip_mpp_rkvenc_done(struct rockchip_mpp_dev *data);
-int rockchip_mpp_rkvenc_reset(struct rockchip_mpp_dev *mpp);
-int rockchip_mpp_rkvenc_result(struct rockchip_mpp_dev *mpp,
-			       struct mpp_ctx *ctx,
-			       u32 __user *dst);
-int rockchip_mpp_rkvenc_irq(struct rockchip_mpp_dev *data);
-
 /**
  * struct mpp_dev_ops - hardware mode specific operations
  *

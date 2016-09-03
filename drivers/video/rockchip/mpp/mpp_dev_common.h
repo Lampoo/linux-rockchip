@@ -53,8 +53,6 @@ extern int debug;
 #define DEBUG_IRQ_CHECK				0x00008000
 #define DEBUG_CACHE_32B				0x00010000
 
-#define DEBUG_RESET					0x00100000
-
 #define PRINT_FUNCTION				0x80000000
 #define PRINT_LINE				0x40000000
 
@@ -262,10 +260,6 @@ struct mpp_service {
 	struct list_head subdev_list;
 
 	struct vcodec_hw_ops *hw_ops;
-
-	struct reset_control *rst_a;
-	struct reset_control *rst_h;
-	struct reset_control *rst_v;
 };
 
 /* Ops for common vcodec hardware */
@@ -289,6 +283,7 @@ struct mpp_ctx *rockchip_mpp_rkvenc_init(struct rockchip_mpp_dev *data,
 int rockchip_mpp_rkvenc_prepare(struct rockchip_mpp_dev *data);
 int rockchip_mpp_rkvenc_run(struct rockchip_mpp_dev *data);
 int rockchip_mpp_rkvenc_done(struct rockchip_mpp_dev *data);
+int rockchip_mpp_rkvenc_reset(struct rockchip_mpp_dev *mpp);
 int rockchip_mpp_rkvenc_result(struct rockchip_mpp_dev *mpp,
 			       struct mpp_ctx *ctx,
 			       u32 __user *dst);

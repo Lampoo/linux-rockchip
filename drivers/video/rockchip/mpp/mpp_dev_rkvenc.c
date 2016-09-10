@@ -21,8 +21,6 @@
 #include <linux/types.h>
 #include <linux/uaccess.h>
 #include <linux/rockchip_ion.h>
-#include <linux/reset.h>
-#include <linux/rockchip/pmu.h>
 
 #include "mpp_dev_common.h"
 #include "mpp_dev_rkvenc.h"
@@ -155,61 +153,6 @@ void rockchip_mpp_rkvenc_deinit(struct rockchip_mpp_dev *mpp)
 {
 }
 
-static int rockchip_mpp_rkvenc_reset_init(struct rockchip_mpp_dev *mpp)
-{
-	struct rockchip_rkvenc_dev *enc =
-		container_of(mpp, struct rockchip_rkvenc_dev, dev);
-
-	mpp_debug(DEBUG_RESET, "reset init in:\n");
-	enc->rst_a = devm_reset_control_get(mpp->dev, "video_a");
-	enc->rst_h = devm_reset_control_get(mpp->dev, "video_h");
-	enc->rst_v = devm_reset_control_get(mpp->dev, "video_c");
-
-	if (IS_ERR_OR_NULL(enc->rst_a)) {
-		mpp_err("No aclk reset resource define\n");
-		enc->rst_a = NULL;
-	}
-
-	if (IS_ERR_OR_NULL(enc->rst_h)) {
-		mpp_err("No hclk reset resource define\n");
-		enc->rst_h = NULL;
-	}
-
-	if (IS_ERR_OR_NULL(enc->rst_v)) {
-		mpp_err("No core reset resource define\n");
-		enc->rst_v = NULL;
-	}
-
-	return 0;
-}
-
-static int rockchip_mpp_rkvenc_reset(struct rockchip_mpp_dev *mpp)
-{
-	struct rockchip_rkvenc_dev *enc =
-		container_of(mpp, struct rockchip_rkvenc_dev, dev);
-
-	if (enc->rst_a && enc->rst_h && enc->rst_v) {
-		mpp_debug(DEBUG_RESET, "reset in\n");
-
-		if (enc->rst_v)
-			reset_control_assert(enc->rst_v);
-		if (enc->rst_a)
-			reset_control_assert(enc->rst_a);
-		if (enc->rst_h)
-			reset_control_assert(enc->rst_h);
-		udelay(1);
-
-		if (enc->rst_v)
-			reset_control_deassert(enc->rst_v);
-		if (enc->rst_a)
-			reset_control_deassert(enc->rst_a);
-		if (enc->rst_h)
-			reset_control_deassert(enc->rst_h);
-		mpp_debug(DEBUG_RESET, "reset out\n");
-	}
-	return 0;
-}
-
 static void status_check(struct rockchip_mpp_dev *mpp)
 {
 	u32 lkt_status;
@@ -305,13 +248,8 @@ int rockchip_mpp_rkvenc_run(struct rockchip_mpp_dev *mpp)
 	case RKVENC_MODE_ONEFRAME: {
 		u32 *src = ctx->cfg.elem[0].reg;
 
-		for (i = 2; i < (LINK_TABLE_START + LINK_TABLE_LEN); i++)
+		for (i = (LINK_TABLE_START + LINK_TABLE_LEN) - 1; i > 0; i--)
 			mpp_write_relaxed(mpp, src[i], i * 4);
-
-		mpp_write_relaxed(mpp, 0x1ff, RKVENC_INT_EN);
-		reg = RKVENC_CLK_GATE_EN
-			| RKVENC_CMD(1);
-		mpp_write_relaxed(mpp, reg, RKVENC_ENC_START);
 
 		dsb(sy);
 
@@ -413,27 +351,13 @@ int rockchip_mpp_rkvenc_irq(struct rockchip_mpp_dev *mpp)
 
 	mpp_debug_enter();
 
-	/* TODO, add more protect here, removed later */
-	mpp_debug(DEBUG_IRQ_STATUS, "irq_status: %08x\n", irq_status);
-	enc->irq_status = irq_status;
-
-	if (irq_status & RKVENC_SAFE_CLEAR_FINISH) {
-		mpp_debug(DEBUG_RESET, "clear finish, reset\n");
-		rockchip_mpp_rkvenc_reset(mpp);
-		return 0;
-	}
-
 	if (irq_status) {
 		mpp_write_relaxed(mpp, 0xffffffff, RKVENC_INT_CLR);
-		if (irq_status != 1) {
-			/* TODO, add more protect here, removed later */
-			mpp_err("error irq_status: %08x\n", irq_status);
-			if (irq_status == RKVENC_TIMEOUT_ERROR) {
-				/* time out error */
-				mpp_err("timeout occur, enable save clear\n");
-				mpp_write_relaxed(mpp, 1, RKVENC_SAFE_CLR);
-			}
-		}
+
+		mpp_debug(DEBUG_IRQ_STATUS, "interrupt status %08x\n",
+			  irq_status);
+
+		enc->irq_status = irq_status;
 
 		mpp_debug_leave();
 
@@ -441,6 +365,26 @@ int rockchip_mpp_rkvenc_irq(struct rockchip_mpp_dev *mpp)
 	} else {
 		return -1;
 	}
+}
+
+int rockchip_mpp_rkvenc_reset(struct rockchip_mpp_dev *mpp)
+{
+	struct mpp_service *pservice = mpp->srv;
+	struct mpp_mem_region *mem_region = NULL, *n;
+
+	struct mpp_ctx *ctx = pservice->current_ctx;
+
+	/* release memory region attach to this registers table. */
+	list_for_each_entry_safe(mem_region, n,
+				 &ctx->mem_region_list, reg_lnk) {
+		ion_free(pservice->ion_client, mem_region->hdl);
+		list_del_init(&mem_region->reg_lnk);
+		kfree(mem_region);
+	}
+
+	kfree(ctx);
+
+	return 0;
 }
 
 int rockchip_mpp_rkvenc_result(struct rockchip_mpp_dev *mpp,
@@ -545,36 +489,7 @@ struct mpp_dev_ops rkvenc_ops = {
 	.result = rockchip_mpp_rkvenc_result,
 };
 
-static void rockchip_mpp_rkvenc_power_on(struct rockchip_mpp_dev *mpp)
-{
-	struct rockchip_rkvenc_dev *enc =
-		container_of(mpp, struct rockchip_rkvenc_dev, dev);
-
-	if (enc->aclk)
-		clk_prepare_enable(enc->aclk);
-	if (enc->hclk)
-		clk_prepare_enable(enc->hclk);
-	if (enc->core)
-		clk_prepare_enable(enc->core);
-
-	/* Because */
-	rockchip_mpp_rkvenc_reset(mpp);
-}
-
-static void rockchip_mpp_rkvenc_power_off(struct rockchip_mpp_dev *mpp)
-{
-	struct rockchip_rkvenc_dev *enc =
-		container_of(mpp, struct rockchip_rkvenc_dev, dev);
-
-	if (enc->core)
-		clk_disable_unprepare(enc->core);
-	if (enc->hclk)
-		clk_disable_unprepare(enc->hclk);
-	if (enc->aclk)
-		clk_disable_unprepare(enc->aclk);
-}
-
-static int rockchip_mpp_rkvenc_probe(struct rockchip_mpp_dev *mpp)
+int rockchip_mpp_rkvenc_probe(struct rockchip_mpp_dev *mpp)
 {
 	struct rockchip_rkvenc_dev *enc =
 		container_of(mpp, struct rockchip_rkvenc_dev, dev);
@@ -617,7 +532,9 @@ static int rockchip_mpp_rkvenc_probe(struct rockchip_mpp_dev *mpp)
 		goto fail;
 	}
 
-	rockchip_mpp_rkvenc_reset_init(mpp);
+	clk_prepare_enable(enc->aclk);
+	clk_prepare_enable(enc->hclk);
+	clk_prepare_enable(enc->core);
 
 	return 0;
 
@@ -630,8 +547,6 @@ fail:
 const struct rockchip_mpp_dev_variant rkvenc_variant = {
 	.data_len = sizeof(struct rockchip_rkvenc_dev),
 	.hw_probe = rockchip_mpp_rkvenc_probe,
-	.power_on = rockchip_mpp_rkvenc_power_on,
-	.power_off = rockchip_mpp_rkvenc_power_off,
 };
 EXPORT_SYMBOL(rkvenc_variant);
 

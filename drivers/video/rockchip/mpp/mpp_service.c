@@ -86,8 +86,7 @@ static const struct file_operations debug_mpp_fops = {
 };
 #endif
 
-#define MPP_TIMEOUT_DELAY		(2 * HZ)
-#define MPP_POWER_OFF_DELAY		(4 * HZ)
+#define MPP_TIMEOUT_DELAY		(2 * HZ) /* 2s */
 
 static void ctx_deinit(struct rockchip_mpp_dev *data, struct mpp_ctx *reg);
 static void mpp_service_session_clear(struct rockchip_mpp_dev *data,
@@ -106,76 +105,12 @@ static void mpp_service_session_clear(struct rockchip_mpp_dev *data,
 	}
 }
 
-static void mpp_service_power_off(struct rockchip_mpp_dev *mpp)
+static void mpp_service_power_off(struct mpp_service *pservice)
 {
-	struct mpp_service *pservice = mpp->srv;
-	int total_running;
-	int ret = atomic_add_unless(&pservice->enabled, -1, 0);
-
-	if (!ret)
-		return;
-
-	total_running = atomic_read(&pservice->total_running);
-	if (total_running) {
-		pr_alert("alert: power off when %d task running!!\n",
-			 total_running);
-		mdelay(50);
-		pr_alert("alert: delay 50 ms for running task\n");
-	}
-
-	pr_info("%s: power off...", dev_name(mpp->dev));
-
-	mpp->variant->power_off(mpp);
-
-	atomic_add(1, &pservice->power_off_cnt);
-	wake_unlock(&pservice->wake_lock);
-	pr_info("done\n");
 }
 
-static inline void mpp_queue_power_off_work(struct rockchip_mpp_dev *mpp)
+static void mpp_service_power_on(struct mpp_service *pservice)
 {
-	queue_delayed_work(system_nrt_wq, &mpp->power_off_work,
-			   MPP_POWER_OFF_DELAY);
-}
-
-static void mpp_power_off_work(struct work_struct *work_s)
-{
-	struct delayed_work *dlwork = container_of(work_s,
-			struct delayed_work, work);
-	struct rockchip_mpp_dev *mpp =
-		container_of(dlwork,
-			     struct rockchip_mpp_dev, power_off_work);
-
-	if (mutex_trylock(&mpp->srv->lock)) {
-		mpp_service_power_off(mpp);
-		mutex_unlock(&mpp->srv->lock);
-	} else {
-		/* Come back later if the device is busy... */
-		mpp_queue_power_off_work(mpp);
-	}
-}
-
-static void mpp_service_power_on(struct rockchip_mpp_dev *mpp)
-{
-	int ret;
-	ktime_t now = ktime_get();
-	struct mpp_service *pservice = mpp->srv;
-
-	if (ktime_to_ns(ktime_sub(now, pservice->last)) > NSEC_PER_SEC) {
-		cancel_delayed_work_sync(&mpp->power_off_work);
-		mpp_queue_power_off_work(mpp);
-		pservice->last = now;
-	}
-	ret = atomic_add_unless(&pservice->enabled, 1, 1);
-	if (!ret)
-		return;
-
-	pr_info("%s: power on\n", dev_name(mpp->dev));
-
-	mpp->variant->power_on(mpp);
-
-	atomic_add(1, &pservice->power_on_cnt);
-	wake_lock(&pservice->wake_lock);
 }
 
 static struct mpp_ctx *ctx_init(struct rockchip_mpp_dev *mpp,
@@ -240,7 +175,6 @@ static void rockchip_mpp_run(struct rockchip_mpp_dev *mpp)
 	mpp_debug_enter();
 
 	set_bit(HW_RUNNING, &mpp->state);
-	atomic_add(1, &pservice->total_running);
 
 	list_del_init(&ctx->status_link);
 	pservice->current_ctx = ctx;
@@ -260,7 +194,7 @@ static void rockchip_mpp_try_run(struct rockchip_mpp_dev *mpp)
 
 	if (!list_empty(&pservice->pending)) {
 		if (mpp->ops->prepare) {
-			mpp_service_power_on(mpp);
+			mpp_service_power_on(pservice);
 			mpp->ops->prepare(mpp);
 		}
 
@@ -316,7 +250,6 @@ static int mpp_service_wait_result(struct mpp_session *session,
 
 	if (ret < 0) {
 		mutex_lock(&pservice->lock);
-		atomic_sub(1, &pservice->total_running);
 		if (mpp->ops->reset)
 			mpp->ops->reset(mpp);
 		mutex_unlock(&pservice->lock);
@@ -489,7 +422,7 @@ static int mpp_service_open(struct inode *inode, struct file *filp)
 		return -ENOMEM;
 	}
 
-	session->pid = current->pid;
+	session->pid	= current->pid;
 	INIT_LIST_HEAD(&session->waiting);
 	INIT_LIST_HEAD(&session->running);
 	INIT_LIST_HEAD(&session->done);
@@ -591,7 +524,6 @@ static irqreturn_t mpp_isr(int irq, void *dev_id)
 	clear_bit(HW_RUNNING, &data->state);
 	pservice->current_ctx = NULL;
 
-	atomic_sub(1, &pservice->total_running);
 	wake_up(&ctx->session->wait);
 
 	rockchip_mpp_try_run(data);
@@ -632,8 +564,6 @@ static int mpp_dev_probe(struct platform_device *pdev,
 	mpp->dev = dev;
 	mpp->state = 0;
 	mpp->variant = variant;
-
-	INIT_DELAYED_WORK(&mpp->power_off_work, mpp_power_off_work);
 
 	mpp->variant->hw_probe(mpp);
 
@@ -722,8 +652,9 @@ static void mpp_dev_remove(struct rockchip_mpp_dev *data)
 	data->ops->remove(data);
 
 	mutex_lock(&pservice->lock);
-	cancel_delayed_work_sync(&data->power_off_work);
-	mpp_service_power_off(data);
+	cancel_delayed_work_sync(&pservice->power_off_work);
+	if (pservice->hw_ops->power_off)
+		pservice->hw_ops->power_off(pservice);
 	mutex_unlock(&pservice->lock);
 
 	device_destroy(data->cls, data->dev_t);
@@ -784,9 +715,8 @@ static void mpp_init_drvdata(struct mpp_service *pservice)
 	INIT_LIST_HEAD(&pservice->session);
 	INIT_LIST_HEAD(&pservice->subdev_list);
 
-	atomic_set(&pservice->total_running, 0);
-	atomic_set(&pservice->enabled, 0);
-	atomic_set(&pservice->power_on_cnt, 0);
+	atomic_set(&pservice->enabled,       0);
+	atomic_set(&pservice->power_on_cnt,  0);
 	atomic_set(&pservice->power_off_cnt, 0);
 	atomic_set(&pservice->reset_request, 0);
 
@@ -836,6 +766,8 @@ static int mpp_probe(struct platform_device *pdev)
 
 err:
 	pr_info("init failed\n");
+	if (pservice->hw_ops->power_off)
+		pservice->hw_ops->power_off(pservice);
 	wake_lock_destroy(&pservice->wake_lock);
 
 	return ret;
@@ -918,11 +850,11 @@ static int debug_mpp_show(struct seq_file *s, void *unused)
 	struct rockchip_mpp_dev *data = s->private;
 	struct mpp_service *pservice = data->srv;
 
-	mpp_service_power_on(data);
+	mpp_service_power_on(pservice);
 	mutex_lock(&pservice->lock);
 
 	mutex_unlock(&pservice->lock);
-	mpp_service_power_off(data);
+	mpp_service_power_off(pservice);
 
 	return 0;
 }

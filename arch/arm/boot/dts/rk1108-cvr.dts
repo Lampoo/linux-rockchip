@@ -553,18 +553,6 @@
 	status = "okay";
 };
 
-&rkvenc {
-	status = "okay";
-};
-
-&vpu {
-	status = "okay";
-};
-
-&rkvdec {
-	status = "okay";
-};
-
 &iep {
 	status = "okay";
 };

@@ -261,6 +261,4 @@ static inline void mpp_time_diff(struct mpp_ctx *ctx)
 		  (end.tv_usec - ctx->start.tv_usec));
 }
 
-extern const struct rockchip_mpp_dev_variant rkvenc_variant;
-
 #endif

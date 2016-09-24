@@ -52,6 +52,9 @@ static void imx_camera_module_reset(
 	cam_mod->ctrl_updt = 0;
 	cam_mod->state = IMX_CAMERA_MODULE_POWER_OFF;
 	cam_mod->state_before_suspend = IMX_CAMERA_MODULE_POWER_OFF;
+	cam_mod->exp_config.exp_time = 0;
+	cam_mod->exp_config.gain = 0;
+	cam_mod->vts_cur = 0;
 }
 /* ======================================================================== */
 
@@ -229,6 +232,7 @@ static int imx_camera_module_attach(
 err:
 	pltfrm_camera_module_pr_err(&cam_mod->sd,
 		"failed with error %d\n", ret);
+	imx_camera_module_release(cam_mod);
 	return ret;
 }
 
@@ -467,10 +471,6 @@ int imx_camera_module_s_power(struct v4l2_subdev *sd, int on)
 		}
 		if (IMX_CAMERA_MODULE_HW_STANDBY == cam_mod->state) {
 			ret = pltfrm_camera_module_set_pin_state(&cam_mod->sd,
-				PLTFRM_CAMERA_MODULE_PIN_PWR,
-				PLTFRM_CAMERA_MODULE_PIN_STATE_ACTIVE);
-			usleep_range(1000, 1500);
-			ret = pltfrm_camera_module_set_pin_state(&cam_mod->sd,
 				PLTFRM_CAMERA_MODULE_PIN_PD,
 				PLTFRM_CAMERA_MODULE_PIN_STATE_INACTIVE);
 			if (!IS_ERR_VALUE(ret)) {
@@ -500,10 +500,7 @@ int imx_camera_module_s_power(struct v4l2_subdev *sd, int on)
 			ret = pltfrm_camera_module_set_pin_state(
 				&cam_mod->sd,
 				PLTFRM_CAMERA_MODULE_PIN_PD,
-				PLTFRM_CAMERA_MODULE_PIN_STATE_INACTIVE);
-			ret = pltfrm_camera_module_set_pin_state(&cam_mod->sd,
-				PLTFRM_CAMERA_MODULE_PIN_PWR,
-				PLTFRM_CAMERA_MODULE_PIN_STATE_INACTIVE);
+				PLTFRM_CAMERA_MODULE_PIN_STATE_ACTIVE);
 			if (!IS_ERR_VALUE(ret))
 				cam_mod->state = IMX_CAMERA_MODULE_HW_STANDBY;
 		}
@@ -908,6 +905,15 @@ long imx_camera_module_ioctl(struct v4l2_subdev *sd,
 		timings->exp_time = cam_mod->exp_config.exp_time;
 		timings->gain = cam_mod->exp_config.gain;
 
+		if (cam_mod->exp_config.exp_time)
+			timings->exp_time = cam_mod->exp_config.exp_time;
+		else
+			timings->exp_time = imx_timings.exp_time;
+
+		if (cam_mod->exp_config.gain)
+			timings->gain = cam_mod->exp_config.gain;
+		else
+			timings->gain = imx_timings.gain;
 		return ret;
 	} else if (cmd == PLTFRM_CIFCAM_G_ITF_CFG) {
 		struct pltfrm_cam_itf *itf_cfg = (struct pltfrm_cam_itf*)arg;
@@ -930,6 +936,7 @@ long imx_camera_module_ioctl(struct v4l2_subdev *sd,
 		pltfrm_camera_module_ioctl(sd, PLTFRM_CIFCAM_G_ITF_CFG, arg);
 		return 0;
 	} else if (cmd == PLTFRM_CIFCAM_ATTACH) {
+		imx_camera_module_init(cam_mod, &cam_mod->custom);
 		pltfrm_camera_module_ioctl(sd, cmd, arg);
 		return imx_camera_module_attach(cam_mod);
 	} else {
@@ -1042,7 +1049,6 @@ int imx_camera_module_init(struct imx_camera_module *cam_mod,
 
 	pltfrm_camera_module_pr_debug(&cam_mod->sd, "\n");
 
-	cam_mod->custom = *custom;
 	imx_camera_module_reset(cam_mod);
 
 	if (IS_ERR_OR_NULL(custom->start_streaming) ||

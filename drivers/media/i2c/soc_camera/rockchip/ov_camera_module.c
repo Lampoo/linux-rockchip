@@ -250,6 +250,7 @@ static int ov_camera_module_attach(
 err:
 	pltfrm_camera_module_pr_err(&cam_mod->sd,
 		"failed with error %d\n", ret);
+	ov_camera_module_release(cam_mod);
 	return ret;
 }
 
@@ -506,6 +507,10 @@ int ov_camera_module_s_power(struct v4l2_subdev *sd, int on)
 							 core, init, 0);
 				}
 			}
+		}
+		if (cam_mod->update_config) {
+			ov_camera_module_write_config(cam_mod);
+			cam_mod->update_config = false;
 		}
 	} else {
 		if (OV_CAMERA_MODULE_STREAMING == cam_mod->state) {
@@ -950,6 +955,7 @@ long ov_camera_module_ioctl(struct v4l2_subdev *sd,
 		pltfrm_camera_module_ioctl(sd, PLTFRM_CIFCAM_G_ITF_CFG, arg);
 		return 0;
 	} else if (cmd == PLTFRM_CIFCAM_ATTACH) {
+		ov_camera_module_init(cam_mod, &cam_mod->custom);
 		pltfrm_camera_module_ioctl(sd, cmd, arg);
 		return ov_camera_module_attach(cam_mod);
 	} else {
@@ -1079,7 +1085,6 @@ int ov_camera_module_init(struct ov_camera_module *cam_mod,
 
 	pltfrm_camera_module_pr_debug(&cam_mod->sd, "\n");
 
-	cam_mod->custom = *custom;
 	ov_camera_module_reset(cam_mod);
 
 	if (IS_ERR_OR_NULL(custom->start_streaming) ||
@@ -1142,6 +1147,7 @@ void ov_camera_module_release(struct ov_camera_module *cam_mod)
 		destroy_workqueue(cam_mod->otp_work.wq);
 		cam_mod->otp_work.wq = NULL;
 	}
+
 	cam_mod->custom.configs = NULL;
 
 	pltfrm_camera_module_release(&cam_mod->sd);

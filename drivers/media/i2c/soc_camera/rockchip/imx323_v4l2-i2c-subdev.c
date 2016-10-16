@@ -11,6 +11,13 @@
  * version 2. This program is licensed "as is" without any warranty of any
  * kind, whether express or implied.
  *
+ * Note:
+ *
+ *v0.1.0:
+ *1. Initialize version;
+ *2. Support config sensor gain and shutter time in 	imx_camera_module_custom_config.exposure_valid_frame;
+ *v0.1.1:
+ *1. v_blanking time 3us -> 5ms;
  */
 
 #include <linux/i2c.h>
@@ -124,7 +131,7 @@ static struct imx_camera_module_config imx323_configs[] = {
 			sizeof(imx323_init_tab_1920_1080_30fps)
 			/
 			sizeof(imx323_init_tab_1920_1080_30fps[0]),
-		.v_blanking_time_us = 3,
+		.v_blanking_time_us = 5000,
 		PLTFRM_CAM_ITF_DVP_CFG(
 			PLTFRM_CAM_ITF_BT601_12,
 			PLTFRM_CAM_SIGNAL_HIGH_LEVEL,
@@ -345,14 +352,11 @@ static int imx323_set_flip(struct imx_camera_module *cam_mod)
 	if (!IS_ERR_OR_NULL(cam_mod->active_config)) {
 		if (mode == IMX_FLIP_BIT_MASK) {
 			orientation = IMX323_ORIENTATION_V;
-		}
-		else if (mode == IMX_MIRROR_BIT_MASK) {
+		} else if (mode == IMX_MIRROR_BIT_MASK) {
 			orientation = IMX323_ORIENTATION_H;
-		}
-		else if (mode == (IMX_MIRROR_BIT_MASK | IMX_FLIP_BIT_MASK)) {
+ 		} else if (mode == (IMX_MIRROR_BIT_MASK | IMX_FLIP_BIT_MASK)) {
 			orientation = IMX323_ORIENTATION_H | IMX323_ORIENTATION_V;
-		}
-		else {
+		} else {
 			orientation = 0;
 		}
 	}
@@ -394,13 +398,8 @@ static int imx323_s_ext_ctrls(struct imx_camera_module *cam_mod,
 	int ret = 0;
 
 	/* Handles only exposure and gain together special case. */
-	if (ctrls->count == 1)
-		ret = imx323_s_ctrl(cam_mod, ctrls->ctrls[0].id);
-	else if ((ctrls->count == 3) &&
-		 ((ctrls->ctrls[0].id == V4L2_CID_GAIN &&
-		   ctrls->ctrls[1].id == V4L2_CID_EXPOSURE) ||
-		  (ctrls->ctrls[1].id == V4L2_CID_GAIN &&
-		   ctrls->ctrls[0].id == V4L2_CID_EXPOSURE)))
+	if ((ctrls->ctrls[0].id == V4L2_CID_GAIN ||
+		ctrls->ctrls[0].id == V4L2_CID_EXPOSURE))
 		ret = imx323_write_aec(cam_mod);
 	else
 		ret = -EINVAL;
@@ -589,7 +588,13 @@ static struct imx_camera_module_custom_config imx323_custom_config = {
 	.set_flip = imx323_set_flip,
 	.configs = imx323_configs,
 	.num_configs = sizeof(imx323_configs) / sizeof(imx323_configs[0]),
-	.power_up_delays_ms = {5, 20, 0}
+	.power_up_delays_ms = {5, 20, 0},
+	/*
+	*0: Exposure time valid fileds;
+	*1: Exposure gain valid fileds;
+	*(2 fileds == 1 frames)
+	*/
+	.exposure_valid_frame = {4, 4}
 };
 
 static int imx323_probe(

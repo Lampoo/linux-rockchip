@@ -561,7 +561,7 @@ static long rockchip_mpp_rkvenc_ioctl(struct file *filp, unsigned int cmd,
 		mpp_write(mpp, reg & (~RKVENC_OSD_CLK_SEL_BIT), RKVENC_OSD_CFG);
 
 		for (i = 0; i < 256; i++)
-			mpp_write(mpp, palette.plalette[i].elem,
+			mpp_write(mpp, palette->plalette[i].elem,
 				  RKVENC_OSD_PLT(i));
 
 		mpp_write(mpp, reg | RKVENC_OSD_CLK_SEL_BIT, RKVENC_OSD_CFG);

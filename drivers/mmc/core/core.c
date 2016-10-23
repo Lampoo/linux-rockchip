@@ -36,6 +36,8 @@
 #include <linux/mmc/sd.h>
 #include <linux/mmc/sdio.h>
 
+#include <linux/math64.h>
+
 #include "core.h"
 #include "bus.h"
 #include "host.h"
@@ -64,6 +66,33 @@ static const unsigned freqs[] = { 400000, 300000, 200000, 100000 };
  */
 bool use_spi_crc = 1;
 module_param(use_spi_crc, bool, 0);
+
+static inline void
+mmc_update_latency_hist(struct mmc_host *host, int read, u_int64_t delta_us)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(latency_x_axis_us); i++) {
+		if (delta_us < (u_int64_t)latency_x_axis_us[i]) {
+			if (read)
+				host->latency_y_axis_read[i]++;
+			else
+				host->latency_y_axis_write[i]++;
+			break;
+		}
+	}
+	if (i == ARRAY_SIZE(latency_x_axis_us)) {
+		/* Overflowed the histogram */
+		if (read)
+			host->latency_y_axis_read[i]++;
+		else
+			host->latency_y_axis_write[i]++;
+	}
+	if (read)
+		host->latency_reads_elems++;
+	else
+		host->latency_writes_elems++;
+}
 
 /*
  * We normally treat cards as removed during suspend if they are not
@@ -167,22 +196,33 @@ void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
 		led_trigger_event(host->led, LED_OFF);
 
 		pr_debug("%s: req done (CMD%u): %d: %08x %08x %08x %08x\n",
-			 mmc_hostname(host), cmd->opcode, err,
-			 cmd->resp[0], cmd->resp[1],
-			 cmd->resp[2], cmd->resp[3]);
+			mmc_hostname(host), cmd->opcode, err,
+			cmd->resp[0], cmd->resp[1],
+			cmd->resp[2], cmd->resp[3]);
 
 		if (mrq->data) {
 			pr_debug("%s:     %d bytes transferred: %d\n",
-				 mmc_hostname(host),
-				 mrq->data->bytes_xfered, mrq->data->error);
+				mmc_hostname(host),
+				mrq->data->bytes_xfered, mrq->data->error);
+			if (mrq->lat_hist_enabled) {
+				ktime_t completion;
+				u_int64_t delta_us;
+
+				completion = ktime_get();
+				delta_us = ktime_us_delta(completion,
+							  mrq->io_start);
+				mmc_update_latency_hist(host,
+					(mrq->data->flags & MMC_DATA_READ),
+					delta_us);
+			}
 		}
 
 		if (mrq->stop) {
 			pr_debug("%s:     (CMD%u): %d: %08x %08x %08x %08x\n",
-				 mmc_hostname(host), mrq->stop->opcode,
-				 mrq->stop->error,
-				 mrq->stop->resp[0], mrq->stop->resp[1],
-				 mrq->stop->resp[2], mrq->stop->resp[3]);
+				mmc_hostname(host), mrq->stop->opcode,
+				mrq->stop->error,
+				mrq->stop->resp[0], mrq->stop->resp[1],
+				mrq->stop->resp[2], mrq->stop->resp[3]);
 		}
 
 		if (mrq->done)
@@ -191,6 +231,7 @@ void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
 		mmc_host_clk_release(host);
 	}
 }
+
 EXPORT_SYMBOL(mmc_request_done);
 
 static void __mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
@@ -228,11 +269,12 @@ mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 		 mrq->cmd->arg, mrq->cmd->flags);
 
 	if (mrq->data) {
-		pr_debug("%s:     blksz %d blocks %d flags %08x tsac %d ms nsac %d\n",
-			 mmc_hostname(host), mrq->data->blksz,
-			 mrq->data->blocks, mrq->data->flags,
-			 mrq->data->timeout_ns / 1000000,
-			 mrq->data->timeout_clks);
+		pr_debug("%s:     blksz %d blocks %d flags %08x "
+			"tsac %d ms nsac %d\n",
+			mmc_hostname(host), mrq->data->blksz,
+			mrq->data->blocks, mrq->data->flags,
+			mrq->data->timeout_ns / 1000000,
+			mrq->data->timeout_clks);
 	}
 
 	if (mrq->stop) {
@@ -567,7 +609,7 @@ static void mmc_wait_for_req_done(struct mmc_host *host,
  *	performed while another request is running on the host.
  */
 static void mmc_pre_req(struct mmc_host *host, struct mmc_request *mrq,
-			bool is_first_req)
+		 bool is_first_req)
 {
 	if (host->ops->pre_req) {
 		mmc_host_clk_hold(host);
@@ -643,8 +685,14 @@ struct mmc_async_req *mmc_start_req(struct mmc_host *host,
 			mmc_start_bkops(host->card, true);
 	}
 
-	if (!err && areq)
+	if (!err && areq) {
+		if (host->latency_hist_enabled) {
+			areq->mrq->io_start = ktime_get();
+			areq->mrq->lat_hist_enabled = 1;
+		} else
+			areq->mrq->lat_hist_enabled = 0;
 		start_err = __mmc_start_data_req(host, areq->mrq);
+	}
 
 	if (host->areq)
 		mmc_post_req(host, host->areq->mrq, 0);
@@ -722,7 +770,7 @@ int mmc_interrupt_hpi(struct mmc_card *card)
 	default:
 		/* In all other states, it's illegal to issue HPI */
 		pr_debug("%s: HPI cannot be sent. Card state=%d\n",
-			 mmc_hostname(card->host), R1_CURRENT_STATE(status));
+			mmc_hostname(card->host), R1_CURRENT_STATE(status));
 		err = -EINVAL;
 		goto out;
 	}
@@ -757,9 +805,7 @@ EXPORT_SYMBOL(mmc_interrupt_hpi);
  *	to complete.  Return any error that occurred while the command
  *	was executing.  Do not attempt to parse the response.
  */
-int mmc_wait_for_cmd(struct mmc_host *host,
-		     struct mmc_command *cmd,
-		     int retries)
+int mmc_wait_for_cmd(struct mmc_host *host, struct mmc_command *cmd, int retries)
 {
 	struct mmc_request mrq = {NULL};
 
@@ -775,6 +821,7 @@ int mmc_wait_for_cmd(struct mmc_host *host,
 
 	return cmd->error;
 }
+
 EXPORT_SYMBOL(mmc_wait_for_cmd);
 
 /**
@@ -995,16 +1042,15 @@ int __mmc_claim_host(struct mmc_host *host, atomic_t *abort)
 		host->claimed = 1;
 		host->claimer = current;
 		host->claim_cnt += 1;
-	} else {
+	} else
 		wake_up(&host->wq);
-	}
-
 	spin_unlock_irqrestore(&host->lock, flags);
 	remove_wait_queue(&host->wq, &wait);
 	if (host->ops->enable && !stop && host->claim_cnt == 1)
 		host->ops->enable(host);
 	return stop;
 }
+
 EXPORT_SYMBOL(__mmc_claim_host);
 
 /**
@@ -1067,7 +1113,8 @@ static inline void mmc_set_ios(struct mmc_host *host)
 {
 	struct mmc_ios *ios = &host->ios;
 
-	pr_debug("%s: clock %uHz busmode %u powermode %u cs %u Vdd %u width %u timing %u\n",
+	pr_debug("%s: clock %uHz busmode %u powermode %u cs %u Vdd %u "
+		"width %u timing %u\n",
 		 mmc_hostname(host), ios->clock, ios->bus_mode,
 		 ios->power_mode, ios->chip_select, ios->vdd,
 		 ios->bus_width, ios->timing);
@@ -1380,8 +1427,8 @@ EXPORT_SYMBOL_GPL(mmc_regulator_get_ocrmask);
  * set_ios() method.
  */
 int mmc_regulator_set_ocr(struct mmc_host *mmc,
-			  struct regulator *supply,
-			  unsigned short vdd_bit)
+			struct regulator *supply,
+			unsigned short vdd_bit)
 {
 	int			result = 0;
 	int			min_uV, max_uV;
@@ -1520,6 +1567,7 @@ int __mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage)
 		host->ios.signal_voltage = old_signal_voltage;
 
 	return err;
+
 }
 
 int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage, u32 ocr)
@@ -1920,9 +1968,9 @@ void mmc_init_erase(struct mmc_card *card)
 			card->pref_erase = 2 * 1024 * 1024 / 512;
 		else
 			card->pref_erase = 4 * 1024 * 1024 / 512;
-		if (card->pref_erase < card->erase_size) {
+		if (card->pref_erase < card->erase_size)
 			card->pref_erase = card->erase_size;
-		} else {
+		else {
 			sz = card->pref_erase % card->erase_size;
 			if (sz)
 				card->pref_erase += card->erase_size - sz;
@@ -2128,7 +2176,7 @@ static int mmc_do_erase(struct mmc_card *card, unsigned int from,
 		err = mmc_wait_for_cmd(card->host, &cmd, 0);
 		if (err || (cmd.resp[0] & 0xFDF92000)) {
 			pr_err("error %d requesting status %#x\n",
-			       err, cmd.resp[0]);
+				err, cmd.resp[0]);
 			err = -EIO;
 			goto out;
 		}
@@ -2138,7 +2186,7 @@ static int mmc_do_erase(struct mmc_card *card, unsigned int from,
 		 */
 		if (time_after(jiffies, timeout)) {
 			pr_err("%s: Card stuck in programming state! %s\n",
-			       mmc_hostname(card->host), __func__);
+				mmc_hostname(card->host), __func__);
 			err =  -EIO;
 			goto out;
 		}
@@ -2367,7 +2415,7 @@ int mmc_set_blocklen(struct mmc_card *card, unsigned int blocklen)
 EXPORT_SYMBOL(mmc_set_blocklen);
 
 int mmc_set_blockcount(struct mmc_card *card, unsigned int blockcount,
-		       bool is_rel_write)
+			bool is_rel_write)
 {
 	struct mmc_command cmd = {0};
 
@@ -2619,8 +2667,8 @@ void mmc_rescan(struct work_struct *work)
 	 * if there is a _removable_ card registered, check whether it is
 	 * still present
 	 */
-	if (host->bus_ops && host->bus_ops->detect && !host->bus_dead &&
-	    !(host->caps & MMC_CAP_NONREMOVABLE))
+	if (host->bus_ops && host->bus_ops->detect && !host->bus_dead
+	    && !(host->caps & MMC_CAP_NONREMOVABLE))
 		host->bus_ops->detect(host);
 
 	host->detect_change = 0;
@@ -2695,7 +2743,6 @@ void mmc_stop_host(struct mmc_host *host)
 {
 #ifdef CONFIG_MMC_DEBUG
 	unsigned long flags;
-
 	spin_lock_irqsave(&host->lock, flags);
 	host->removed = 1;
 	spin_unlock_irqrestore(&host->lock, flags);
@@ -2789,13 +2836,13 @@ int mmc_flush_cache(struct mmc_card *card)
 		return err;
 
 	if (mmc_card_mmc(card) &&
-	    (card->ext_csd.cache_size > 0) &&
-	    (card->ext_csd.cache_ctrl & 1)) {
+			(card->ext_csd.cache_size > 0) &&
+			(card->ext_csd.cache_ctrl & 1)) {
 		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-				 EXT_CSD_FLUSH_CACHE, 1, 0);
+				EXT_CSD_FLUSH_CACHE, 1, 0);
 		if (err)
 			pr_err("%s: cache flush error %d\n",
-			       mmc_hostname(card->host), err);
+					mmc_hostname(card->host), err);
 	}
 
 	return err;
@@ -2847,7 +2894,7 @@ EXPORT_SYMBOL(mmc_cache_ctrl);
    to sync the card.
 */
 int mmc_pm_notify(struct notifier_block *notify_block,
-		  unsigned long mode, void *unused)
+					unsigned long mode, void *unused)
 {
 	struct mmc_host *host = container_of(
 		notify_block, struct mmc_host, pm_notify);
@@ -2932,6 +2979,7 @@ void mmc_set_embedded_sdio_data(struct mmc_host *host,
 	host->embedded_sdio_data.funcs = funcs;
 	host->embedded_sdio_data.num_funcs = num_funcs;
 }
+
 EXPORT_SYMBOL(mmc_set_embedded_sdio_data);
 #endif
 
@@ -2973,6 +3021,124 @@ static void __exit mmc_exit(void)
 	mmc_unregister_host_class();
 	mmc_unregister_bus();
 	destroy_workqueue(workqueue);
+}
+
+/*
+ * MMC IO latency support. We want this to be as cheap as possible, so doing
+ * this lockless (and avoiding atomics), a few off by a few errors in this
+ * code is not harmful, and we don't want to do anything that is
+ * perf-impactful.
+ * TODO : If necessary, we can make the histograms per-cpu and aggregate
+ * them when printing them out.
+ */
+static void
+mmc_zero_latency_hist(struct mmc_host *host)
+{
+	memset(host->latency_y_axis_read, 0,
+	       sizeof(host->latency_y_axis_read));
+	memset(host->latency_y_axis_write, 0,
+	       sizeof(host->latency_y_axis_write));
+	host->latency_reads_elems = 0;
+	host->latency_writes_elems = 0;
+}
+
+static ssize_t
+latency_hist_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	int i;
+	struct mmc_host *host = cls_dev_to_mmc_host(dev);
+	int bytes_written = 0;
+	u_int64_t num_elem, elem;
+	int pct;
+
+	num_elem = host->latency_reads_elems;
+	if (num_elem > 0) {
+		bytes_written += scnprintf(buf + bytes_written,
+			   PAGE_SIZE - bytes_written,
+			   "IO svc_time Read Latency Histogram :\n");
+		for (i = 0;
+		     i < ARRAY_SIZE(latency_x_axis_us);
+		     i++) {
+			elem = host->latency_y_axis_read[i];
+			pct = div64_u64(elem * 100, num_elem);
+			bytes_written += scnprintf(buf + bytes_written,
+						   PAGE_SIZE - bytes_written,
+						   "\t< %5lluus%15llu%15d%%\n",
+						   latency_x_axis_us[i],
+						   elem, pct);
+		}
+		/* Last element in y-axis table is overflow */
+		elem = host->latency_y_axis_read[i];
+		pct = div64_u64(elem * 100, num_elem);
+		bytes_written += scnprintf(buf + bytes_written,
+					   PAGE_SIZE - bytes_written,
+					   "\t> %5dms%15llu%15d%%\n", 10,
+					   elem, pct);
+	}
+	num_elem = host->latency_writes_elems;
+	if (num_elem > 0) {
+		bytes_written += scnprintf(buf + bytes_written,
+				   PAGE_SIZE - bytes_written,
+				   "IO svc_time Write Latency Histogram :\n");
+		for (i = 0;
+		     i < ARRAY_SIZE(latency_x_axis_us);
+		     i++) {
+			elem = host->latency_y_axis_write[i];
+			pct = div64_u64(elem * 100, num_elem);
+			bytes_written += scnprintf(buf + bytes_written,
+						   PAGE_SIZE - bytes_written,
+						   "\t< %5lluus%15llu%15d%%\n",
+						   latency_x_axis_us[i],
+						   elem, pct);
+		}
+		/* Last element in y-axis table is overflow */
+		elem = host->latency_y_axis_write[i];
+		pct = div64_u64(elem * 100, num_elem);
+		bytes_written += scnprintf(buf + bytes_written,
+					   PAGE_SIZE - bytes_written,
+					   "\t> %5dms%15llu%15d%%\n", 10,
+					   elem, pct);
+	}
+	return bytes_written;
+}
+/*
+ * Values permitted 0, 1, 2.
+ * 0 -> Disable IO latency histograms (default)
+ * 1 -> Enable IO latency histograms
+ * 2 -> Zero out IO latency histograms
+ */
+static ssize_t
+latency_hist_store(struct device *dev, struct device_attribute *attr,
+		   const char *buf, size_t count)
+{
+	struct mmc_host *host = cls_dev_to_mmc_host(dev);
+	long value;
+
+	if (kstrtol(buf, 0, &value))
+		return -EINVAL;
+	if (value == MMC_IO_LAT_HIST_ZERO)
+		mmc_zero_latency_hist(host);
+	else if (value == MMC_IO_LAT_HIST_ENABLE ||
+		 value == MMC_IO_LAT_HIST_DISABLE)
+		host->latency_hist_enabled = value;
+	return count;
+}
+
+static DEVICE_ATTR(latency_hist, S_IRUGO | S_IWUSR,
+		   latency_hist_show, latency_hist_store);
+
+void
+mmc_latency_hist_sysfs_init(struct mmc_host *host)
+{
+	if (device_create_file(&host->class_dev, &dev_attr_latency_hist))
+		dev_err(&host->class_dev,
+			"Failed to create latency_hist sysfs entry\n");
+}
+
+void
+mmc_latency_hist_sysfs_exit(struct mmc_host *host)
+{
+	device_remove_file(&host->class_dev, &dev_attr_latency_hist);
 }
 
 subsys_initcall(mmc_init);

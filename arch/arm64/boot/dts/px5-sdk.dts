@@ -246,16 +246,16 @@
 };
 
 &emmc {
-	clock-frequency = <100000000>;
-	clock-freq-min-max = <400000 100000000>;
+	clock-frequency = <150000000>;
+	clock-freq-min-max = <400000 150000000>;
 
 	supports-highspeed;
 	supports-emmc;
 	bootpart-no-access;
 
 	//supports-sd;
-	//supports-DDR_MODE; //you should set the two value in your project. only close in RK3288-SDK board.
-	//caps2-mmc-hs200;
+	supports-DDR_MODE; //you should set the two value in your project. only close in RK3288-SDK board.
+	caps2-mmc-hs200;
 
 	ignore-pm-notify;
 	keep-power-in-suspend;
@@ -522,6 +522,8 @@
 		1008000 1050000
 		1200000 1150000
 		1296000 1225000
+		1416000 1300000
+		1512000 1350000
 	>;
 	support-pvtm = <0>;
 	pvtm-operating-points = <
@@ -535,6 +537,8 @@
 		1008000 1050000 25000
 		1200000 1150000 25000
 		1296000 1225000 25000
+		1416000 1300000 25000
+		1512000 1350000 25000
 	>;
 	status = "okay";
 };
@@ -549,6 +553,7 @@
 		696000 975000
 		816000 1025000
 		1008000 1125000
+		1200000 1225000
 	>;
 	support-pvtm = <0>;
 	pvtm-operating-points = <
@@ -560,6 +565,7 @@
 		696000 975000   25000
 		816000 1025000  25000
 		1008000 1125000 25000
+		1200000 1225000 25000
 	>;
 	status = "okay";
 };

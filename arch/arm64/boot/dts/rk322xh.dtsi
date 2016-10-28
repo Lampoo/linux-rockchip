@@ -56,7 +56,13 @@
 	#size-cells = <2>;
 
 	aliases {
+		serial0 = &uart0;
+		serial1 = &uart1;
 		serial2 = &uart_dbg;
+		i2c0 = &i2c0;
+		i2c1 = &i2c1;
+		i2c2 = &i2c2;
+		i2c3 = &i2c3;
 	};
 
 	cpus {
@@ -117,6 +123,12 @@
 		rockchip,wake-irq = <0>;
 		rockchip,irq-mode-enable = <1>;  /* If enable uart uses irq instead of fiq */
 		rockchip,baudrate = <1500000>;  /* Only 115200 and 1500000 */
+		status = "disabled";
+	};
+
+	io-domains {
+		compatible = "rockchip,rk322xh-io-voltage-domain";
+		rockchip,grf = <&grf>;
 		status = "disabled";
 	};
 
@@ -233,6 +245,38 @@
 		reg = <0x0 0xff100000 0x0 0x1000>;
 	};
 
+	uart0: serial@ff110000 {
+		compatible = "rockchip,serial";
+		reg = <0x0 0xff110000 0x0 0x100>;
+		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
+		clock-frequency = <24000000>;
+		clocks = <&clk_uart0>, <&clk_gates16 11>;
+		clock-names = "sclk_uart", "pclk_uart";
+		reg-shift = <2>;
+		reg-io-width = <4>;
+		dmas = <&pdma 2>, <&pdma 3>;
+		#dma-cells = <2>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&uart0_xfer &uart0_cts &uart0_rts>;
+		status = "disabled";
+	};
+
+	uart1: serial@ff120000 {
+		compatible = "rockchip,serial";
+		reg = <0x0 0xff120000 0x0 0x100>;
+		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+		clock-frequency = <24000000>;
+		clocks = <&clk_uart1>, <&clk_gates16 12>;
+		clock-names = "sclk_uart", "pclk_uart";
+		reg-shift = <2>;
+		reg-io-width = <4>;
+		dmas = <&pdma 4>, <&pdma 5>;
+		#dma-cells = <2>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&uart1_xfer &uart1_cts &uart1_rts>;
+		status = "disabled";
+	};
+
 	uart_dbg: serial@ff130000 {
 		compatible = "rockchip,serial";
 		reg = <0x0 0xff130000 0x0 0x100>;
@@ -242,12 +286,113 @@
 		clock-names = "sclk_uart", "pclk_uart";
 		reg-shift = <2>;
 		reg-io-width = <4>;
+		dmas = <&pdma 6>, <&pdma 7>;
+		#dma-cells = <2>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&uart2m1_xfer>;
 		status = "disabled";
 	};
 
 	pmu: syscon@ff140000 {
 		compatible = "rockchip,rk322xh-pmu", "rockchip,pmu", "syscon";
 		reg = <0x0 0xff140000 0x0 0x1000>;
+	};
+
+	i2c0: i2c@ff150000 {
+		compatible = "rockchip,rk322xh-i2c";
+		reg = <0x0 0xff150000 0x0 0x1000>;
+		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		clocks = <&clk_gates2 9>, <&clk_gates15 10>;
+		clock-names = "i2c", "pclk";
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2c0_xfer>;
+		status = "disabled";
+	};
+
+	i2c1: i2c@ff160000 {
+		compatible = "rockchip,rk322xh-i2c";
+		reg = <0x0 0xff160000 0x0 0x1000>;
+		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		clocks = <&clk_gates2 10>, <&clk_gates16 0>;
+		clock-names = "i2c", "pclk";
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2c1_xfer>;
+		status = "disabled";
+	};
+
+	i2c2: i2c@ff170000 {
+		compatible = "rockchip,rk322xh-i2c";
+		reg = <0x0 0xff170000 0x0 0x1000>;
+		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		clocks = <&clk_gates2 11>, <&clk_gates16 1>;
+		clock-names = "i2c", "pclk";
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2c2_xfer>;
+		status = "disabled";
+	};
+
+	i2c3: i2c@ff180000 {
+		compatible = "rockchip,rk322xh-i2c";
+		reg = <0x0 0xff180000 0x0 0x1000>;
+		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		clocks = <&clk_gates2 12>, <&clk_gates16 2>;
+		clock-names = "i2c", "pclk";
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2c3_xfer>;
+		status = "disabled";
+	};
+
+	pwm0: pwm@ff1b0000 {
+		compatible = "rockchip,rk-pwm";
+		reg = <0x0 0xff1b0000 0x0 0x10>;
+		#pwm-cells = <2>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pwm0_pin>;
+		clocks = <&clk_gates2 8>, <&clk_gates16 6>;
+		clock-names = "pwm", "pclk";
+		status = "disabled";
+	};
+
+	pwm1: pwm@ff1b0010 {
+		compatible = "rockchip,rk-pwm";
+		reg = <0x0 0xff1b0010 0x0 0x10>;
+		#pwm-cells = <2>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pwm1_pin>;
+		clocks = <&clk_gates2 8>, <&clk_gates16 6>;
+		clock-names = "pwm", "pclk";
+		status = "disabled";
+	};
+
+	pwm2: pwm@ff1b0020 {
+		compatible = "rockchip,rk-pwm";
+		reg = <0x0 0xff1b0020 0x0 0x10>;
+		#pwm-cells = <2>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pwm2_pin>;
+		clocks = <&clk_gates2 8>, <&clk_gates16 6>;
+		clock-names = "pwm", "pclk";
+		status = "disabled";
+	};
+
+	pwm3: pwm@ff1b0030 {
+		compatible = "rockchip,rk-pwm";
+		reg = <0x0 0xff1b0030 0x0 0x10>;
+		interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
+		#pwm-cells = <2>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pwmir_pin>;
+		clocks = <&clk_gates2 8>, <&clk_gates16 6>;
+		clock-names = "pwm", "pclk";
+		status = "disabled";
 	};
 
 	timer@ff1c0000 {
@@ -257,9 +402,64 @@
 		rockchip,broadcast = <1>;
 	};
 
+	amba {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		compatible = "arm,amba-bus";
+		interrupt-parent = <&gic>;
+		ranges;
+
+		pdma: pdma@ff1f0000 {
+			compatible = "arm,pl330", "arm,primecell";
+			reg = <0x0 0xff1f0000 0x0 0x4000>;
+			clocks = <&clk_gates15 1>;
+			clock-names = "apb_pclk";
+			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+			#dma-cells = <1>;
+		};
+	};
+
+	adc: adc@ff280000 {
+		compatible = "rockchip,saradc";
+		reg = <0x0 0xff280000 0x0 0x100>;
+		interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
+		#io-channel-cells = <1>;
+		io-channel-ranges;
+		rockchip,adc-vref = <1800>;
+		clock-frequency = <1000000>;
+		clocks = <&clk_gates2 14>, <&clk_gates17 15>;
+		clock-names = "saradc", "pclk_saradc";
+		status = "disabled";
+	};
+
+	tve: tve@ff373e00 {
+		compatible = "rockchip,rk322xh-tve", "rockchip,rk322x-tve";
+		reg = <0x0 0xff373e00 0x0 0x100>,
+		      <0x0 0xff420000 0x0 0x10000>;
+		clocks = <&clk_gates17 8>;
+		clock-names = "pclk_vdac";
+		saturation = <0x00325d46>;
+		brightcontrast = <0x00009e00>;
+		adjtiming = <0xc6c00880>;
+		lumafilter0 = <0x02ff0000>;
+		lumafilter1 = <0xf40200fe>;
+		lumafilter2 = <0xf332d910>;
+		daclevel = <0x2f>;
+		dac1level = <0xf>;
+		status = "disabled";
+	};
+
 	cru: syscon@ff440000 {
 		compatible = "rockchip,rk322xh-cru", "rockchip,cru", "syscon";
 		reg = <0x0 0xff440000 0x0 0x1000>;
+	};
+
+	reset: reset@ff440300 {
+		compatible = "rockchip,reset";
+		reg = <0x0 0xff440300 0x0 0x38>;
+		rockchip,reset-flag = <ROCKCHIP_RESET_HIWORD_MASK>;
+		#reset-cells = <1>;
 	};
 
 	msch: syscon@ff720000 {
@@ -1027,7 +1227,7 @@
 					/* mac_rxd1 */
 					<0 GPIO_B6 RK_FUNC_1 &pcfg_pull_none>,
 					/* mac_rxd0 */
-					<0 GPIO_B6 RK_FUNC_1 &pcfg_pull_none>,
+					<0 GPIO_B7 RK_FUNC_1 &pcfg_pull_none>,
 					/* mac_txd1 */
 					<0 GPIO_C0 RK_FUNC_1 &pcfg_pull_none_drv_12ma>,
 					/* mac_txd0 */

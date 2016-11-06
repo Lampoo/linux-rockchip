@@ -59,7 +59,7 @@ void cif_cif10_cifrest(struct work_struct *work)
 		      cif_cif10_dev->config.base_addr + CIF_CIF_INTEN);
 	cif_iowrite32OR(ENABLE_CAPTURE,
 			cif_cif10_dev->config.base_addr + CIF_CIF_CTRL);
-	mdelay(5);
+	msleep(200);
 	cif_cif10_img_src_s_streaming(cif_cif10_dev->img_src, true);
 }
 
@@ -76,7 +76,11 @@ static irqreturn_t cif_cif10_pltfrm_irq_handler(int irq, void *cntxt)
 				cif_cif10_dev->config.cam_itf.type))
 		cif_cif10_cifirq(irq, cif_cif10_dev);
 	else
+#if defined(CONFIG_CIF_PINGPONG_MODE)
+		cif_cif10_pingpong_irq(irq, cif_cif10_dev);
+#else
 		cif_cif10_oneframe_irq(irq, cif_cif10_dev);
+#endif
 
 	return IRQ_HANDLED;
 }

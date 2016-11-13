@@ -40,6 +40,7 @@
  *     OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include "../../../arm/boot/dts/lcd-box.dtsi"
 / {
 	chosen {
 		bootargs = "rockchip_jtag earlyprintk=uart8250-32bit,0xff130000 clk_ignore_unused";
@@ -67,6 +68,71 @@
 		gpios = <&gpio2 GPIO_D2 GPIO_ACTIVE_HIGH>;
 		status = "okay";
 	};
+
+	rockchip_audio {
+		compatible = "rockchip,rk322xh-audio", "rockchip,rk322x-audio";
+		dais {
+			dai0 {
+				audio-codec = <&codec>;
+				audio-controller = <&i2s1>;
+				format = "i2s";
+			};
+		};
+	};
+
+	rockchip_spdif_card {
+		compatible = "rockchip-spdif-card";
+		dais {
+			dai0 {
+				audio-codec = <&codec_spdif>;
+				audio-controller = <&spdif>;
+			};
+		};
+	};
+
+	rockchip_hdmi_i2s {
+		compatible = "rockchip-hdmi-i2s";
+		dais {
+			dai0 {
+				audio-codec = <&codec_hdmi_i2s>;
+				audio-controller = <&i2s0>;
+				format = "i2s";
+			};
+		};
+	};
+};
+
+&i2s0 {
+	status = "okay";
+};
+
+&i2s1 {
+	status = "okay";
+};
+
+&spdif {
+	status = "okay";
+};
+
+&codec {
+	spk_depop_time = <100>;
+	status = "okay";
+};
+
+&codec_spdif {
+	status = "okay";
+};
+
+&codec_hdmi_i2s {
+	status = "okay";
+};
+
+&hdmi {
+	status = "okay";
+	rockchip,phy_table =
+		<100000000 0 0 5 8 8 8>,
+		<165000000 8 13 5 8 8 8>,
+		<340000000 40 13 5 13 13 13>;
 };
 
 &i2c1 {
@@ -74,6 +140,82 @@
 		reg = <0x18>;
 		status = "okay";
 	};
+};
+
+&emmc {
+	clock-frequency = <125000000>;
+	clock-freq-min-max = <400000 125000000>;
+	supports-highspeed;
+	supports-emmc;
+	bootpart-no-access;
+	supports-DDR_MODE;
+	caps2-mmc-hs200;
+	ignore-pm-notify;
+	keep-power-in-suspend;
+	status = "okay";
+};
+
+&sdmmc {
+	clock-frequency = <37500000>;
+	clock-freq-min-max = <400000 37500000>;
+	supports-highspeed;
+	supports-sd;
+	broken-cd;
+	card-detect-delay = <800>;
+	ignore-pm-notify;
+	keep-power-in-suspend;
+	power-inverted;
+	status = "disabled";
+};
+
+&sdmmc_ext {
+	clock-frequency = <37500000>;
+	clock-freq-min-max = <400000 37500000>;
+	supports-highspeed;
+	supports-sd;
+	broken-cd;
+	card-detect-delay = <800>;
+	ignore-pm-notify;
+	keep-power-in-suspend;
+	power-inverted;
+	status = "disabled";
+};
+
+&sdio {
+	clock-frequency = <37500000>;
+	clock-freq-min-max = <200000 37500000>;
+	supports-highspeed;
+	supports-sdio;
+	ignore-pm-notify;
+	keep-power-in-suspend;
+	cap-sdio-irq;
+	status = "okay";
+};
+
+&disp_timings {
+	native-mode = <&timing0>;
+};
+
+&rk_screen {
+	status = "okay";
+	display-timings = <&disp_timings>;
+};
+
+&fb {
+	status = "okay";
+	rockchip,disp-policy = <DISPLAY_POLICY_BOX>;
+	rockchip,uboot-logo-on = <0>;
+};
+
+&vop {
+	status = "okay";
+};
+
+&dwc_control_usb {
+	usb_otg_drv = <&gpio0 28 GPIO_ACTIVE_LOW>;
+
+	rockchip,remote_wakeup;
+	rockchip,usb_irq_wakeup;
 };
 
 #include "../../../arm/boot/dts/rk805.dtsi"

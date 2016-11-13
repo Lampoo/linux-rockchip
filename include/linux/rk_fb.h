@@ -107,6 +107,7 @@ enum {
 	CSC_BT601,
 	CSC_BT709,
 	CSC_BT2020,
+	CSC_BT601F,
 };
 #define CSC_SHIFT	6
 #define CSC_MASK	(0x3 << CSC_SHIFT)
@@ -115,6 +116,12 @@ enum {
 #define BT601(x)	((CSC_BT601 << CSC_SHIFT) | ((x) & ~CSC_MASK))
 #define BT709(x)	((CSC_BT709 << CSC_SHIFT) | ((x) & ~CSC_MASK))
 #define BT2020(x)	((CSC_BT2020 << CSC_SHIFT) | ((x) & ~CSC_MASK))
+#define BT601F(x)	((CSC_BT601F << CSC_SHIFT) | ((x) & ~CSC_MASK))
+
+enum {
+	SDR_DATA,
+	HDR_DATA,
+};
 
 /**
  * pixel format definitions,this is copy from android/system/core/include/system/graphics.h
@@ -194,6 +201,22 @@ enum {
 	HAL_PIXEL_FORMAT_YUYV420 = 0x34,
 	HAL_PIXEL_FORMAT_UYVY422 = 0x35,
 	HAL_PIXEL_FORMAT_UYVY420 = 0x36,
+
+	HAL_PIXEL_FORMAT_YCrCb_NV12_BT601F =
+			BT601F(HAL_PIXEL_FORMAT_YCrCb_NV12),
+	HAL_PIXEL_FORMAT_YCrCb_NV12_VIDEO_BT601F =
+			BT601F(HAL_PIXEL_FORMAT_YCrCb_NV12_VIDEO),
+	HAL_PIXEL_FORMAT_YCbCr_422_SP_BT601F =
+			BT601F(HAL_PIXEL_FORMAT_YCbCr_422_SP),
+	HAL_PIXEL_FORMAT_YCrCb_444_BT601F =
+			BT601F(HAL_PIXEL_FORMAT_YCrCb_444),
+
+	HAL_PIXEL_FORMAT_YCrCb_NV12_10_BT601F =
+			BT601F(HAL_PIXEL_FORMAT_YCrCb_NV12_10),
+	HAL_PIXEL_FORMAT_YCbCr_422_SP_10_BT601F	=
+			BT601F(HAL_PIXEL_FORMAT_YCbCr_422_SP_10),
+	HAL_PIXEL_FORMAT_YCrCb_420_SP_10_BT601F	=
+			BT601F(HAL_PIXEL_FORMAT_YCrCb_444_SP_10),
 
 	HAL_PIXEL_FORMAT_YCrCb_NV12_BT709 =
 			BT709(HAL_PIXEL_FORMAT_YCrCb_NV12),
@@ -305,11 +328,12 @@ struct rk_vop_property {
 
 enum rk_win_feature {
 	SUPPORT_WIN_IDENTIFY	= BIT(0),
-	SUPPORT_SCALE		= BIT(1),
-	SUPPORT_YUV		= BIT(2),
-	SUPPORT_YUV10BIT	= BIT(3),
-	SUPPORT_MULTI_AREA	= BIT(4),
-	SUPPORT_HWC_LAYER	= BIT(5)
+	SUPPORT_HW_EXIST	= BIT(1),
+	SUPPORT_SCALE		= BIT(2),
+	SUPPORT_YUV		= BIT(3),
+	SUPPORT_YUV10BIT	= BIT(4),
+	SUPPORT_MULTI_AREA	= BIT(5),
+	SUPPORT_HWC_LAYER	= BIT(6)
 };
 
 struct rk_win_property {
@@ -402,6 +426,7 @@ struct rk_lcdc_bcsh {
 struct rk_lcdc_win_area {
 	bool state;
 	enum data_format format;
+	u8 data_space;		/* SDR or HDR */
 	u8 fmt_cfg;
 	u8 yuyv_fmt;
 	u8 swap_rb;
@@ -587,8 +612,8 @@ struct rk_fb_area_par {
 	u8  fbdc_en;
 	u8  fbdc_cor_en;
 	u8  fbdc_data_format;
-	u16 reserved0;
-	u32 reserved1;
+	u16 data_space;	/* SDR or HDR */
+	u32 reserved0;
 };
 
 
@@ -623,6 +648,7 @@ struct rk_fb_reg_wb_data {
 struct rk_fb_reg_area_data {
 	struct sync_fence *acq_fence;
 	u8 data_format;        /*layer data fmt*/
+	u8 data_space;		/* indicate SDR or HDR */
 	u8  index_buf;          /*judge if the buffer is index*/
 	u32 y_offset;		/*yuv/rgb offset  -->LCDC_WINx_YRGB_MSTx*/
 	u32 c_offset;		/*cb cr offset--->LCDC_WINx_CBR_MSTx*/
@@ -698,6 +724,7 @@ struct rk_lcdc_driver {
 	u16 rotate_mode;
 	u16 cabc_mode;
 	u16 overlay_mode;
+	u16 pre_overlay;
 	u16 output_color;
 
 	u16  fb_win_map;

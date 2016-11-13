@@ -47,7 +47,7 @@
 #include "dt-bindings/suspend/rockchip-pm.h"
 
 / {
-	model = "Rockchip RK1108 EVB_V12 SDK BOARD";
+	model = "Rockchip RK1108 EVB MAINBOARD V12";
 	compatible = "rockchip,rk1108-evb-v12", "rockchip,rk1108";
 
 	memory {
@@ -200,12 +200,29 @@
 	status = "okay";
 };
 
+&watchdog {
+	status = "okay";
+	rockchip,timeout = <5>;
+	rockchip,atboot = <0>;
+};
+
 &adc {
 	status = "okay";
 
 	battery_value {
 		compatible = "rockchip,rk1108_battery";
 		io-channels = <&adc 2>;
+		battery-levels = <
+			3800 3853 3856 3859 3862 3865 3868 3871 3874 3877
+			3880 3883 3886 3389 3892 3895 3898 3901 3904 3907
+			3910 3913 3916 3919 3922 3925 3928 3931 3934 3937
+			3940 3943 3946 3949 3952 3955 3958 3961 3964 3967
+			3970 3973 3976 3979 3982 3985 3988 3991 3994 3997
+			4000 4003 4006 4009 4012 4015 4018 4021 4024 4027
+			4030 4033 4036 4039 4042 4045 4048 4051 4054 4057
+			4060 4063 4066 4069 4072 4075 4080 4085 4090 4095
+			4100 4105 4110 4115 4120 4125 4130 4135 4140 4145
+			4150 4155 4160 4165 4170 4175 4180 4185 4190 4200>;
 	};
 
 	key0 {
@@ -300,8 +317,22 @@
 		reset-gpio = <&gpio3 GPIO_C6 GPIO_ACTIVE_LOW>;
 		irq-gpio = <&gpio3 GPIO_D3 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default", "sleep";
-		pinctrl-0 = <&cif_dvp_d2d9 &cif_dvp_clk>;
-		pinctrl-1 = <&cif_dvp_sleep>;
+		pinctrl-0 = <&cif_dvp_d2d9 &cif_dvp_clk_in>;
+		pinctrl-1 = <&cif_dvp_d2d9_sleep &cif_dvp_clk_in_sleep>;
+	};
+
+	mpu6500: mpu6500@68 {
+		status = "disabled";
+		compatible = "invensense,mpu6500";
+		reg = <0x68>;
+		mpu-int_config = <0x10>;
+		mpu-level_shifter = <0>;
+		mpu-orientation = <1 0 0 0 1 0 0 0 1>;
+		orientation-x= <1>;
+		orientation-y= <1>;
+		orientation-z= <0>;
+		support-hw-poweroff = <1>;
+		mpu-debug = <1>;
 	};
 };
 
@@ -312,17 +343,17 @@
 		compatible = "omnivision,ov2710-v4l2-i2c-subdev";
 		reg = <0x36>;
 		device_type = "v4l2-i2c-subdev";
-		clocks = <&clk_mipicsi_out>;
-		clock-names = "clk_mipicsi_out";
+		clocks = <&clk_cif_out>;
+		clock-names = "clk_cif_out";
 		pinctrl-names = "rockchip,camera_default", "rockchip,camera_sleep";
-		pinctrl-0 = <&cam0_default_pins>;
-		pinctrl-1 = <&cam0_sleep_pins>;
-		rockchip,pd-gpio = <&gpio3 8 GPIO_ACTIVE_HIGH>;
-		rockchip,pwr-gpio = <&gpio3 26 GPIO_ACTIVE_HIGH>;
-		rockchip,rst-gpio = <&gpio3 25 GPIO_ACTIVE_LOW>;
-		rockchip,camera-module-mclk-name = "clk_mipicsi_out";
-		rockchip,camera-module-regulator-names = "vdd_cam", "avdd_cam";
-		rockchip,camera-module-regulator-voltages = <1450000 3300000>;
+		pinctrl-0 = <&cif_dvp_clk_out>;
+		pinctrl-1 = <&cif_dvp_clk_out_sleep>;
+		rockchip,pd-gpio = <&gpio3 GPIO_B0 GPIO_ACTIVE_HIGH>;
+		rockchip,pwr-gpio = <&gpio3 GPIO_B5 GPIO_ACTIVE_HIGH>;
+		rockchip,rst-gpio = <&gpio3 GPIO_D1 GPIO_ACTIVE_LOW>;
+		rockchip,camera-module-mclk-name = "clk_cif_out";
+		rockchip,camera-module-regulator-names = "vdd_cam";
+		rockchip,camera-module-regulator-voltages = <1450000>;
 		rockchip,camera-module-facing = "back";
 		rockchip,camera-module-name = "LA6110PA";
 		rockchip,camera-module-len-name = "YM6011P";
@@ -344,17 +375,17 @@
 		compatible = "omnivision,ov4689-v4l2-i2c-subdev";
 		reg = <0x36>;
 		device_type = "v4l2-i2c-subdev";
-		clocks = <&clk_mipicsi_out>;
-		clock-names = "clk_mipicsi_out";
+		clocks = <&clk_cif_out>;
+		clock-names = "clk_cif_out";
 		pinctrl-names = "rockchip,camera_default", "rockchip,camera_sleep";
-		pinctrl-0 = <&cam0_default_pins>;
-		pinctrl-1 = <&cam0_sleep_pins>;
-		rockchip,pd-gpio = <&gpio3 8 GPIO_ACTIVE_LOW>;
-		rockchip,pwr-gpio = <&gpio3 26 GPIO_ACTIVE_HIGH>;
-		rockchip,rst-gpio = <&gpio3 25 GPIO_ACTIVE_LOW>;
-		rockchip,camera-module-mclk-name = "clk_mipicsi_out";
-		rockchip,camera-module-regulator-names = "vdd_cam", "avdd_cam";
-		rockchip,camera-module-regulator-voltages = <1200000 2800000>;
+		pinctrl-0 = <&cif_dvp_clk_out>;
+		pinctrl-1 = <&cif_dvp_clk_out_sleep>;
+		rockchip,pd-gpio = <&gpio3 GPIO_B0 GPIO_ACTIVE_LOW>;
+		rockchip,pwr-gpio = <&gpio3 GPIO_B5 GPIO_ACTIVE_HIGH>;
+		rockchip,rst-gpio = <&gpio3 GPIO_D1 GPIO_ACTIVE_LOW>;
+		rockchip,camera-module-mclk-name = "clk_cif_out";
+		rockchip,camera-module-regulator-names = "vdd_cam";
+		rockchip,camera-module-regulator-voltages = <1200000>;
 		rockchip,camera-module-facing = "back";
 		rockchip,camera-module-name = "LA6111PA";
 		rockchip,camera-module-len-name = "YM6011P";
@@ -379,14 +410,15 @@
 		clocks = <&clk_cif_out>;
 		clock-names = "clk_cif_out";
 		pinctrl-names = "rockchip,camera_default", "rockchip,camera_sleep";
-		pinctrl-0 = <&cif_dvp_d0d1 &cif_dvp_d2d9 &cif_dvp_d10d11 &cif_dvp_clk &cif_dvp_sync>;
+		pinctrl-0 = <&cif_dvp_d0d1 &cif_dvp_d2d9 &cif_dvp_d10d11
+			&cif_dvp_clk_in &cif_dvp_clk_out &cif_dvp_sync>;
 		pinctrl-1 = <&cif_dvp_sleep>;
-		rockchip,pd-gpio = <&gpio3 25 GPIO_ACTIVE_LOW>;
-		rockchip,pwr-gpio = <&gpio3 26 GPIO_ACTIVE_HIGH>;
-		rockchip,rst-gpio = <&gpio3 8 GPIO_ACTIVE_LOW>;
+		rockchip,pd-gpio = <&gpio3 GPIO_D1 GPIO_ACTIVE_LOW>;
+		rockchip,pwr-gpio = <&gpio3 GPIO_B5 GPIO_ACTIVE_HIGH>;
+		rockchip,rst-gpio = <&gpio3 GPIO_B0 GPIO_ACTIVE_LOW>;
 		rockchip,camera-module-mclk-name = "clk_cif_out";
-		rockchip,camera-module-regulator-names = "vdd_cam", "avdd_cam";
-		rockchip,camera-module-regulator-voltages = <1200000 2700000>;
+		rockchip,camera-module-regulator-names = "vdd_cam";
+		rockchip,camera-module-regulator-voltages = <1200000>;
 		rockchip,camera-module-facing = "back";
 		rockchip,camera-module-name = "LA6114PA";
 		rockchip,camera-module-len-name = "YM6011P";
@@ -452,7 +484,7 @@
 };
 
 &pwm0 {
-	status = "okay";
+	status = "disabled";
 };
 
 &emmc {
@@ -653,6 +685,9 @@
 
 &vop {
 	status = "okay";
+	pinctrl-names = "default", "gpio";
+	pinctrl-0 = <&lcdc_mipi_data>;
+	pinctrl-1 = <&lcdc_mipi_gpio>;
 	power_ctr: power_ctr {
 		rockchip,debug = <0>;
 		/*
@@ -674,5 +709,10 @@
 };
 
 &codec {
+	spk_ctl_io = <&gpio0 GPIO_A5 GPIO_ACTIVE_HIGH>;
+	status = "okay";
+};
+
+&hdmi {
 	status = "okay";
 };

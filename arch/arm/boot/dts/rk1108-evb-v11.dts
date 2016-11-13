@@ -47,8 +47,8 @@
 #include "dt-bindings/suspend/rockchip-pm.h"
 
 / {
-	model = "Rockchip RK1108 CVR SDK BOARD";
-	compatible = "rockchip,rk1108-cvr", "rockchip,rk1108";
+	model = "Rockchip RK1108 EVB MAINBOARD V11";
+	compatible = "rockchip,rk1108-evb-v11", "rockchip,rk1108";
 
 	memory {
 		device_type = "memory";
@@ -57,6 +57,8 @@
 
 	fiq-debugger {
 		status = "okay";
+		rockchip,serial-id = <2>;
+		pinctrl-0 = <&uart2m0_xfer>;
 	};
 
 	rockchip_suspend: rockchip_suspend {
@@ -102,7 +104,7 @@
 		};
 	};
 
-	backlight {
+	backlight: backlight {
 		compatible = "pwm-backlight";
 		pwms = <&pwm0 0 25000>;
 		brightness-levels = <
@@ -167,8 +169,9 @@
 
 	wireless-wlan {
 		compatible = "wlan-platdata";
-		wifi_chip_type = "rtl8723bs_vq0";
-		WIFI,poweren_gpio = <&gpio0 GPIO_A2 GPIO_ACTIVE_HIGH>;
+		wifi_chip_type = "rtl8723cs";
+		sdio_vref = <0>;
+		WIFI,poweren_gpio = <&gpio0 GPIO_C6 GPIO_ACTIVE_HIGH>;
 		WIFI,host_wake_irq = <&gpio0 GPIO_A3 GPIO_ACTIVE_HIGH>;
 		status = "okay";
 	};
@@ -189,20 +192,18 @@
 
 	operating-points = <
 		/* KHz	  uV */
-		408000 1000000
-		600000 1000000
+		408000 950000
+		600000 950000
 		816000 1000000
-		1008000 1050000
-		//1200000 1150000
-		//1296000 1200000
-		//1392000 1250000
-		//1488000 1325000
+		1008000 1100000
 		>;
 	status = "okay";
 };
 
 &watchdog {
 	status = "okay";
+	rockchip,timeout = <5>;
+	rockchip,atboot = <0>;
 };
 
 &adc {
@@ -211,57 +212,64 @@
 	battery_value {
 		compatible = "rockchip,rk1108_battery";
 		io-channels = <&adc 2>;
+		battery-levels = <
+			3800 3853 3856 3859 3862 3865 3868 3871 3874 3877
+			3880 3883 3886 3389 3892 3895 3898 3901 3904 3907
+			3910 3913 3916 3919 3922 3925 3928 3931 3934 3937
+			3940 3943 3946 3949 3952 3955 3958 3961 3964 3967
+			3970 3973 3976 3979 3982 3985 3988 3991 3994 3997
+			4000 4003 4006 4009 4012 4015 4018 4021 4024 4027
+			4030 4033 4036 4039 4042 4045 4048 4051 4054 4057
+			4060 4063 4066 4069 4072 4075 4080 4085 4090 4095
+			4100 4105 4110 4115 4120 4125 4130 4135 4140 4145
+			4150 4155 4160 4165 4170 4175 4180 4185 4190 4200>;
 	};
 
 	key0 {
 		compatible = "rockchip,key";
 		io-channels = <&adc 0>;
+		adc-drift = <45>;
 
 		tab-key {
 			linux,code = <15>;
 			label = "tab";
-			rockchip,adc_value = <1>;
+			rockchip,adc_value = <685>;
 		};
 
 		enter-key {
 			linux,code = <28>;
 			label = "volume down";
-			rockchip,adc_value = <169>;
+			rockchip,adc_value = <802>;
 		};
 
 		up-key {
 			linux,code = <103>;
 			label = "up";
-			rockchip,adc_value = <352>;
+			rockchip,adc_value = <238>;
 		};
 
 		down-key {
 			linux,code = <108>;
 			label = "down";
-			rockchip,adc_value = <559>;
+			rockchip,adc_value = <353>;
 		};
-	};
-
-	key1 {
-		compatible = "rockchip,key";
-		io-channels = <&adc 1>;
 
 		left-key {
 			linux,code = <105>;
 			label = "left";
-			rockchip,adc_value = <353>;
+			rockchip,adc_value = <465>;
 		};
 
 		right-key {
 			linux,code = <106>;
 			label = "right";
-			rockchip,adc_value = <559>;
+			rockchip,adc_value = <109>;
 		};
 
 		menu-key {
 			linux,code = <127>;
 			label = "menu";
-			rockchip,adc_value = <169>;
+			rockchip,adc_value = <581>;
 		};
 
 		esc-key {
@@ -284,13 +292,24 @@
 		status = "okay";
 	};
 
+	sensor: sensor@19 {
+		compatible = "bma2xx_acc";
+		reg = <0x19>;
+		type = <2>;
+		irq-gpio = <&gpio0 GPIO_B3 IRQ_TYPE_LEVEL_HIGH>;
+		irq_enable = <0>;
+		poll_delay_ms = <30>;
+		layout = <2>;
+		status = "okay";
+	};
+
 	nvp6124: nvp6124@30 {
 		status = "disabled";
 		compatible = "rockchip,nvp";
 		reg = <0x30>;
 		device_type = "v4l2-i2c-subdev";
 		/* 1 or 2 or 4 */
-		channels = <2>;
+		channels = <4>;
 		/* 1.8v or 3.3v */
 		apio_vol = <3300>;
 		/* PAL or NTSC */
@@ -298,8 +317,8 @@
 		reset-gpio = <&gpio3 GPIO_C6 GPIO_ACTIVE_LOW>;
 		irq-gpio = <&gpio3 GPIO_D3 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default", "sleep";
-		pinctrl-0 = <&cif_dvp_d2d9 &cif_dvp_clk>;
-		pinctrl-1 = <&cif_dvp_sleep>;
+		pinctrl-0 = <&cif_dvp_d2d9 &cif_dvp_clk_in>;
+		pinctrl-1 = <&cif_dvp_d2d9_sleep &cif_dvp_clk_in_sleep>;
 	};
 };
 
@@ -316,11 +335,11 @@
 		pinctrl-0 = <&cam0_default_pins>;
 		pinctrl-1 = <&cam0_sleep_pins>;
 		rockchip,pd-gpio = <&gpio3 8 GPIO_ACTIVE_HIGH>;
-		rockchip,pwr-gpio = <&gpio0 18 GPIO_ACTIVE_HIGH>;
+		rockchip,pwr-gpio = <&gpio3 26 GPIO_ACTIVE_HIGH>;
 		rockchip,rst-gpio = <&gpio3 25 GPIO_ACTIVE_LOW>;
 		rockchip,camera-module-mclk-name = "clk_mipicsi_out";
-		rockchip,camera-module-regulator-names = "vdd_cam", "avdd_cam";
-		rockchip,camera-module-regulator-voltages = <1450000 3300000>;
+		rockchip,camera-module-regulator-names = "vdd_cam";
+		rockchip,camera-module-regulator-voltages = <1450000>;
 		rockchip,camera-module-facing = "back";
 		rockchip,camera-module-name = "LA6110PA";
 		rockchip,camera-module-len-name = "YM6011P";
@@ -348,11 +367,11 @@
 		pinctrl-0 = <&cam0_default_pins>;
 		pinctrl-1 = <&cam0_sleep_pins>;
 		rockchip,pd-gpio = <&gpio3 8 GPIO_ACTIVE_LOW>;
-		rockchip,pwr-gpio = <&gpio0 18 GPIO_ACTIVE_HIGH>;
+		rockchip,pwr-gpio = <&gpio3 26 GPIO_ACTIVE_HIGH>;
 		rockchip,rst-gpio = <&gpio3 25 GPIO_ACTIVE_LOW>;
 		rockchip,camera-module-mclk-name = "clk_mipicsi_out";
-		rockchip,camera-module-regulator-names = "vdd_cam", "avdd_cam";
-		rockchip,camera-module-regulator-voltages = <1200000 2800000>;
+		rockchip,camera-module-regulator-names = "vdd_cam";
+		rockchip,camera-module-regulator-voltages = <1200000>;
 		rockchip,camera-module-facing = "back";
 		rockchip,camera-module-name = "LA6111PA";
 		rockchip,camera-module-len-name = "YM6011P";
@@ -377,14 +396,15 @@
 		clocks = <&clk_cif_out>;
 		clock-names = "clk_cif_out";
 		pinctrl-names = "rockchip,camera_default", "rockchip,camera_sleep";
-		pinctrl-0 = <&cif_dvp_d0d1 &cif_dvp_d2d9 &cif_dvp_d10d11 &cif_dvp_clk &cif_dvp_sync>;
+		pinctrl-0 = <&cif_dvp_d0d1 &cif_dvp_d2d9 &cif_dvp_d10d11
+			&cif_dvp_clk_in &cif_dvp_clk_out &cif_dvp_sync>;
 		pinctrl-1 = <&cif_dvp_sleep>;
 		rockchip,pd-gpio = <&gpio3 25 GPIO_ACTIVE_LOW>;
-		rockchip,pwr-gpio = <&gpio0 18 GPIO_ACTIVE_HIGH>;
+		rockchip,pwr-gpio = <&gpio3 26 GPIO_ACTIVE_HIGH>;
 		rockchip,rst-gpio = <&gpio3 8 GPIO_ACTIVE_LOW>;
 		rockchip,camera-module-mclk-name = "clk_cif_out";
-		rockchip,camera-module-regulator-names = "vdd_cam", "avdd_cam";
-		rockchip,camera-module-regulator-voltages = <1200000 2700000>;
+		rockchip,camera-module-regulator-names = "vdd_cam";
+		rockchip,camera-module-regulator-voltages = <1200000>;
 		rockchip,camera-module-facing = "back";
 		rockchip,camera-module-name = "LA6114PA";
 		rockchip,camera-module-len-name = "YM6011P";
@@ -401,6 +421,10 @@
 	};
 };
 
+&cif1to4 {
+	status = "disabled";
+};
+
 &cif_cif0 {
 	rockchip,camera-modules-attached = <&nvp6124 &cvbsin>;
 	status = "okay";
@@ -408,7 +432,7 @@
 
 &cif_cif1 {
 	rockchip,camera-modules-attached = <&nvp6124>;
-	status = "okay";
+	status = "disabled";
 };
 
 &cif_cif2 {
@@ -423,10 +447,6 @@
 
 &cif_isp0 {
 	rockchip,camera-modules-attached = <&camera0 &camera1 &camera2>;
-	status = "okay";
-};
-
-&cif1to4 {
 	status = "okay";
 };
 
@@ -544,8 +564,8 @@
 
 		rk805_dcdc4_reg: regulator@3 {
 			regulator-name= "vcc_io";
-			regulator-min-microvolt = <3300000>;
-			regulator-max-microvolt = <3300000>;
+			regulator-min-microvolt = <3000000>;
+			regulator-max-microvolt = <3000000>;
 			regulator-initial-mode = <0x2>;
 			regulator-initial-state = <3>;
 			regulator-boot-on;
@@ -553,7 +573,7 @@
 			regulator-state-mem {
 				regulator-state-mode = <0x2>;
 				regulator-state-enabled;
-				regulator-state-uv = <3300000>;
+				regulator-state-uv = <3000000>;
 			};
 		};
 
@@ -584,18 +604,22 @@
 		};
 
 		rk805_ldo3_reg: regulator@6 {
-			regulator-name= "avdd_cam";
-			regulator-min-microvolt = <2500000>;
-			regulator-max-microvolt = <3400000>;
+			regulator-name= "vdd10_pmu";
+			regulator-min-microvolt = <1000000>;
+			regulator-max-microvolt = <1000000>;
 			regulator-initial-state = <3>;
+			regulator-boot-on;
+			regulator-always-on;
 			regulator-state-mem {
-				regulator-state-disabled;
+				regulator-state-enabled;
+				regulator-state-uv = <1000000>;
 			};
 		};
 	};
 };
 
 &dwc_control_usb {
+	vbus_drv = <&gpio0 GPIO_B0 GPIO_ACTIVE_LOW>;
 	rockchip,remote_wakeup;
 	rockchip,usb_irq_wakeup;
 	status = "okay";
@@ -647,6 +671,10 @@
 
 &vop {
 	status = "okay";
+	backlight = <&backlight>;
+	pinctrl-names = "default", "gpio";
+	pinctrl-0 = <&lcdc_mipi_data>;
+	pinctrl-1 = <&lcdc_mipi_gpio>;
 	power_ctr: power_ctr {
 		rockchip,debug = <0>;
 		/*
@@ -668,5 +696,10 @@
 };
 
 &codec {
+	spk_ctl_io = <&gpio0 GPIO_A5 GPIO_ACTIVE_HIGH>;
+	status = "okay";
+};
+
+&hdmi {
 	status = "okay";
 };

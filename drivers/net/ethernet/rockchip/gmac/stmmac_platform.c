@@ -36,6 +36,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/mfd/syscon.h>
 #include <linux/regmap.h>
+#include <linux/reset.h>
 
 static u64 gmac_dmamask = DMA_BIT_MASK(32);
 
@@ -776,11 +777,11 @@ static int phy_power_on(bool enable)
 		/* disable macphy */
 		regmap_write(bsp_priv->grf, RK322X_GRF_MACPHY_CON0,
 			     GRF_CLR_BIT(0));
-		/* reset macphy */
-		regmap_write(bsp_priv->cru, 0x11c, GRF_BIT(15));
-		mdelay(1);
-		regmap_write(bsp_priv->cru, 0x11c, GRF_CLR_BIT(15));
-		mdelay(1);
+		/* cru reset macphy */
+		reset_control_assert(bsp_priv->macphy_reset);
+		usleep_range(400, 500);
+		reset_control_deassert(bsp_priv->macphy_reset);
+		usleep_range(400, 500);
 		/* enable macphy */
 		regmap_write(bsp_priv->grf, RK322X_GRF_MACPHY_CON0, GRF_BIT(0));
 	} else {
@@ -1079,13 +1080,21 @@ static int stmmac_probe_config_dt(struct platform_device *pdev,
 	} else {
 		pr_info("%s: internal PHY/external PHY? (%s).\n",
 			__func__, strings);
-		if (!strcmp(strings, "internal"))
+		if (!strcmp(strings, "internal")) {
 			g_bsp_priv.internal_phy = true;
-		else
+			g_bsp_priv.macphy_reset =
+				devm_reset_control_get(&pdev->dev, "mac-phy");
+			if (IS_ERR(g_bsp_priv.macphy_reset)) {
+				ret = PTR_ERR(g_bsp_priv.macphy_reset);
+				dev_err(&pdev->dev, "failed to get macphy reset: %d\n",
+					ret);
+				return ret;
+			}
+		} else {
 			g_bsp_priv.internal_phy = false;
+		}
 	}
 
-	g_bsp_priv.cru = syscon_regmap_lookup_by_phandle(np, "rockchip,cru");
 	g_bsp_priv.grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
 	g_bsp_priv.pdev = pdev;
 
@@ -1111,23 +1120,17 @@ static int stmmac_probe_config_dt(struct platform_device *pdev,
 	g_bsp_priv.gmac_clk_enable = gmac_clk_enable;
 
 	plat->bsp_priv = &g_bsp_priv;
+	g_bsp_priv.chip = (unsigned long)match->data;
 
 	/*
 	 * Currently only the properties needed on SPEAr600
 	 * are provided. All other properties should be added
 	 * once needed on other platforms.
 	 */
-	if (of_device_is_compatible(np, "rockchip,rk3288-gmac") ||
-	    of_device_is_compatible(np, "rockchip,rk312x-gmac") ||
-	    of_device_is_compatible(np, "rockchip,rk3368-gmac") ||
-	    of_device_is_compatible(np, "rockchip,rk322x-gmac") ||
-	    of_device_is_compatible(np, "rockchip,rk1108-gmac")) {
+	if (g_bsp_priv.chip < RK_MAX_GMAC) {
 		plat->has_gmac = 1;
 		plat->pmt = 1;
 	}
-
-
-	g_bsp_priv.chip = (unsigned long)match->data;
 
 	return 0;
 }

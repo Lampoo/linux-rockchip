@@ -49,6 +49,7 @@
 
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
+#include <linux/usb/otg.h>
 
 /* Global constants */
 #define DWC3_EP0_BOUNCE_SIZE	512
@@ -184,10 +185,22 @@
 
 /* Global USB2 PHY Configuration Register */
 #define DWC3_GUSB2PHYCFG_PHYSOFTRST	(1 << 31)
+#define DWC3_GUSB2PHYCFG_U2_FREECLK_EXISTS	(1 << 30)
 #define DWC3_GUSB2PHYCFG_SUSPHY		(1 << 6)
+#define DWC3_GUSB2PHYCFG_ENBLSLPM	(1 << 8)
+#define DWC3_GUSB2PHYCFG_PHYIF(n)	(n << 3)
+#define DWC3_GUSB2PHYCFG_PHYIF_MASK	DWC3_GUSB2PHYCFG_PHYIF(1)
+#define DWC3_GUSB2PHYCFG_USBTRDTIM(n)	(n << 10)
+#define DWC3_GUSB2PHYCFG_USBTRDTIM_MASK	DWC3_GUSB2PHYCFG_USBTRDTIM(0xf)
+#define USBTRDTIM_UTMI_8_BIT		9
+#define USBTRDTIM_UTMI_16_BIT		5
+#define UTMI_PHYIF_16_BIT		1
+#define UTMI_PHYIF_8_BIT		0
 
 /* Global USB3 PIPE Control Register */
 #define DWC3_GUSB3PIPECTL_PHYSOFTRST	(1 << 31)
+#define DWC3_GUSB3PIPECTL_U2SSINP3OK	(1 << 29)
+#define DWC3_GUSB3PIPECTL_DEPOCHANGE	(1 << 18)
 #define DWC3_GUSB3PIPECTL_SUSPHY	(1 << 17)
 
 /* Global TX Fifo Size Register */
@@ -205,6 +218,9 @@
 /* Global HWPARAMS4 Register */
 #define DWC3_GHWPARAMS4_HIBER_SCRATCHBUFS(n)	(((n) & (0x0f << 13)) >> 13)
 #define DWC3_MAX_HIBER_SCRATCHBUFS		15
+
+/* Global HWPARAMS6 Register */
+#define DWC3_GHWPARAMS6_EN_FPGA			(1 << 7)
 
 /* Device Configuration Register */
 #define DWC3_DCFG_LPM_CAP	(1 << 22)
@@ -566,11 +582,6 @@ struct dwc3_hwparams {
 /* HWPARAMS0 */
 #define DWC3_MODE(n)		((n) & 0x7)
 
-#define DWC3_MODE_DEVICE	0
-#define DWC3_MODE_HOST		1
-#define DWC3_MODE_DRD		2
-#define DWC3_MODE_HUB		3
-
 #define DWC3_MDWIDTH(n)		(((n) & 0xff00) >> 8)
 
 /* HWPARAMS1 */
@@ -632,7 +643,10 @@ struct dwc3_scratchpad_array {
  * @u1u2: only used on revisions <1.83a for workaround
  * @maximum_speed: maximum speed requested (mainly for testing purposes)
  * @revision: revision register contents
- * @mode: mode of operation
+ * @dr_mode: requested mode of operation
+ * @hsphy_mode: UTMI phy mode, one of following:
+ *		- USBPHY_INTERFACE_MODE_UTMI
+ *		- USBPHY_INTERFACE_MODE_UTMIW
  * @usb2_phy: pointer to USB2 PHY
  * @usb3_phy: pointer to USB3 PHY
  * @dcfg: saved contents of DCFG register
@@ -659,6 +673,45 @@ struct dwc3_scratchpad_array {
  * @mem: points to start of memory which is used for this struct.
  * @hwparams: copy of hwparams registers
  * @root: debugfs root folder pointer
+<<<<<<< HEAD
+=======
+ * @regset: debugfs pointer to regdump file
+ * @test_mode: true when we're entering a USB test mode
+ * @test_mode_nr: test feature selector
+ * @lpm_nyet_threshold: LPM NYET response threshold
+ * @hird_threshold: HIRD threshold
+ * @delayed_status: true when gadget driver asks for delayed status
+ * @ep0_bounced: true when we used bounce buffer
+ * @ep0_expect_in: true when we expect a DATA IN transfer
+ * @has_hibernation: true when dwc3 was configured with Hibernation
+ * @has_lpm_erratum: true when core was configured with LPM Erratum. Note that
+ *			there's now way for software to detect this in runtime.
+ * @is_utmi_l1_suspend: the core asserts output signal
+ * 	0	- utmi_sleep_n
+ * 	1	- utmi_l1_suspend_n
+ * @is_fpga: true when we are using the FPGA board
+ * @needs_fifo_resize: not all users might want fifo resizing, flag it
+ * @pullups_connected: true when Run/Stop bit is set
+ * @resize_fifos: tells us it's ok to reconfigure our TxFIFO sizes.
+ * @setup_packet_pending: true when there's a Setup Packet in FIFO. Workaround
+ * @start_config_issued: true when StartConfig command has been issued
+ * @three_stage_setup: set if we perform a three phase setup
+ * @usb3_lpm_capable: set if hadrware supports Link Power Management
+ * @disable_scramble_quirk: set if we enable the disable scramble quirk
+ * @u2exit_lfps_quirk: set if we enable u2exit lfps quirk
+>>>>>>> eac68e8... usb: dwc3: make LPM configurable in DT
+ * @u2ss_inp3_quirk: set if we enable P3 OK for U2/SS Inactive quirk
+ * @dis_enblslpm_quirk: set if we clear enblslpm in GUSB2PHYCFG,
+ *                      disabling the suspend signal to the PHY.
+ * @is_fpga: true when we are using the FPGA board
+ * @dis_u3_susphy_quirk: set if we disable usb3 suspend phy
+ * @dis_u2_susphy_quirk: set if we disable usb2 suspend phy
+ * @dis_u2_freeclk_exists_quirk : set if we clear u2_freeclk_exists
+ *			in GUSB2PHYCFG, specify that USB2 PHY doesn't
+ *			provide a free-running PHY clock.
+ * @del_phy_power_chg_quirk: set if we enable delay phy power change quirk
+ * @dis_del_phy_power_chg_quirk: set if we disable delay phy power
+ *			change quirk.
  */
 struct dwc3 {
 	struct usb_ctrlrequest	*ctrl_req;
@@ -690,6 +743,9 @@ struct dwc3 {
 	void __iomem		*regs;
 	size_t			regs_size;
 
+	enum usb_dr_mode	dr_mode;
+	enum usb_phy_interface	hsphy_mode;
+
 	/* used for suspend/resume */
 	u32			dcfg;
 	u32			gctl;
@@ -698,7 +754,6 @@ struct dwc3 {
 	u32			u1u2;
 	u32			maximum_speed;
 	u32			revision;
-	u32			mode;
 
 #define DWC3_REVISION_173A	0x5533173a
 #define DWC3_REVISION_175A	0x5533175a
@@ -751,6 +806,17 @@ struct dwc3 {
 
 	u8			test_mode;
 	u8			test_mode_nr;
+	unsigned		u2ss_inp3_quirk:1;
+	unsigned		dis_enblslpm_quirk:1;
+
+	unsigned		is_fpga:1;
+	unsigned		usb3_lpm_capable:1;
+
+	unsigned		dis_u3_susphy_quirk:1;
+	unsigned		dis_u2_susphy_quirk:1;
+	unsigned		dis_u2_freeclk_exists_quirk:1;
+	unsigned		del_phy_power_chg_quirk:1;
+	unsigned		dis_del_phy_power_chg_quirk:1;
 };
 
 /* -------------------------------------------------------------------------- */

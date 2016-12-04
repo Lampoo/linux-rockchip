@@ -194,7 +194,7 @@ static void rockchip_mpp_rkvenc_cfg_palette(struct rockchip_mpp_dev *mpp,
 }
 
 static struct mpp_ctx *rockchip_mpp_rkvenc_init(struct rockchip_mpp_dev *mpp,
-						void __user *src, u32 dwsize)
+						void __user *src, u32 size)
 {
 	struct rockchip_rkvenc_dev *enc = to_rkvenc_dev(mpp);
 	struct rkvenc_ctx *ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
@@ -215,11 +215,9 @@ static struct mpp_ctx *rockchip_mpp_rkvenc_init(struct rockchip_mpp_dev *mpp,
 
 	ctx->mode = RKVENC_MODE_LINKTABLE_FIX;
 
-	dwsize *= 4; /* convert to size in byte */
+	size = size > sizeof(ctx->cfg) ? sizeof(ctx->cfg) : size;
 
-	dwsize = dwsize > sizeof(ctx->cfg) ? sizeof(ctx->cfg) : dwsize;
-
-	if (copy_from_user(&ctx->cfg, src, dwsize)) {
+	if (copy_from_user(&ctx->cfg, src, size)) {
 		mpp_err("error: copy_from_user failed in reg_init\n");
 		kfree(ctx);
 		return NULL;
@@ -687,7 +685,8 @@ static int rockchip_mpp_rkvenc_probe(struct rockchip_mpp_dev *mpp)
 		return -1;
 	}
 
-	ret = mpp_get_dma_addr(mpp, enc->lkt_hdl, &enc->lkt_dma_addr, &tmp);
+	ret = mpp_get_dma_addr(mpp, enc->lkt_hdl,
+			       &enc->lkt_dma_addr, (u32 *)&tmp);
 	if (ret < 0) {
 		dev_err(mpp->dev, "get link table dma_addr failed\n");
 		goto fail;
@@ -708,7 +707,8 @@ static int rockchip_mpp_rkvenc_probe(struct rockchip_mpp_dev *mpp)
 		goto fail;
 	}
 
-	ret = mpp_get_dma_addr(mpp, enc->war_hdl, &enc->war_dma_addr, &tmp);
+	ret = mpp_get_dma_addr(mpp, enc->war_hdl,
+			       &enc->war_dma_addr, (u32 *)&tmp);
 	if (ret < 0) {
 		dev_err(mpp->dev, "get war dma_addr failed\n");
 		goto fail;

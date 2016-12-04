@@ -1796,8 +1796,18 @@ static int rk_fb_reg_effect(struct rk_lcdc_driver *dev_drv,
 				if (dev_drv->ops->get_win_state) {
 					win_status =
 					dev_drv->ops->get_win_state(dev_drv, i, j);
-					if (win_status)
+					if (win_status) {
 						wait_for_vsync = true;
+						dev_info(dev_drv->dev,
+							 "win[%d]area[%d]: "
+							 "state: %d, "
+							 "cur state: %d,"
+							 "count: %d\n",
+							 i, j,
+							 dev_drv->win[i]->area[j].state,
+							 win_status,
+							 101 - count);
+					}
 				}
 			} else {
 				pr_err("!!!win[%d]state:%d,error!!!\n",
@@ -1951,7 +1961,8 @@ static void rk_fb_update_reg(struct rk_lcdc_driver *dev_drv,
 		timeout = wait_event_interruptible_timeout(dev_drv->vsync_info.wait,
 				ktime_compare(dev_drv->vsync_info.timestamp, timestamp) > 0,
 				msecs_to_jiffies(50));
-
+		if (timeout <= 0)
+			dev_info(dev_drv->dev, "timeout: %ld\n", timeout);
 		wait_for_vsync = rk_fb_reg_effect(dev_drv, regs, count);
 	} while (wait_for_vsync && count--);
 #ifdef H_USE_FENCE
@@ -2076,6 +2087,8 @@ static int rk_fb_config_debug(struct rk_lcdc_driver *dev_drv,
 			rk_fb_dbg(cmd, "	   xact=%d,yact=%d,xvir=%d,yvir=%d\n",
 				  area_par->xact, area_par->yact,
 				  area_par->xvir, area_par->yvir);
+			rk_fb_dbg(cmd, "	   data_space%d\n",
+				  area_par->data_space);
 		}
 	}
 
@@ -3014,7 +3027,7 @@ static int rk_fb_blank(int blank_mode, struct fb_info *info)
 	mutex_lock(&dev_drv->switch_screen);
 #if defined(CONFIG_RK_HDMI)
 	if ((rk_fb->disp_mode == ONE_DUAL) &&
-	    (hdmi_get_hotplug() == HDMI_HPD_ACTIVED)) {
+	    (hdmi_get_hotplug() == HDMI_HPD_ACTIVATED)) {
 		pr_info("hdmi is connect , not blank lcdc\n");
 	} else
 #endif
@@ -3556,21 +3569,22 @@ int rk_fb_switch_screen(struct rk_screen *screen, int enable, int lcdc_id)
 			dev_drv->id);
 	if (enable == 2 /*&& dev_drv->enable*/)
 		return 0;
-	pr_info("switch:en=%d,lcdc_id=%d,screen type=%d,cur type=%d\n",
+	pr_info("switch:en=%d,lcdc_id=%d,screen type=%d,cur type=%d",
 		enable, lcdc_id, screen->type, dev_drv->cur_screen->type);
+	pr_info("data space: %d, color mode: %d\n",
+		screen->data_space, screen->color_mode);
 
 	mutex_lock(&dev_drv->switch_screen);
 	hdmi_switch_state = 0;
 	dev_drv->hdmi_switch = 1;
 	if (!dev_drv->uboot_logo) {
-		mdelay(200);
 		list_is_empty = list_empty(&dev_drv->update_regs_list) &&
 					   list_empty(&dev_drv->saved_list);
 		if (!list_is_empty) {
 			ret = wait_event_timeout(dev_drv->update_regs_wait,
 						 list_empty(&dev_drv->update_regs_list) &&
 						 list_empty(&dev_drv->saved_list),
-						 msecs_to_jiffies(60));
+						 msecs_to_jiffies(200));
 			if (ret <= 0)
 				pr_info("%s: wait update_regs_wait timeout\n",
 					__func__);

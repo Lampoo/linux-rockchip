@@ -116,6 +116,7 @@ enum {
 	RK312X_GMAC,
 	RK3368_GMAC,
 	RK322X_GMAC,
+	RK322XH_GMAC,
 	RK1108_GMAC,
 	RK_MAX_GMAC
 };
@@ -163,8 +164,8 @@ struct bsp_priv {
 	struct clk *clk_macphy;
 	bool clk_enable;
 
-	int (*phy_power_on)(bool enable);
-	int (*gmac_clk_enable)(bool enable);
+	int (*phy_power_on)(struct bsp_priv *bsp_priv, bool enable);
+	int (*gmac_clk_enable)(struct bsp_priv *bsp_priv, bool enable);
 };
 
 extern int phyaddr;

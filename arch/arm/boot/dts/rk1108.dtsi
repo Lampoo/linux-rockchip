@@ -132,6 +132,9 @@
 			<&clk_i2s1_pll 594000000>, <&clk_i2s2_pll 594000000>,
 			<&clk_uart0_pll 297000000>, <&clk_uart1_pll 297000000>,
 			<&clk_uart2_pll 297000000>;
+		rockchip,clocks-uboot-has-init =
+			<&dclk_vop_pll>;
+		rockchip,set_div_for_pll_init;
 	};
 
 	rockchip_clocks_enable: clocks-enable {
@@ -218,6 +221,23 @@
 						816000 1000000
 						>;
 					status = "disabled";
+					tsadc-ch = <0>;
+					temp-limit-enable = <1>;
+					target-temp = <85>;
+					min_temp_limit = <600000>;
+
+					normal-temp-limit = <
+					/* delta-temp delta-freq */
+						3	96000
+						6	144000
+						9	192000
+						15	384000
+						>;
+
+					performance-temp-limit = <
+						/* temp freq */
+						100     816000
+						>;
 				};
 			};
 			pd_dsp {
@@ -226,7 +246,7 @@
 						/* KHz    uV */
 						300000 850000
 						400000 900000
-						600000 1100000
+						600000 1150000
 						//700000 1200000
 						>;
 					skip_adjusting_volt = <1>;
@@ -234,6 +254,12 @@
 				};
 			};
 		};
+	};
+
+	sram: sram@10080000 {
+		compatible = "mmio-sram";
+		reg = <0x10080000 0x2000>;
+		map-exec;
 	};
 
 	i2s0: i2s0@10110000 {
@@ -535,12 +561,6 @@
 		clocks = <&clk_gates3 12>, <&clk_gates13 14>;
 		clock-names = "saradc", "pclk_saradc";
 		status = "disabled";
-	};
-
-	sram: sram@20020000 {
-		compatible = "mmio-sram";
-		reg = <0x20020000 0x1000>;
-		map-exec;
 	};
 
 	pwm0: pwm@20040000 {

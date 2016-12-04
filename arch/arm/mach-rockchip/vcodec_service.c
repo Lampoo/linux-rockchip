@@ -192,6 +192,12 @@ static struct vcodec_info vcodec_info_set[] = {
 		.task_info	= task_vpu2,
 		.trans_info	= trans_vpu2,
 	},
+	[6] = {
+		.hw_id		= RKV_DEC_ID2,
+		.hw_info	= &hw_rkvdec,
+		.task_info	= task_rkv,
+		.trans_info	= trans_rkv,
+	},
 };
 
 #define DEBUG
@@ -489,7 +495,7 @@ static void vcodec_enter_mode(struct vpu_subdev_data *data)
 #if defined(CONFIG_VCODEC_MMU)
 	struct vpu_subdev_data *subdata, *n;
 #endif
-	if (pservice->subcnt < 2) {
+	if (pservice->subcnt < 2 || pservice->mode_ctrl == 0) {
 #if defined(CONFIG_VCODEC_MMU)
 		if (data->mmu_dev && !test_bit(MMU_ACTIVATED, &data->state)) {
 			set_bit(MMU_ACTIVATED, &data->state);
@@ -2812,7 +2818,7 @@ static void get_hw_info(struct vpu_subdev_data *data)
 		dec->reserve = 0;
 		dec->mvc_support = 1;
 
-		if (!cpu_is_rk3036()) {
+		if (data->enc_dev.iosize != 0) {
 			u32 config_reg = readl_relaxed(data->enc_dev.regs + 63);
 
 			enc->max_encoded_width = config_reg & ((1 << 11) - 1);
@@ -2888,18 +2894,12 @@ static irqreturn_t vdpu_irq(int irq, void *dev_id)
 
 		writel_relaxed(0, dev->regs + task->reg_irq);
 
-		/*
-		 * NOTE: rkvdec need to reset after each task to avoid timeout
-		 *       error on H.264 switch to H.265
-		 */
-		if (data->mode == VCODEC_RUNNING_MODE_RKVDEC)
-			writel(0x100000, dev->regs + task->reg_irq);
-
 		/* set clock gating to save power */
 		writel(task->gating_mask, dev->regs + task->reg_en);
 
 		atomic_add(1, &dev->irq_count_codec);
 		time_diff(task);
+		pservice->irq_status = raw_status;
 	}
 
 	task = &data->task_info[TASK_PP];
@@ -2925,8 +2925,6 @@ static irqreturn_t vdpu_irq(int irq, void *dev_id)
 			time_diff(task);
 		}
 	}
-
-	pservice->irq_status = raw_status;
 
 	if (atomic_read(&dev->irq_count_pp) ||
 	    atomic_read(&dev->irq_count_codec))

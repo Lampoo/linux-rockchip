@@ -166,6 +166,7 @@ void mpp_dump_reg_mem(u32 *regs, int count)
 
 int mpp_dev_common_ctx_init(struct rockchip_mpp_dev *mpp, struct mpp_ctx *cfg)
 {
+	INIT_LIST_HEAD(&cfg->session_link);
 	INIT_LIST_HEAD(&cfg->mem_region_list);
 
 	return 0;
@@ -216,8 +217,6 @@ static struct mpp_ctx *ctx_init(struct rockchip_mpp_dev *mpp,
 
 	ctx->session = session;
 	ctx->mpp = mpp;
-
-	INIT_LIST_HEAD(&ctx->session_link);
 
 	mpp_srv_pending_locked(mpp->srv, ctx);
 
@@ -798,6 +797,8 @@ static struct device *rockchip_get_sysmmu_dev(const char *compt)
 #if defined(CONFIG_OF)
 static const struct of_device_id mpp_dev_dt_ids[] = {
 	{.compatible = "rockchip,rkvenc", .data = &rkvenc_variant, },
+	{.compatible = "rockchip,vepu", .data = &vepu_variant, },
+	{.compatible = "rockchip,h265e", .data = &h265e_variant, },
 	{},
 };
 #endif

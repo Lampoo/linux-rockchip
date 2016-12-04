@@ -171,7 +171,7 @@
 					status-reg = <0x04 10>;
 					clocks = <&xin24m>;
 					clock-output-names = "clk_apll";
-					rockchip,pll-type = <CLK_PLL_322XH_APLL>;
+					rockchip,pll-type = <CLK_PLL_312XPLUS>;
 					#clock-cells = <0>;
 					#clock-init-cells = <1>;
 				};
@@ -206,7 +206,7 @@
 					status-reg = <0x64 10>;
 					clocks = <&xin24m>;
 					clock-output-names = "clk_gpll";
-					rockchip,pll-type = <CLK_PLL_3036PLUS_AUTO>;
+					rockchip,pll-type = <CLK_PLL_312XPLUS>;
 					#clock-cells = <0>;
 					#clock-init-cells = <1>;
 				};
@@ -254,7 +254,7 @@
 					clk_core: clk_core_mux {
 						compatible = "rockchip,rk3188-mux-con";
 						rockchip,bits = <6 2>;
-						clocks = <&clk_apll>, <&clk_gpll>, <&clk_dpll>;
+						clocks = <&clk_apll>, <&clk_gpll>, <&clk_dpll>, <&clk_npll>;
 						clock-output-names = "clk_core";
 						#clock-cells = <0>;
 						#clock-init-cells = <1>;
@@ -275,7 +275,7 @@
 					aclk_bus_mux: aclk_bus_mux {
 						compatible = "rockchip,rk3188-mux-con";
 						rockchip,bits = <13 2>;
-						clocks = <&clk_cpll>, <&clk_gpll>, <&hdmi_phy_clk>;
+						clocks = <&clk_cpll>, <&clk_gpll>, <&dummy>;
 						clock-output-names = "aclk_bus";
 						#clock-cells = <0>;
 						#clock-init-cells = <1>;
@@ -974,7 +974,8 @@
 						#clock-cells = <0>;
 						#clock-init-cells = <1>;
 						rockchip,clkops-idx = <CLKOPS_RATE_MUX_DIV>;
-						rockchip,flags = <CLK_SET_RATE_PARENT_IN_ORDER>;
+						rockchip,flags = <(CLK_SET_RATE_PARENT |
+								  CLK_SET_RATE_NO_REPARENT)>;
 					};
 
 					/* 13 reserved */
@@ -982,7 +983,7 @@
 					clk_pdm: clk_pdm_mux {
 						compatible = "rockchip,rk3188-mux-con";
 						rockchip,bits = <14 2>;
-						clocks = <&dummy>, <&clk_gpll>, <&dummy>;
+						clocks = <&dummy>, <&dummy>, <&clk_apll>, <&dummy>;
 						clock-output-names = "clk_pdm";
 						#clock-cells = <0>;
 						#clock-init-cells = <1>;
@@ -1625,13 +1626,14 @@
 
 					clk_rtc32k_div: clk_rtc32k_div {
 						compatible = "rockchip,rk3188-div-con";
-						rockchip,bits = <6 8>;
+						rockchip,bits = <0 14>;
 						clocks = <&clk_rtc32k>;
 						clock-output-names = "clk_rtc32k";
 						rockchip,div-type = <CLK_DIVIDER_PLUS_ONE>;
 						#clock-cells = <0>;
 						rockchip,clkops-idx = <CLKOPS_RATE_MUX_DIV>;
-						rockchip,flags = <CLK_SET_RATE_PARENT_IN_ORDER>;
+						rockchip,flags = <(CLK_SET_RATE_PARENT_IN_ORDER |
+								  CLK_SET_RATE_NO_REPARENT)>;
 					};
 
 					clk_rtc32k: clk_rtc32k_mux {
@@ -1685,7 +1687,7 @@
 					dclk_vop_pll_mux: dclk_vop_pll_mux {
 						compatible = "rockchip,rk3188-mux-con";
 						rockchip,bits = <0 1>;
-						clocks = <&clk_cpll>, <&clk_gpll>;
+						clocks = <&clk_gpll>, <&clk_cpll>;
 						clock-output-names = "dclk_vop_pll";
 						#clock-cells = <0>;
 						#clock-init-cells = <1>;
@@ -1698,6 +1700,7 @@
 						clock-output-names = "dclk_vop";
 						#clock-cells = <0>;
 						#clock-init-cells = <1>;
+						rockchip,flags = <CLK_SET_RATE_NO_REPARENT>;
 					};
 
 					/* 2 reserved */
@@ -2425,11 +2428,11 @@
 					compatible = "rockchip,rk3188-gate-clk";
 					reg = <0x0224 0x4>;
 					clocks =
-					<&aclk_gmac>,	<&clk_mac2phy>,
-					<&clk_mac2phy>,	<&clk_mac2phy>,
+					<&aclk_gmac>,	<&clk_gmac2phy>,
+					<&clk_mac2phy>,	<&clk_gmac2phy>,
 
-					<&clk_mac2io>,	<&clk_mac2io>,
-					<&clk_mac2io>,	<&clk_mac2io>,
+					<&clk_gmac2io>,	<&clk_gmac2io>,
+					<&clk_gmac2io>,	<&clk_gmac2io>,
 
 					<&dummy>,	<&dummy>,
 					<&dummy>,	<&dummy>,
@@ -2784,7 +2787,7 @@
 					<&aclk_vio>,	<&hclk_vio>,
 
 					<&aclk_vio>,	<&hclk_vio>,
-					<&dummy>,	<&hclk_vio>,
+					<&aclk_rga>,	<&hclk_vio>,
 
 					<&hclk_vio>,	<&hclk_vio>,
 					<&hclk_vio>,	<&aclk_vio>;
@@ -2797,7 +2800,7 @@
 					"aclk_iep",	"hclk_iep",
 
 					"aclk_cif",	"hclk_cif",
-					"reserved",	"hclk_rga",
+					"p_aclk_rga",	"hclk_rga",
 
 					"hclk_ahb1tom",	"pclk_h2p",
 					"hclk_h2p",	"aclk_hdcp";
@@ -2810,7 +2813,7 @@
 					reg = <0x0258 0x4>;
 					clocks =
 					<&hclk_vio>,	<&dummy>,
-					<&dummy>,	<&dummy>,
+					<&dummy>,	<&aclk_rga>,
 
 					<&hclk_vio>,	<&hclk_vio>,
 					<&dummy>,	<&dummy>,
@@ -3011,7 +3014,7 @@
 					<&dummy>,	<&dummy>,
 
 					<&dummy>,	<&dummy>,
-					<&dummy>,	<&dummy>;
+					<&dummy>,	<&pclk_bus>;
 
 					clock-output-names =
 					"hclk_pdm",	"p_usb3phy_otg",
@@ -3024,10 +3027,37 @@
 					"reserved",	"reserved",
 
 					"reserved",	"reserved",
-					"reserved",	"reserved";
+					"reserved",	"pclk_wdt";
 
 					#clock-cells = <1>;
 				};
+			};
+		};
+
+		special_regs {
+			compatible = "rockchip,rk-clock-special-regs";
+			#address-cells = <2>;
+			#size-cells = <2>;
+			ranges;
+
+			clk_gmac2io: clk_gmac2io_mux {
+				compatible = "rockchip,rk3188-mux-con";
+				reg = <0x0 0xff100904 0x0 0x4>;
+				rockchip,bits = <10 1>;
+				clocks = <&clk_mac2io>, <&gmac_clkin>;
+				clock-output-names = "clk_gmac2io";
+				#clock-cells = <0>;
+				#clock-init-cells = <1>;
+			};
+
+			clk_gmac2phy: clk_gmac2phy_mux {
+				compatible = "rockchip,rk3188-mux-con";
+				reg = <0x0 0xff100908 0x0 0x4>;
+				rockchip,bits = <10 1>;
+				clocks = <&clk_mac2phy>, <&phy_50m_out>;
+				clock-output-names = "clk_gmac2phy";
+				#clock-cells = <0>;
+				#clock-init-cells = <1>;
 			};
 		};
 	};

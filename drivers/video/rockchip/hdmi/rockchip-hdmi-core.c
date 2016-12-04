@@ -76,6 +76,63 @@ static inline void hdmi_wq_set_audio(struct hdmi *hdmi)
 		hdmi->ops->setaudio(hdmi, &hdmi->audio);
 }
 
+static int hdmi_check_format(struct hdmi *hdmi, struct hdmi_video *vpara)
+{
+	struct hdmi_video_timing *timing;
+	struct fb_videomode *mode;
+	int tmdsclk;
+
+	if (!vpara)
+		return -ENOENT;
+	timing = (struct hdmi_video_timing *)hdmi_vic2timing(vpara->vic);
+	if (!timing) {
+		pr_err("[%s] not found vic %d\n", __func__, vpara->vic);
+		return -ENOENT;
+	}
+	mode = &timing->mode;
+	if (vpara->color_input == HDMI_COLOR_YCBCR420)
+		tmdsclk = mode->pixclock / 2;
+	else if (vpara->format_3d == HDMI_3D_FRAME_PACKING)
+		tmdsclk = 2 * mode->pixclock;
+	else
+		tmdsclk = mode->pixclock;
+	if (vpara->color_output != HDMI_COLOR_YCBCR422) {
+		switch (vpara->color_output_depth) {
+		case 10:
+			tmdsclk += tmdsclk / 4;
+			break;
+		case 12:
+			tmdsclk += tmdsclk / 2;
+			break;
+		case 16:
+			tmdsclk += tmdsclk;
+			break;
+		case 8:
+		default:
+			break;
+		}
+	} else if (vpara->color_output_depth > 12) {
+		/* YCbCr422 mode only support up to 12bit */
+		vpara->color_output_depth = 12;
+	}
+	if ((tmdsclk > 594000000) ||
+	    (tmdsclk > 340000000 &&
+	     tmdsclk > hdmi->edid.maxtmdsclock)) {
+		if (vpara->format_3d == HDMI_3D_FRAME_PACKING) {
+			pr_err("out of max tmdsclk, disable 3d\n");
+			vpara->format_3d = 0;
+		} else if (vpara->color_output == HDMI_COLOR_YCBCR444 &&
+			   hdmi->edid.ycbcr422) {
+			pr_warn("out of max tmdsclk, down to YCbCr422");
+			vpara->color_output = HDMI_COLOR_YCBCR422;
+		} else {
+			pr_warn("out of max tmds clock, limit to 8bit\n");
+			vpara->color_output_depth = 8;
+		}
+	}
+	return 0;
+}
+
 static void hdmi_wq_set_video(struct hdmi *hdmi)
 {
 	struct hdmi_video *video = &(hdmi->video);
@@ -137,10 +194,23 @@ static void hdmi_wq_set_video(struct hdmi *hdmi)
 		video->eotf = 0;
 	} else {
 		video->vic = hdmi->vic & HDMI_VIC_MASK;
-		video->eotf = hdmi->eotf;
+		video->eotf = 0;
+		if (hdmi->eotf) {
+			if (hdmi->eotf & hdmi->edid.hdr.hdrinfo.eotf) {
+				video->eotf = hdmi->eotf;
+			} else {
+				pr_err("sink eotf %x not support eotf %x\n",
+				       hdmi->edid.hdr.hdrinfo.eotf,
+				       hdmi->eotf);
+				if (hdmi->edid.hdr.hdrinfo.eotf &
+				    EOTF_TRADITIONAL_GMMA_SDR)
+					video->eotf = EOTF_TRADITIONAL_GMMA_SDR;
+			}
+		}
 		/* ST_2084 must be 10bit and bt2020 */
 		if (video->eotf & EOTF_ST_2084) {
-			video->color_output_depth = 10;
+			if (deepcolor & HDMI_DEEP_COLOR_30BITS)
+				video->color_output_depth = 10;
 			if (video->color_output > HDMI_COLOR_RGB_16_235)
 				video->colorimetry =
 					HDMI_COLORIMETRY_EXTEND_BT_2020_YCC;
@@ -149,7 +219,7 @@ static void hdmi_wq_set_video(struct hdmi *hdmi)
 					HDMI_COLORIMETRY_EXTEND_BT_2020_RGB;
 		}
 	}
-
+	hdmi_check_format(hdmi, video);
 	if (hdmi->uboot) {
 		if ((uboot_vic & HDMI_UBOOT_VIC_MASK) != hdmi->vic)
 			hdmi->uboot = 0;
@@ -164,7 +234,7 @@ static void hdmi_wq_parse_edid(struct hdmi *hdmi)
 {
 	struct hdmi_edid *pedid;
 
-	int rc = HDMI_ERROR_SUCESS, extendblock = 0, i, trytimes;
+	int rc = HDMI_ERROR_SUCCESS, extendblock = 0, i, trytimes;
 
 	if (hdmi == NULL)
 		return;
@@ -284,7 +354,7 @@ static void hdmi_wq_remove(struct hdmi *hdmi)
 		hdmi->ops->remove(hdmi);
 	if (hdmi->property->feature & SUPPORT_CEC)
 		rockchip_hdmi_cec_set_pa(0);
-	if (hdmi->hotplug == HDMI_HPD_ACTIVED) {
+	if (hdmi->hotplug == HDMI_HPD_ACTIVATED) {
 		screen.type = SCREEN_HDMI;
 		rk_fb_switch_screen(&screen, 0, hdmi->lcdc->id);
 	}
@@ -338,7 +408,7 @@ static void hdmi_work_queue(struct work_struct *work)
 			if (!hdmi->sleep) {
 				if (hdmi->ops->enable)
 					hdmi->ops->enable(hdmi);
-				if (hdmi->hotplug == HDMI_HPD_ACTIVED)
+				if (hdmi->hotplug == HDMI_HPD_ACTIVATED)
 					hdmi_wq_insert(hdmi);
 			}
 		}
@@ -352,7 +422,7 @@ static void hdmi_work_queue(struct work_struct *work)
 		break;
 	case HDMI_DISABLE_CTL:
 		if (hdmi->enable) {
-			if (hdmi->hotplug == HDMI_HPD_ACTIVED)
+			if (hdmi->hotplug == HDMI_HPD_ACTIVATED)
 				hdmi_wq_set_output(hdmi,
 						   HDMI_VIDEO_MUTE |
 						   HDMI_AUDIO_MUTE);
@@ -366,7 +436,7 @@ static void hdmi_work_queue(struct work_struct *work)
 		break;
 	case HDMI_SUSPEND_CTL:
 		if (!hdmi->sleep) {
-			if (hdmi->hotplug == HDMI_HPD_ACTIVED)
+			if (hdmi->hotplug == HDMI_HPD_ACTIVATED)
 				hdmi_wq_set_output(hdmi,
 						   HDMI_VIDEO_MUTE |
 						   HDMI_AUDIO_MUTE);
@@ -383,10 +453,10 @@ static void hdmi_work_queue(struct work_struct *work)
 		HDMIDBG(2, "hdmi_work_queue() - hpd is %d hotplug is %d\n",
 			hpd, hdmi->hotplug);
 		if (hpd != hdmi->hotplug) {
-			if (hpd == HDMI_HPD_ACTIVED) {
+			if (hpd == HDMI_HPD_ACTIVATED) {
 				hdmi->hotplug = hpd;
 				hdmi_wq_insert(hdmi);
-			} else if (hdmi->hotplug == HDMI_HPD_ACTIVED) {
+			} else if (hdmi->hotplug == HDMI_HPD_ACTIVATED) {
 				hdmi_wq_remove(hdmi);
 			}
 			hdmi->hotplug = hpd;
@@ -416,7 +486,7 @@ static void hdmi_work_queue(struct work_struct *work)
 	case HDMI_MUTE_AUDIO:
 	case HDMI_UNMUTE_AUDIO:
 		if (hdmi->mute & HDMI_AUDIO_MUTE ||
-		    hdmi->hotplug != HDMI_HPD_ACTIVED)
+		    hdmi->hotplug != HDMI_HPD_ACTIVATED)
 			break;
 		if (event == HDMI_MUTE_AUDIO)
 			hdmi_wq_set_output(hdmi, hdmi->mute |
@@ -451,14 +521,15 @@ static void hdmi_work_queue(struct work_struct *work)
 				   HDMI_VIDEO_MUTE | HDMI_AUDIO_MUTE);
 		msleep(100);
 		hdmi_wq_set_video(hdmi);
+		hdmi_wq_set_audio(hdmi);
 		hdmi_wq_set_output(hdmi, hdmi->mute);
 		break;
 	case HDMI_ENABLE_HDCP:
-		if (hdmi->hotplug == HDMI_HPD_ACTIVED && hdmi->ops->hdcp_cb)
+		if (hdmi->hotplug == HDMI_HPD_ACTIVATED && hdmi->ops->hdcp_cb)
 			hdmi->ops->hdcp_cb(hdmi);
 		break;
 	case HDMI_HDCP_AUTH_2ND:
-		if (hdmi->hotplug == HDMI_HPD_ACTIVED &&
+		if (hdmi->hotplug == HDMI_HPD_ACTIVATED &&
 		    hdmi->ops->hdcp_auth2nd)
 			hdmi->ops->hdcp_auth2nd(hdmi);
 		break;
@@ -596,10 +667,9 @@ void rockchip_hdmi_unregister(struct hdmi *hdmi)
 			kfree(hdmi->edid.specs->modedb);
 			kfree(hdmi->edid.specs);
 		}
-		kfree(hdmi);
-
 		ref_info[hdmi->id].ref = 0;
 		ref_info[hdmi->id].hdmi = NULL;
+		kfree(hdmi);
 
 		hdmi = NULL;
 	}
@@ -626,7 +696,7 @@ int hdmi_config_audio(struct hdmi_audio	*audio)
 			continue;
 		hdmi = ref_info[i].hdmi;
 		memcpy(&hdmi->audio, audio, sizeof(struct hdmi_audio));
-		if (hdmi->hotplug == HDMI_HPD_ACTIVED)
+		if (hdmi->hotplug == HDMI_HPD_ACTIVATED)
 			hdmi_submit_work(hdmi, HDMI_SET_AUDIO, 0, 0);
 	}
 	return 0;
@@ -716,7 +786,7 @@ static int __init hdmi_class_init(void)
 		ref_info[i].ref = 0;
 		ref_info[i].hdmi = NULL;
 	}
-	pr_info("Rockchip hdmi driver version 2.0\n.");
+	pr_info("Rockchip hdmi driver version 2.0\n");
 	return 0;
 }
 

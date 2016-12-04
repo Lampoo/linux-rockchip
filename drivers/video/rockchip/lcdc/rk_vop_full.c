@@ -71,9 +71,17 @@ static struct rk_lcdc_win rk322xh_vop_win[] = {
 				SUPPORT_YUV10BIT,
 	  .property.max_input_x = 4096,
 	  .property.max_input_y = 2304},
+	{ .name = "win3",
+		  .id = 3,
+		  .property.feature = SUPPORT_WIN_IDENTIFY |
+					SUPPORT_SCALE | SUPPORT_YUV |
+					SUPPORT_YUV10BIT,
+		  .property.max_input_x = 4096,
+		  .property.max_input_y = 2304},
+
 	{
 	  .name = "hwc",
-	  .id = 3,
+	  .id = 4,
 	  .property.feature = SUPPORT_WIN_IDENTIFY | SUPPORT_HW_EXIST |
 				SUPPORT_HWC_LAYER,
 	  .property.max_input_x = 128,
@@ -116,6 +124,7 @@ static const u32 sdr2hdr_bt1886eotf_yn_for_bt2020[65] = {
 };
 
 static const u32 sdr2hdr_bt1886eotf_yn_for_hdr[65] = {
+#if 0
 	0,
 	5,     21,    49,    91,
 	150,   225,   320,   434,
@@ -133,6 +142,70 @@ static const u32 sdr2hdr_bt1886eotf_yn_for_hdr[65] = {
 	10039, 10136, 10234, 10333,
 	10432, 10531, 10631, 10732,
 	10833, 10935, 11038, 11141,
+#endif
+
+#if 0
+	/* dst_range 300int */
+	0,
+	4,    15,   36,   66,
+	108,  162,  229,  310,
+	406,  517,  644,  788,
+	949,  1127, 1324, 1539,
+	1773, 2027, 2301, 2595,
+	2750, 2911, 3076, 3247,
+	3423, 3605, 3793, 3985,
+	4184, 4388, 4598, 4814,
+	4924, 5035, 5148, 5262,
+	5378, 5495, 5614, 5734,
+	5856, 5979, 6104, 6230,
+	6358, 6487, 6618, 6750,
+	6817, 6884, 6951, 7019,
+	7087, 7156, 7225, 7295,
+	7364, 7435, 7505, 7576,
+	7647, 7719, 7791, 7864,
+#endif
+
+#if 0
+	/* dst_range 400int */
+	0,
+	5,     20,    46,    86,
+	141,   213,   302,   410,
+	537,   684,   853,   1044,
+	1258,  1496,  1758,  2044,
+	2357,  2695,  3060,  3453,
+	3660,  3873,  4094,  4322,
+	4558,  4800,  5050,  5308,
+	5573,  5845,  6125,  6413,
+	6560,  6708,  6859,  7012,
+	7166,  7323,  7481,  7642,
+	7804,  7969,  8135,  8304,
+	8474,  8647,  8821,  8998,
+	9087,  9177,  9267,  9357,
+	9449,  9540,  9632,  9725,
+	9818,  9912,  10006, 10101,
+	10196, 10292, 10388, 10485,
+#endif
+
+#if 1
+	/* dst_range 425int */
+	0,
+	5,     21,    49,     91,
+	150,   225,   320,   434,
+	569,   726,   905,   1108,
+	1336,  1588,  1866,  2171,
+	2502,  2862,  3250,  3667,
+	3887,  4114,  4349,  4591,
+	4841,  5099,  5364,  5638,
+	5920,  6209,  6507,  6812,
+	6968,  7126,  7287,  7449,
+	7613,  7779,  7948,  8118,
+	8291,  8466,  8643,  8822,
+	9003,  9187,  9372,  9560,
+	9655,  9750,  9846,  9942,
+	10039, 10136, 10234, 10333,
+	10432, 10531, 10631, 10732,
+	10833, 10935, 11038, 11141,
+#endif
 };
 
 static const u32 sdr2hdr_st2084oetf_yn_for_bt2020[65] = {
@@ -156,6 +229,7 @@ static const u32 sdr2hdr_st2084oetf_yn_for_bt2020[65] = {
 };
 
 static const u32 sdr2hdr_st2084oetf_yn_for_hdr[65] = {
+#if 0
 	0,
 	668,   910,   1217,  1600,
 	2068,  2384,  2627,  3282,
@@ -173,6 +247,25 @@ static const u32 sdr2hdr_st2084oetf_yn_for_hdr[65] = {
 	13839, 13953, 14163, 14350,
 	14519, 14673, 14945, 15180,
 	15570, 15887, 16153, 16383,
+#else
+	0,
+	281,   418,   610,   871,
+	1217,  1464,  1662,  2218,
+	2599,  2896,  3699,  4228,
+	4628,  4953,  5227,  5466,
+	5676,  6038,  6341,  6602,
+	6833,  7039,  7226,  7396,
+	7554,  7835,  8082,  8302,
+	8501,  8848,  9145,  9405,
+	9635,  9842,  10031, 10204,
+	10512, 10779, 11017, 11230,
+	11423, 11599, 11762, 11913,
+	12054, 12185, 12426, 12641,
+	12835, 13013, 13177, 13328,
+	13469, 13600, 13840, 14055,
+	14248, 14425, 14737, 15006,
+	15453, 15816, 16121, 16383,
+#endif
 };
 
 static const u32 sdr2hdr_st2084oetf_dxn_pow2[64] = {
@@ -392,7 +485,7 @@ static int vop_reg_dump(struct rk_lcdc_driver *dev_drv)
 			vop_readl(vop_dev, i * 16 + 0xc));
 	}
 
-	for (i = 0x600; i <= 0x650 >> 2; i++) {
+	for (i = 0x600 >> 4; i <= 0x650 >> 4; i++) {
 		pr_info("0x%04x: ", i * 16 + 0x20020000);
 		pr_info("%08x  %08x  %08x  %08x\n",
 			vop_readl(vop_dev, i * 16 + 0x0),
@@ -401,7 +494,7 @@ static int vop_reg_dump(struct rk_lcdc_driver *dev_drv)
 			vop_readl(vop_dev, i * 16 + 0xc));
 	}
 
-	for (i = SDR2HDR_CTRL; i <= 0x730 >> 2; i++) {
+	for (i = SDR2HDR_CTRL >> 4; i <= 0x730 >> 4; i++) {
 		pr_info("0x%04x: ", i * 16 + 0x20020000);
 		pr_info("%08x  %08x  %08x  %08x\n",
 			vop_readl(vop_dev, i * 16 + 0x0),
@@ -410,7 +503,7 @@ static int vop_reg_dump(struct rk_lcdc_driver *dev_drv)
 			vop_readl(vop_dev, i * 16 + 0xc));
 	}
 
-	for (i = HDR2SDR_CTRL; i <= 0xa30 >> 2; i++) {
+	for (i = HDR2SDR_CTRL >> 4; i <= 0xa30 >> 4; i++) {
 		pr_info("0x%04x: ", i * 16 + 0x20020000);
 		pr_info("%08x  %08x  %08x  %08x\n",
 			vop_readl(vop_dev, i * 16 + 0x0),
@@ -599,7 +692,11 @@ static int vop_pre_init(struct rk_lcdc_driver *dev_drv)
 	vop_writel(vop_dev, FRC_LOWER11_0, 0xdeb77deb);
 	vop_writel(vop_dev, FRC_LOWER11_1, 0xed7bb7de);
 
-	vop_msk_reg(vop_dev, SYS_CTRL, V_AUTO_GATING_EN(0));
+	vop_writel(vop_dev, WIN0_CTRL2, 0x21);
+	vop_writel(vop_dev, WIN1_CTRL2, 0x43);
+	vop_writel(vop_dev, WIN2_CTRL2, 0x65);
+
+	vop_msk_reg(vop_dev, SYS_CTRL, V_AUTO_GATING_EN(1));
 	vop_msk_reg(vop_dev, DSP_CTRL1, V_DITHER_UP_EN(1));
 
 	vop_msk_reg(vop_dev, SDR2HDR_CTRL, V_WIN_CSC_MODE_SEL(1));
@@ -684,7 +781,7 @@ static void rk322xh_vop_win_csc_mode(struct vop_device *vop_dev,
 		y2r_en = 0;
 	}
 
-	shift = win->id << 2;
+	shift = win->id * 2;
 	val = (V_WIN0_R2Y_EN(r2y_en) | V_WIN0_Y2R_EN(y2r_en)) << shift;
 	vop_msk_reg(vop_dev, SDR2HDR_CTRL, val);
 	if (r2y_en | y2r_en) {
@@ -717,9 +814,6 @@ static void rk322xh_vop_hdr_csc_cfg(struct rk_lcdc_driver *dev_drv)
 
 	output_data_space = dev_drv->cur_screen->data_space;
 
-	vop_dev->pre_sdr2hdr = 0;
-	vop_dev->post_sdr2hdr = 0;
-	vop_dev->post_hdr2sdr = 0;
 	dev_drv->pre_overlay = 1;
 
 	for (i = 0; i < dev_drv->lcdc_win_num; i++) {
@@ -736,7 +830,6 @@ static void rk322xh_vop_hdr_csc_cfg(struct rk_lcdc_driver *dev_drv)
 				post_hdr2sdr_en = 1;
 				post_sdr2hdr_en = 0;
 			} else {
-				pr_warn("sdr input and hdr output!\n");
 				post_hdr2sdr_en = 0;
 				post_sdr2hdr_en = 1;
 			}
@@ -763,10 +856,10 @@ static void rk322xh_vop_hdr_csc_cfg(struct rk_lcdc_driver *dev_drv)
 	if ((pre_sdr2hdr_en == win_state) && (pre_sdr2hdr_en != 0)) {
 		/* enable pre sdr2hdr */
 		vop_dev->pre_sdr2hdr = 1;
-		val = V_BT1886EOTF_PRE_CONV_EN(pre_sdr2hdr_en) |
-			V_RGB2RGB_PRE_CONV_EN(pre_sdr2hdr_en) |
+		val = V_BT1886EOTF_PRE_CONV_EN(!!pre_sdr2hdr_en) |
+			V_RGB2RGB_PRE_CONV_EN(!!pre_sdr2hdr_en) |
 			V_RGB2RGB_PRE_CONV_MODE(0) |
-			V_ST2084OETF_PRE_CONV_EN(pre_sdr2hdr_en);
+			V_ST2084OETF_PRE_CONV_EN(!!pre_sdr2hdr_en);
 		vop_load_sdr2hdr_table(vop_dev, SDR2HDR_FOR_HDR);
 	} else if (pre_sdr2hdr_en == 0) {
 		/* disable pre sdr2hdr */
@@ -938,7 +1031,14 @@ static void rk322xh_vop_sdr_csc_cfg(struct rk_lcdc_driver *dev_drv)
 static void rk322xh_vop_bcsh_path_sel(struct rk_lcdc_driver *dev_drv);
 static void rk322xh_vop_csc_cfg(struct rk_lcdc_driver *dev_drv)
 {
+	struct vop_device *vop_dev =
+	    container_of(dev_drv, struct vop_device, driver);
+
 	dev_drv->pre_overlay = 0;
+	vop_dev->pre_sdr2hdr = 0;
+	vop_dev->post_sdr2hdr = 0;
+	vop_dev->post_hdr2sdr = 0;
+
 	if ((dev_drv->win[0]->area[0].data_space ||
 	     dev_drv->cur_screen->data_space) &&
 	    dev_drv->win[0]->area[0].state)
@@ -1239,6 +1339,10 @@ static int vop_alpha_cfg(struct rk_lcdc_driver *dev_drv, int win_id)
 		dst_alpha_ctl = WIN2_DST_ALPHA_CTRL;
 		break;
 	case 3:
+		src_alpha_ctl = WIN3_SRC_ALPHA_CTRL;
+		dst_alpha_ctl = WIN3_DST_ALPHA_CTRL;
+		break;
+	case 4:
 		src_alpha_ctl = HWC_SRC_ALPHA_CTRL;
 		dst_alpha_ctl = HWC_DST_ALPHA_CTRL;
 		break;
@@ -1336,14 +1440,14 @@ static int vop_win_full_reg_update(struct rk_lcdc_driver *dev_drv, int win_id)
 					val = V_WIN0_DSP_BG_RED(0x200) |
 						V_WIN0_DSP_BG_GREEN(0x40) |
 						V_WIN0_DSP_BG_BLUE(0x200) |
-						V_WIN0_BG_EN(1);
+						V_WIN0_BG_EN(0);
 					vop_msk_reg(vop_dev, WIN0_DSP_BG + off,
 						    val);
 				} else {
 					val = V_WIN0_DSP_BG_RED(0) |
 						V_WIN0_DSP_BG_GREEN(0) |
 						V_WIN0_DSP_BG_BLUE(0) |
-						V_WIN0_BG_EN(1);
+						V_WIN0_BG_EN(0);
 					vop_msk_reg(vop_dev, WIN0_DSP_BG + off,
 						    val);
 				}
@@ -1468,7 +1572,7 @@ static int vop_layer_update_regs(struct vop_device *vop_dev,
 		case 2:
 			vop_win_full_reg_update(dev_drv, win->id);
 			break;
-		case 3:
+		case 4:
 			vop_hwc_reg_update(dev_drv, win->id);
 			break;
 		default:
@@ -1620,10 +1724,27 @@ static void rk322xh_vop_bcsh_path_sel(struct rk_lcdc_driver *dev_drv)
 	    container_of(dev_drv, struct vop_device, driver);
 	u32 bcsh_ctrl;
 	u32 r2y_mode = 0, y2r_mode = 0;
+	u64 val = 0;
 
 	vop_msk_reg(vop_dev, SYS_CTRL, V_OVERLAY_MODE(dev_drv->overlay_mode));
 	vop_msk_reg(vop_dev, SYS_CTRL1,
-		    V_LEVEL2_OVERLAY_EN(dev_drv->pre_overlay));
+		    V_LEVEL2_OVERLAY_EN(dev_drv->pre_overlay) |
+		    V_ALPHA_HARD_CALC(dev_drv->pre_overlay));
+	/* BG color */
+	if (dev_drv->overlay_mode == VOP_YUV_DOMAIN) {
+		val = V_DSP_OUT_RGB_YUV(1);
+		vop_msk_reg(vop_dev, POST_SCL_CTRL, val);
+		val = V_DSP_BG_BLUE(0x200) | V_DSP_BG_GREEN(0x40) |
+			V_DSP_BG_RED(0x200);
+		vop_msk_reg(vop_dev, DSP_BG, val);
+	} else {
+		val = V_DSP_OUT_RGB_YUV(0);
+		vop_msk_reg(vop_dev, POST_SCL_CTRL, val);
+		val = V_DSP_BG_BLUE(0) | V_DSP_BG_GREEN(0) |
+			V_DSP_BG_RED(0);
+		vop_msk_reg(vop_dev, DSP_BG, val);
+	}
+
 	if (dev_drv->overlay_mode == VOP_YUV_DOMAIN) {
 		if (IS_YUV_COLOR(dev_drv->output_color)) {	/* bypass */
 			vop_msk_reg(vop_dev, BCSH_CTRL,
@@ -1873,7 +1994,7 @@ static int vop_load_screen(struct rk_lcdc_driver *dev_drv, bool initscreen)
 			val = V_DSP_OUT_RGB_YUV(0);
 			vop_msk_reg(vop_dev, POST_SCL_CTRL, val);
 			val = V_DSP_BG_BLUE(0) | V_DSP_BG_GREEN(0) |
-				V_DSP_BG_RED(0x3ff);
+				V_DSP_BG_RED(0);
 			vop_msk_reg(vop_dev, DSP_BG, val);
 		}
 		vop_config_timing(dev_drv);
@@ -2051,7 +2172,7 @@ static int vop_pan_display(struct rk_lcdc_driver *dev_drv, int win_id)
 	case 2:
 		win_full_display(vop_dev, win);
 		break;
-	case 3:
+	case 4:
 		hwc_display(vop_dev, win);
 		break;
 	default:
@@ -2736,7 +2857,7 @@ static int vop_set_par(struct rk_lcdc_driver *dev_drv, int win_id)
 	case 2:
 		win_full_set_par(vop_dev, screen, win);
 		break;
-	case 3:
+	case 4:
 		hwc_set_par(vop_dev, screen, win);
 		break;
 	default:
@@ -2888,9 +3009,12 @@ static int vop_get_win_state(struct rk_lcdc_driver *dev_drv,
 		area_status = vop_read_bit(vop_dev, WIN1_CTRL0, V_WIN1_EN(0));
 		break;
 	case 2:
-		area_status = vop_read_bit(vop_dev, WIN1_CTRL0, V_WIN2_EN(0));
+		area_status = vop_read_bit(vop_dev, WIN2_CTRL0, V_WIN2_EN(0));
 		break;
 	case 3:
+		area_status = vop_read_bit(vop_dev, WIN3_CTRL0, V_WIN3_EN(0));
+		break;
+	case 4:
 		area_status = vop_read_bit(vop_dev, HWC_CTRL0, V_HWC_EN(0));
 		break;
 	default:
@@ -3296,9 +3420,10 @@ static ssize_t vop_get_disp_info(struct rk_lcdc_driver *dev_drv,
 	memset(dsp_buf, 0, sizeof(dsp_buf));
 
 	size += snprintf(dsp_buf, 80,
-		"vop output:\n  data space: %s\n  color mode: %s\n",
+		"vop output:\n  data space: %s\n  color mode: %s[%d]\n",
 		screen->data_space ? "HDR" : "SDR",
-		(screen->color_mode > COLOR_RGB_BT2020) ? "Ycbcr" : "RGB");
+		(screen->color_mode > COLOR_RGB_BT2020) ? "Ycbcr" : "RGB",
+		screen->color_mode);
 
 	strcat(buf, dsp_buf);
 	memset(dsp_buf, 0, sizeof(dsp_buf));
@@ -3412,6 +3537,10 @@ static int vop_config_done(struct rk_lcdc_driver *dev_drv)
 				vop_msk_reg(vop_dev, WIN2_CTRL0, val);
 				break;
 			case 3:
+				val = V_WIN3_EN(0);
+				vop_msk_reg(vop_dev, WIN3_CTRL0, val);
+				break;
+			case 4:
 				val = V_HWC_EN(0);
 				vop_msk_reg(vop_dev, HWC_CTRL0, val);
 				break;
@@ -3475,7 +3604,8 @@ static int vop_get_dsp_addr(struct rk_lcdc_driver *dev_drv,
 		dsp_addr[0][0] = vop_readl(vop_dev, WIN0_YRGB_MST);
 		dsp_addr[1][0] = vop_readl(vop_dev, WIN1_YRGB_MST);
 		dsp_addr[2][0] = vop_readl(vop_dev, WIN2_YRGB_MST);
-		dsp_addr[3][0] = vop_readl(vop_dev, HWC_MST);
+		dsp_addr[3][0] = vop_readl(vop_dev, WIN3_YRGB_MST);
+		dsp_addr[4][0] = vop_readl(vop_dev, HWC_MST);
 	}
 	spin_unlock(&vop_dev->reg_lock);
 	return 0;

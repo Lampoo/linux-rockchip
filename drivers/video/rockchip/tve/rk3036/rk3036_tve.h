@@ -118,14 +118,15 @@ enum {
 enum {
 	SOC_RK3036 = 0,
 	SOC_RK312X,
-	SOC_RK322X
+	SOC_RK322X,
+	SOC_RK322XH
 };
 
 #define TVOUT_DEAULT TVOUT_CVBS_PAL
 
 #define grf_writel(offset, v)	do { \
 	writel_relaxed(v, RK_GRF_VIRT + offset); \
-	dsb(); \
+	dsb(sy); \
 	} while (0)
 
 struct rk3036_tve {

@@ -20,6 +20,16 @@ static void uoc_write(u32 value, u32 reg)
 #ifdef CONFIG_USB20_OTG
 static void usb20otg_hw_init(void)
 {
+	/* Open debug mode for tuning */
+	uoc_write(UOC_HIWORD_UPDATE(0x1, 0x1, 10), 0x2c);
+
+	/* Open HS pre-emphasize function to increase HS slew rate */
+	uoc_write(UOC_HIWORD_UPDATE(0x5, 0x7, 0), 0x0);
+
+	/* Set ODT compensation voltage reference */
+	uoc_write(UOC_HIWORD_UPDATE(0x1, 0x1, 15), 0x8);
+	uoc_write(UOC_HIWORD_UPDATE(0x3, 0x3, 0), 0xc);
+
 	/* Turn off differential receiver in suspend mode */
 	uoc_write(UOC_HIWORD_UPDATE(0, 1, 2), 0x18);
 
@@ -112,7 +122,7 @@ static void usb20otg_clock_init(void *pdata)
 	}
 
 	usbpdata->ahbclk = ahbclk;
-	usbpdata->ahbclk = ahbclk_otg_pmu;
+	usbpdata->ahbclk_otg_pmu = ahbclk_otg_pmu;
 }
 
 static void usb20otg_clock_enable(void *pdata, int enable)

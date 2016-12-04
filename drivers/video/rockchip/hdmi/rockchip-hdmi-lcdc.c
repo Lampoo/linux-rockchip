@@ -804,9 +804,7 @@ static int hdmi_set_info(struct rk_screen *screen, struct hdmi *hdmi)
 	mode = (struct fb_videomode *)&hdmi_mode[i].mode;
 	if (hdmi->video.color_input == HDMI_COLOR_RGB_0_255) {
 		screen->color_mode = COLOR_RGB;
-	} else if (mode->xres >= 3840 &&
-		   mode->yres >= 2160 &&
-		   colorimetry > HDMI_COLORIMETRY_EXTEND_ADOBE_RGB) {
+	} else if (colorimetry > HDMI_COLORIMETRY_EXTEND_ADOBE_RGB) {
 		screen->color_mode = COLOR_YCBCR_BT2020;
 		if (hdmi->video.eotf == EOTF_ST_2084)
 			screen->data_space = 1;
@@ -1179,7 +1177,7 @@ static void hdmi_sort_modelist(struct hdmi_edid *edid, int feature)
 /**
  * hdmi_ouputmode_select - select hdmi transmitter output mode: hdmi or dvi?
  * @hdmi: handle of hdmi
- * @edid_ok: get EDID data success or not, HDMI_ERROR_SUCESS means success.
+ * @edid_ok: get EDID data success or not, HDMI_ERROR_SUCCESS means success.
  */
 int hdmi_ouputmode_select(struct hdmi *hdmi, int edid_ok)
 {
@@ -1188,7 +1186,7 @@ int hdmi_ouputmode_select(struct hdmi *hdmi, int edid_ok)
 	struct fb_videomode *modedb = NULL, *mode = NULL;
 	int i, pixclock, feature = hdmi->property->feature;
 
-	if (edid_ok != HDMI_ERROR_SUCESS) {
+	if (edid_ok != HDMI_ERROR_SUCCESS) {
 		dev_err(hdmi->dev, "warning: EDID error, assume sink as HDMI !!!!");
 		hdmi->edid.status = -1;
 		hdmi->edid.sink_hdmi = 1;
@@ -1283,7 +1281,7 @@ int hdmi_ouputmode_select(struct hdmi *hdmi, int edid_ok)
 		hdmi_sort_modelist(&hdmi->edid, hdmi->property->feature);
 	}
 
-	return HDMI_ERROR_SUCESS;
+	return HDMI_ERROR_SUCCESS;
 }
 
 /**

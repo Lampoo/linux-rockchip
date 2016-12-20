@@ -63,8 +63,15 @@
 *
 *v0.1.8:
 *1. Register v4l2 subdev for support subdev api; ex s_frame_interval;
+*
+*v0.1.9:
+*1. Isp device video node is dynamic;
+*2. Isp dma device add querycap ops;
+*
+*v0.1.a:
+*1. fix struct cifisp_hist_stat .hist_bins unsigned short to unsigned int;
 */
 
-#define CONFIG_CIFISP11_DRIVER_VERSION KERNEL_VERSION(0, 1, 8)
+#define CONFIG_CIFISP11_DRIVER_VERSION KERNEL_VERSION(0, 1, 0xa)
 
 #endif

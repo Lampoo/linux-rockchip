@@ -220,6 +220,9 @@ struct rk3x_i2c {
 	enum rk3x_i2c_state state;
 	unsigned int processed;
 	int error;
+
+	/* NACK Retry flag */
+	u32 nack_retry;
 };
 
 static inline void i2c_writel(struct rk3x_i2c *i2c, u32 value,
@@ -369,9 +372,9 @@ static void rk3x_i2c_fill_transmit_buf(struct rk3x_i2c *i2c)
 static void rk3x_i2c_handle_start(struct rk3x_i2c *i2c, unsigned int ipd)
 {
 	if (!(ipd & REG_INT_START)) {
-		rk3x_i2c_stop(i2c, -EIO);
 		dev_warn(i2c->dev, "unexpected irq in START: 0x%x\n", ipd);
 		rk3x_i2c_clean_ipd(i2c);
+		rk3x_i2c_stop(i2c, -EIO);
 		return;
 	}
 
@@ -397,9 +400,9 @@ static void rk3x_i2c_handle_start(struct rk3x_i2c *i2c, unsigned int ipd)
 static void rk3x_i2c_handle_write(struct rk3x_i2c *i2c, unsigned int ipd)
 {
 	if (!(ipd & REG_INT_MBTF)) {
-		rk3x_i2c_stop(i2c, -EIO);
 		dev_err(i2c->dev, "unexpected irq in WRITE: 0x%x\n", ipd);
 		rk3x_i2c_clean_ipd(i2c);
+		rk3x_i2c_stop(i2c, -EIO);
 		return;
 	}
 
@@ -452,9 +455,9 @@ static void rk3x_i2c_handle_stop(struct rk3x_i2c *i2c, unsigned int ipd)
 	unsigned int con;
 
 	if (!(ipd & REG_INT_STOP)) {
-		rk3x_i2c_stop(i2c, -EIO);
 		dev_err(i2c->dev, "unexpected irq in STOP: 0x%x\n", ipd);
 		rk3x_i2c_clean_ipd(i2c);
+		rk3x_i2c_stop(i2c, -EIO);
 		return;
 	}
 
@@ -477,6 +480,7 @@ static irqreturn_t rk3x_i2c_irq(int irqno, void *dev_id)
 {
 	struct rk3x_i2c *i2c = dev_id;
 	unsigned int ipd;
+	int ret;
 
 	spin_lock(&i2c->lock);
 
@@ -502,8 +506,13 @@ static irqreturn_t rk3x_i2c_irq(int irqno, void *dev_id)
 
 		ipd &= ~REG_INT_NAKRCV;
 
-		if (!(i2c->msg->flags & I2C_M_IGNORE_NAK))
-			rk3x_i2c_stop(i2c, -ENXIO);
+		if (!(i2c->msg->flags & I2C_M_IGNORE_NAK)) {
+			dev_err(i2c->dev, "NACK IRQ: state %d, ipd: 0x%x\n",
+				i2c->state, ipd);
+			ret = i2c->nack_retry ? -EAGAIN : -ENXIO;
+			rk3x_i2c_stop(i2c, ret);
+			goto out;
+		}
 	}
 
 	/* is there anything left to handle? */
@@ -1329,6 +1338,8 @@ static int rk3x_i2c_probe(struct platform_device *pdev)
 
 	clk_rate = clk_get_rate(i2c->clk);
 	rk3x_i2c_adapt_div(i2c, clk_rate);
+
+	of_property_read_u32(np, "nack-retry", &i2c->nack_retry);
 
 	ret = i2c_add_adapter(&i2c->adap);
 	if (ret < 0) {

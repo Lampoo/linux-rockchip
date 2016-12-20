@@ -167,6 +167,7 @@ void mpp_dump_reg_mem(u32 *regs, int count)
 int mpp_dev_common_ctx_init(struct rockchip_mpp_dev *mpp, struct mpp_ctx *cfg)
 {
 	INIT_LIST_HEAD(&cfg->session_link);
+	INIT_LIST_HEAD(&cfg->status_link);
 	INIT_LIST_HEAD(&cfg->mem_region_list);
 
 	return 0;
@@ -211,7 +212,7 @@ static struct mpp_ctx *ctx_init(struct rockchip_mpp_dev *mpp,
 		ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
 
 	if (NULL == ctx) {
-		mpp_err("error: kmalloc fail in ctx_init\n");
+		mpp_err("kmalloc failed\n");
 		return NULL;
 	}
 
@@ -632,11 +633,11 @@ static int mpp_dev_release(struct inode *inode, struct file *filp)
 	list_del_init(&session->list_session);
 	mpp_dev_session_clear(mpp, session);
 	filp->private_data = NULL;
+	mpp_srv_unlock(mpp->srv);
 	if (mpp->ops->release)
 		mpp->ops->release(session);
 	else
 		kfree(session);
-	mpp_srv_unlock(mpp->srv);
 
 	pr_debug("dev closed\n");
 	mpp_debug_leave();

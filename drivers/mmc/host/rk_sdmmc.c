@@ -1387,6 +1387,17 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		regs &= ~((0x1 << slot->id) << 16);
 	}
 
+	/* SDR/HS200 mode set */
+	if (ios->timing == MMC_TIMING_MMC_HS200) {
+		if (priv->ctrl_type == DW_MCI_TYPE_RK322XH)
+			cru_writel(((0x3 << 1) << 16) | (0x1 << 1),
+				   RK322XH_CRU_EMMC_CON0);
+	} else if (ios->timing == MMC_TIMING_UHS_SDR104) {
+		if (priv->ctrl_type == DW_MCI_TYPE_RK322XH)
+			cru_writel(((0x3 << 1) << 16) | (0x1 << 1),
+				   RK322XH_CRU_SDIO_CON0);
+	}
+
 	mci_writel(slot->host, UHS_REG, regs);
 	slot->host->timing = ios->timing;
 
@@ -1430,6 +1441,7 @@ EXIT_POWER:
 			regs &= ~(1 << slot->id);
 
 		mci_writel(slot->host, PWREN, regs);
+		dw_mci_ctrl_all_reset(host);
 		break;
 	default:
 		break;
@@ -2149,14 +2161,6 @@ static void dw_mci_command_complete(struct dw_mci *host, struct mmc_command *cmd
 	if (cmd->error) {
 		MMC_DBG_WARN_FUNC(host->mmc, "cmd%d Error: %d, status: 0x%08x. [%s]",
 			cmd->opcode, cmd->error, status, mmc_hostname(host->mmc));
-
-		if(MMC_SEND_STATUS != cmd->opcode)
-			if(host->cmd_rto >= SDMMC_CMD_RTO_MAX_HOLD){
-				host->cmd_rto = 0;
-				MMC_DBG_ERR_FUNC(host->mmc,
-					"Cmd response timeout hold times overflow. [%s]",
-					mmc_hostname(host->mmc));
-			}
 
 		/* newer ip versions need a delay between retries */
 		if (host->quirks & DW_MCI_QUIRK_RETRY_DELAY)
@@ -3050,7 +3054,6 @@ static void dw_mci_work_routine_card(struct work_struct *work)
 					}
 				}
 
-				dw_mci_ctrl_all_reset(host);
 				/* Stop edma when rountine card triggered */
 				if (cpu_is_rk3036() || cpu_is_rk312x())
 					if (host->dma_ops && host->dma_ops->stop)

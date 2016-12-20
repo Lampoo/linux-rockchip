@@ -55,6 +55,9 @@ static int dvfs_get_temp(int chn)
 #if IS_ENABLED(CONFIG_ROCKCHIP_THERMAL)
 	int read_back = 0;
 
+	if (clk_cpu_dvfs_node)
+		return rockchip_tsadc_get_temp(chn, 0);
+
 	if (clk_cpu_bl_dvfs_node == NULL ||
 	    IS_ERR_OR_NULL(clk_cpu_bl_dvfs_node->vd->regulator))
 		return temp;
@@ -650,6 +653,9 @@ static int vd_regulator_round_volt_max(struct vd_node *vd, int volt)
 	int sel_volt;
 	int i;
 	
+	if (volt >= vd->volt_list[vd->n_voltages - 1])
+		return vd->volt_list[vd->n_voltages - 1];
+
 	for (i = 0; i < vd->n_voltages; i++) {
 		sel_volt = vd->volt_list[i];
 		if(sel_volt <= 0){	
@@ -669,6 +675,9 @@ static int vd_regulator_round_volt_min(struct vd_node *vd, int volt)
 	int sel_volt;
 	int i;
 	
+	if (volt >= vd->volt_list[vd->n_voltages - 1])
+		return vd->volt_list[vd->n_voltages - 1];
+
 	for (i = 0; i < vd->n_voltages; i++) {
 		sel_volt = vd->volt_list[i];
 		if(sel_volt <= 0){	
@@ -1333,6 +1342,11 @@ static void dvfs_temp_limit_normal(struct dvfs_node *dvfs_node, int temp)
 					dvfs_node->min_temp_limit)
 					dvfs_node->temp_limit_rate =
 					dvfs_node->min_temp_limit;
+				if (dvfs_node->max_temp_limit &&
+					(dvfs_node->temp_limit_rate >
+					dvfs_node->max_temp_limit))
+					dvfs_node->temp_limit_rate =
+					dvfs_node->max_temp_limit;
 				dvfs_clk_set_rate(dvfs_node,
 						  dvfs_node->last_set_rate);
 				dvfs_temp_limit_4k();
@@ -2415,6 +2429,9 @@ static int dvfs_node_parse_dt(struct device_node *np,
 		of_property_read_u32_index(np, "min_temp_limit",
 					   0, &dvfs_node->min_temp_limit);
 		dvfs_node->min_temp_limit *= 1000;
+		of_property_read_u32_index(np, "max_temp_limit",
+					   0, &dvfs_node->max_temp_limit);
+		dvfs_node->max_temp_limit *= 1000;
 		of_property_read_u32_index(np, "target-temp",
 					   0, &dvfs_node->target_temp);
 		pr_info("target-temp:%d\n", dvfs_node->target_temp);

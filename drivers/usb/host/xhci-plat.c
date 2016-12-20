@@ -17,8 +17,20 @@
 #include <linux/of.h>
 #include <linux/usb/xhci_pdriver.h>
 #include <linux/dma-mapping.h>
+#include <linux/usb/phy.h>
 
 #include "xhci.h"
+
+static struct hc_driver __read_mostly xhci_plat_hc_driver;
+
+static int xhci_plat_setup(struct usb_hcd *hcd);
+static int xhci_plat_start(struct usb_hcd *hcd);
+
+static const struct xhci_driver_overrides xhci_plat_overrides __initconst = {
+	.extra_priv_size = sizeof(struct xhci_hcd),
+	.reset = xhci_plat_setup,
+	.start = xhci_plat_start,
+};
 
 static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
 {
@@ -36,54 +48,10 @@ static int xhci_plat_setup(struct usb_hcd *hcd)
 	return xhci_gen_setup(hcd, xhci_plat_quirks);
 }
 
-static const struct hc_driver xhci_plat_xhci_driver = {
-	.description =		"xhci-hcd",
-	.product_desc =		"xHCI Host Controller",
-	.hcd_priv_size =	sizeof(struct xhci_hcd *),
-
-	/*
-	 * generic hardware linkage
-	 */
-	.irq =			xhci_irq,
-	.flags =		HCD_MEMORY | HCD_USB3 | HCD_SHARED,
-
-	/*
-	 * basic lifecycle operations
-	 */
-	.reset =		xhci_plat_setup,
-	.start =		xhci_run,
-	.stop =			xhci_stop,
-	.shutdown =		xhci_shutdown,
-
-	/*
-	 * managing i/o requests and associated device resources
-	 */
-	.urb_enqueue =		xhci_urb_enqueue,
-	.urb_dequeue =		xhci_urb_dequeue,
-	.alloc_dev =		xhci_alloc_dev,
-	.free_dev =		xhci_free_dev,
-	.alloc_streams =	xhci_alloc_streams,
-	.free_streams =		xhci_free_streams,
-	.add_endpoint =		xhci_add_endpoint,
-	.drop_endpoint =	xhci_drop_endpoint,
-	.endpoint_reset =	xhci_endpoint_reset,
-	.check_bandwidth =	xhci_check_bandwidth,
-	.reset_bandwidth =	xhci_reset_bandwidth,
-	.address_device =	xhci_address_device,
-	.update_hub_device =	xhci_update_hub_device,
-	.reset_device =		xhci_discover_or_reset_device,
-
-	/*
-	 * scheduling support
-	 */
-	.get_frame_number =	xhci_get_frame,
-
-	/* Root hub support */
-	.hub_control =		xhci_hub_control,
-	.hub_status_data =	xhci_hub_status_data,
-	.bus_suspend =		xhci_bus_suspend,
-	.bus_resume =		xhci_bus_resume,
-};
+static int xhci_plat_start(struct usb_hcd *hcd)
+{
+	return xhci_run(hcd);
+}
 
 static int xhci_plat_probe(struct platform_device *pdev)
 {
@@ -99,7 +67,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	if (usb_disabled())
 		return -ENODEV;
 
-	driver = &xhci_plat_xhci_driver;
+	driver = &xhci_plat_hc_driver;
 
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0)
@@ -159,14 +127,15 @@ static int xhci_plat_probe(struct platform_device *pdev)
 		goto dealloc_usb2_hcd;
 	}
 
+	xhci->shared_hcd->phy = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB3);
+
 	if ((node && of_property_read_bool(node, "usb3-lpm-capable")) ||
 			(pdata && pdata->usb3_lpm_capable))
 		xhci->quirks |= XHCI_LPM_SUPPORT;
-	/*
-	 * Set the xHCI pointer before xhci_plat_setup() (aka hcd_driver.reset)
-	 * is called by usb_add_hcd().
-	 */
-	*((struct xhci_hcd **) xhci->shared_hcd->hcd_priv) = xhci;
+
+	if (pdata && pdata->usb3_disable_autosuspend)
+		xhci->quirks |= XHCI_DIS_AUTOSUSPEND;
+
 
 	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
 	if (ret)
@@ -204,7 +173,6 @@ static int xhci_plat_remove(struct platform_device *dev)
 	iounmap(hcd->regs);
 	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
 	usb_put_hcd(hcd);
-	kfree(xhci);
 
 	return 0;
 }
@@ -253,12 +221,18 @@ static struct platform_driver usb_xhci_driver = {
 };
 MODULE_ALIAS("platform:xhci-hcd");
 
-int xhci_register_plat(void)
+static int __init xhci_plat_init(void)
 {
+	xhci_init_driver(&xhci_plat_hc_driver, &xhci_plat_overrides);
 	return platform_driver_register(&usb_xhci_driver);
 }
+module_init(xhci_plat_init);
 
-void xhci_unregister_plat(void)
+static void __exit xhci_plat_exit(void)
 {
 	platform_driver_unregister(&usb_xhci_driver);
 }
+module_exit(xhci_plat_exit);
+
+MODULE_DESCRIPTION("xHCI Platform Host Controller Driver");
+MODULE_LICENSE("GPL");

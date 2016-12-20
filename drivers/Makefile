@@ -33,6 +33,9 @@ obj-y				+= amba/
 # really early.
 obj-$(CONFIG_DMADEVICES)	+= dma/
 
+# SOC specific infrastructure drivers.
+obj-y				+= soc/
+
 obj-$(CONFIG_VIRTIO)		+= virtio/
 obj-$(CONFIG_XEN)		+= xen/
 
@@ -162,3 +165,4 @@ obj-y				+= headset_observe/
 obj-$(CONFIG_CORESIGHT)		+= coresight/
 obj-$(CONFIG_ANDROID)		+= android/
 obj-$(CONFIG_RK_SFC)		+= rksfc/
+obj-y                           += rk_nand/

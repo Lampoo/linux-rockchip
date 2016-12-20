@@ -130,9 +130,24 @@
 		/* KHz    uV */
 		408000 950000
 		600000 950000
-		816000 1025000
+		816000 1000000
 		1008000 1100000
-		1200000 1200000
+		1200000 1225000
+		1296000 1300000
+		1392000 1350000
+		1512000 1350000
+		1608000 1350000
+		1800000 1350000
+		2016000 1350000
+		>;
+	status = "okay";
+};
+
+&clk_ddr_dvfs_table {
+	operating-points = <
+		/* KHz    uV */
+		400000 900000
+		800000 1050000
 		>;
 	status = "okay";
 };
@@ -140,9 +155,10 @@
 &clk_gpu_dvfs_table {
 	operating-points = <
 		/* KHz    uV */
-		200000 1050000
-		300000 1050000
-		400000 1100000
+		200000 900000
+		300000 950000
+		400000 1025000
+		500000 1100000
 		>;
 	status = "okay";
 };
@@ -199,8 +215,8 @@
 };
 
 &emmc {
-	clock-frequency = <125000000>;
-	clock-freq-min-max = <400000 125000000>;
+	clock-frequency = <150000000>;
+	clock-freq-min-max = <400000 150000000>;
 	supports-highspeed;
 	supports-emmc;
 	bootpart-no-access;
@@ -238,8 +254,8 @@
 };
 
 &sdio {
-	clock-frequency = <37500000>;
-	clock-freq-min-max = <200000 37500000>;
+	clock-frequency = <150000000>;
+	clock-freq-min-max = <200000 150000000>;
 	supports-highspeed;
 	supports-sdio;
 	ignore-pm-notify;
@@ -309,7 +325,7 @@
 &fb {
 	status = "okay";
 	rockchip,disp-policy = <DISPLAY_POLICY_BOX>;
-	rockchip,uboot-logo-on = <0>;
+	rockchip,uboot-logo-on = <1>;
 };
 
 &vop {
@@ -380,7 +396,7 @@
 		rk805_dcdc1_reg: regulator@0 {
 			regulator-name = "vdd_logic";
 			regulator-min-microvolt = <700000>;
-			regulator-max-microvolt = <1500000>;
+			regulator-max-microvolt = <1350000>;
 			regulator-initial-mode = <0x1>;
 			regulator-initial-state = <3>;
 			regulator-boot-on;
@@ -395,7 +411,7 @@
 		rk805_dcdc2_reg: regulator@1 {
 			regulator-name = "vdd_arm";
 			regulator-min-microvolt = <700000>;
-			regulator-max-microvolt = <1500000>;
+			regulator-max-microvolt = <1350000>;
 			regulator-initial-mode = <0x1>;
 			regulator-initial-state = <3>;
 			regulator-boot-on;
@@ -403,7 +419,7 @@
 			regulator-state-mem {
 				regulator-state-mode = <0x2>;
 				regulator-state-enabled;
-				regulator-state-uv = <900000>;
+				regulator-state-uv = <950000>;
 			};
 		};
 

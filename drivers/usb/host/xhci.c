@@ -28,6 +28,7 @@
 #include <linux/slab.h>
 #include <linux/dmi.h>
 #include <linux/dma-mapping.h>
+#include <linux/usb/quirks.h>
 
 #include "xhci.h"
 
@@ -4724,10 +4725,7 @@ int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
 	hcd->self.no_stop_on_short = 1;
 
 	if (usb_hcd_is_primary_hcd(hcd)) {
-		xhci = kzalloc(sizeof(struct xhci_hcd), GFP_KERNEL);
-		if (!xhci)
-			return -ENOMEM;
-		*((struct xhci_hcd **) hcd->hcd_priv) = xhci;
+		xhci = hcd_to_xhci(hcd);
 		xhci->main_hcd = hcd;
 		/* Mark the first roothub as being USB 2.0.
 		 * The xHCI driver will register the USB 3.0 roothub.
@@ -4744,6 +4742,12 @@ int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
 		/* xHCI private pointer was set in xhci_pci_probe for the second
 		 * registered roothub.
 		 */
+		xhci = hcd_to_xhci(hcd);
+
+		if (xhci->quirks & XHCI_DIS_AUTOSUSPEND)
+			xhci->shared_hcd->self.root_hub->quirks |=
+				USB_QUIRK_AUTO_SUSPEND;
+
 		return 0;
 	}
 
@@ -4773,13 +4777,13 @@ int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
 	/* Make sure the HC is halted. */
 	retval = xhci_halt(xhci);
 	if (retval)
-		goto error;
+		return retval;
 
 	xhci_dbg(xhci, "Resetting HCD\n");
 	/* Reset the internal HC memory state and registers. */
 	retval = xhci_reset(xhci);
 	if (retval)
-		goto error;
+		return retval;
 	xhci_dbg(xhci, "Reset complete\n");
 
 	/* Set dma_mask and coherent_dma_mask to 64-bits,
@@ -4794,13 +4798,88 @@ int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
 	/* Initialize HCD and host controller data structures. */
 	retval = xhci_init(hcd);
 	if (retval)
-		goto error;
+		return retval;
 	xhci_dbg(xhci, "Called HCD init\n");
 	return 0;
-error:
-	kfree(xhci);
-	return retval;
 }
+
+static const struct hc_driver xhci_hc_driver = {
+	.description =		"xhci-hcd",
+	.product_desc =		"xHCI Host Controller",
+	.hcd_priv_size =	sizeof(struct xhci_hcd *),
+
+	/*
+	 * generic hardware linkage
+	 */
+	.irq =			xhci_irq,
+	.flags =		HCD_MEMORY | HCD_USB3 | HCD_SHARED,
+
+	/*
+	 * basic lifecycle operations
+	 */
+	.reset =		NULL, /* set in xhci_init_driver() */
+	.start =		xhci_run,
+	.stop =			xhci_stop,
+	.shutdown =		xhci_shutdown,
+
+	/*
+	 * managing i/o requests and associated device resources
+	 */
+	.urb_enqueue =		xhci_urb_enqueue,
+	.urb_dequeue =		xhci_urb_dequeue,
+	.alloc_dev =		xhci_alloc_dev,
+	.free_dev =		xhci_free_dev,
+	.alloc_streams =	xhci_alloc_streams,
+	.free_streams =		xhci_free_streams,
+	.add_endpoint =		xhci_add_endpoint,
+	.drop_endpoint =	xhci_drop_endpoint,
+	.endpoint_reset =	xhci_endpoint_reset,
+	.check_bandwidth =	xhci_check_bandwidth,
+	.reset_bandwidth =	xhci_reset_bandwidth,
+	.address_device =	xhci_address_device,
+	.update_hub_device =	xhci_update_hub_device,
+	.reset_device =		xhci_discover_or_reset_device,
+
+	/*
+	 * scheduling support
+	 */
+	.get_frame_number =	xhci_get_frame,
+
+	/*
+	 * root hub support
+	 */
+	.hub_control =		xhci_hub_control,
+	.hub_status_data =	xhci_hub_status_data,
+	.bus_suspend =		xhci_bus_suspend,
+	.bus_resume =		xhci_bus_resume,
+
+	/*
+	 * call back when device connected and addressed
+	 */
+	.update_device =        xhci_update_device,
+	.set_usb2_hw_lpm =	xhci_set_usb2_hardware_lpm,
+	.enable_usb3_lpm_timeout =	xhci_enable_usb3_lpm_timeout,
+	.disable_usb3_lpm_timeout =	xhci_disable_usb3_lpm_timeout,
+	.find_raw_port_number =	xhci_find_raw_port_number,
+};
+
+void xhci_init_driver(struct hc_driver *drv,
+		      const struct xhci_driver_overrides *over)
+{
+	BUG_ON(!over);
+
+	/* Copy the generic table to drv then apply the overrides */
+	*drv = xhci_hc_driver;
+
+	if (over) {
+		drv->hcd_priv_size += over->extra_priv_size;
+		if (over->reset)
+			drv->reset = over->reset;
+		if (over->start)
+			drv->start = over->start;
+	}
+}
+EXPORT_SYMBOL_GPL(xhci_init_driver);
 
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_AUTHOR(DRIVER_AUTHOR);
@@ -4808,21 +4887,6 @@ MODULE_LICENSE("GPL");
 
 static int __init xhci_hcd_init(void)
 {
-	int retval;
-
-	if (usb_disabled())
-		return -ENODEV;
-
-	retval = xhci_register_pci();
-	if (retval < 0) {
-		printk(KERN_DEBUG "Problem registering PCI driver.");
-		return retval;
-	}
-	retval = xhci_register_plat();
-	if (retval < 0) {
-		printk(KERN_DEBUG "Problem registering platform driver.");
-		goto unreg_pci;
-	}
 	/*
 	 * Check the compiler generated sizes of structures that must be laid
 	 * out in specific ways for hardware access.
@@ -4842,15 +4906,5 @@ static int __init xhci_hcd_init(void)
 	BUILD_BUG_ON(sizeof(struct xhci_run_regs) != (8+8*128)*32/8);
 
 	return 0;
-unreg_pci:
-	xhci_unregister_pci();
-	return retval;
 }
 module_init(xhci_hcd_init);
-
-static void __exit xhci_hcd_cleanup(void)
-{
-	xhci_unregister_pci();
-	xhci_unregister_plat();
-}
-module_exit(xhci_hcd_cleanup);

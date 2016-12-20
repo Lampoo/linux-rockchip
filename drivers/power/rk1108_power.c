@@ -20,7 +20,7 @@
 #include <linux/power_supply.h>
 #include <linux/of_platform.h>
 
-#define BATTERY_STABLE_COUNT	1
+#define BATTERY_STABLE_COUNT	10
 #define DIVIDER_RESISTANCE_A	200
 #define DIVIDER_RESISTANCE_B	120
 
@@ -32,7 +32,7 @@ static int battery_present		= 1;
 static int battery_technology	= POWER_SUPPLY_TECHNOLOGY_LION;
 static int battery_capacity		= 50;
 static int battery_voltage		= 3300;
-static int battery_stable		= BATTERY_STABLE_COUNT;
+static int pre_battery_capacity	= 100;
 
 struct rk1108_battery_data {
 	struct platform_device *pdev;
@@ -252,7 +252,7 @@ static int rk1108_adc_to_voltage(int adc_value)
 	return voltage;
 }
 
-static void rk1108_battery_capacity_change(
+static int rk1108_battery_capacity_change(
 	int adc_value,
 	struct rk1108_battery_data *gdata)
 {
@@ -260,6 +260,7 @@ static void rk1108_battery_capacity_change(
 	int voltage;
 
 	voltage = rk1108_adc_to_voltage(adc_value);
+	battery_voltage = voltage;
 	for (i = 0; i <= gdata->max_voltage; i++) {
 		if (voltage < gdata->levels[i]) {
 			battery_capacity = i;
@@ -269,6 +270,13 @@ static void rk1108_battery_capacity_change(
 
 	if (i == 100)
 		battery_capacity = 100;
+
+	if (battery_capacity != pre_battery_capacity) {
+		pre_battery_capacity = battery_capacity;
+		return 1;
+	}
+
+	return 0;
 }
 
 static int rk1108_battery_checkvbus(void)
@@ -287,7 +295,9 @@ static void rk1108_battery_work_func(struct work_struct *work)
 	struct rk1108_battery_data *gdata;
 	struct iio_channel *channel;
 	struct device *dev;
-	int result, value, changed;
+	int result = 0, i = 0, batv = 0;
+	int value = 0;
+	int changed_vbus = 0, changed_bat = 0;
 
 	gdata = container_of(
 			(struct delayed_work *)work,
@@ -296,42 +306,35 @@ static void rk1108_battery_work_func(struct work_struct *work)
 
 	channel = gdata->chan;
 	dev = &gdata->pdev->dev;
-	changed = 0;
 
 	/* Check vbus status */
 	result = rk1108_battery_checkvbus();
-	if ((1 == result) && (result != usb_online)) {
+	if (result != usb_online)
+		changed_vbus = 1;
+	if (result == 1) {
 		usb_online = 1;
 		battery_status = POWER_SUPPLY_STATUS_CHARGING;
-		changed = 1;
 	}
-	if ((0 == result) && (result != usb_online)) {
+	if (result == 0) {
 		usb_online = 0;
 		battery_status = POWER_SUPPLY_STATUS_DISCHARGING;
-		changed = 1;
 	}
 	/* Read ADC value */
-	result = iio_read_channel_raw(channel, &value);
-	if (result < 0) {
-		dev_err(dev, "read adc channel 2 error:%d\n", result);
-		return;
-	}
-	if ((value - battery_voltage > 2) || (value - battery_voltage < -2)) {
-		if ((value - battery_voltage > 10) ||
-		    (value - battery_voltage < -10)) {
-			if ((changed != 1) && (battery_stable >= 0)) {
-				battery_stable--;
-				goto out;
-			}
+	for (i = 0; i < BATTERY_STABLE_COUNT; i++) {
+		result = iio_read_channel_raw(channel, &value);
+		if (result < 0) {
+			dev_err(dev, "read adc channel 2 error:%d\n", result);
+			goto out;
 		}
-		battery_stable = BATTERY_STABLE_COUNT;
-		/* Get ADC value and send user */
-		battery_voltage = value;
-		rk1108_battery_capacity_change(value, gdata);
-		changed = 1;
+		batv = batv + value;
 	}
-	if (changed == 1)
+	batv = batv / BATTERY_STABLE_COUNT;
+
+	changed_bat = rk1108_battery_capacity_change(batv, gdata);
+	if ((changed_vbus == 1) || (changed_bat == 1)) {
 		power_supply_changed(&rk1108_power_supplies[1]);
+	}
+
 out:
 	/* start work queue */
 	schedule_delayed_work(&gdata->work, msecs_to_jiffies(500));

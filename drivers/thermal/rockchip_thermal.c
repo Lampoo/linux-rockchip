@@ -936,6 +936,9 @@ static int rockchip_configure_from_dt(struct device *dev,
 		return -EINVAL;
 	}
 
+	/* init the cpu_temp to be invalid value */
+	thermal->cpu_temp = INVALID_TEMP;
+
 	return 0;
 }
 
@@ -1003,8 +1006,8 @@ static int rk3368_rockchip_tsadc_get_temp(int chn, int voltage)
 		    ((tsadc_data * voltage - data_adjust * 1000000) +
 		     500000) / 1000000;
 		rockchip_code_to_temp(tsadc->temp_table, code_temp, &out_temp);
-		out_temp = out_temp / 1000;
-		thermal->cpu_temp = (int)out_temp;
+		temp = (int)out_temp / 1000;
+		thermal->cpu_temp = temp;
 		if (thermal->logout)
 			printk("cpu code temp:[%d, %d], voltage: %d\n",
 			       tsadc_data, temp, voltage);
@@ -1041,12 +1044,16 @@ int rockchip_tsadc_get_temp(int chn, int voltage)
 		return temp;
 	}
 
-	if (soc_is_rk3368)
+	if (soc_is_rk3368) {
 		temp = rk3368_rockchip_tsadc_get_temp(chn, voltage);
-	else
+	} else {
 		thermal->chip->get_temp(thermal->chip->temp_table, chn,
 					thermal->regs, (long *)&temp);
-
+		/* Convert milli degree Celsius to degree Celsius. */
+		temp /= 1000;
+		/* back up the temp for easy access when panic dump */
+		thermal->cpu_temp = temp;
+	}
 	mutex_unlock(&thermal->suspend_lock);
 
 	return temp;
@@ -1142,6 +1149,38 @@ static struct rockchip_thermal_attribute rockchip_thermal_attrs[] = {
 		, rockchip_thermal_temp_adjust_test_store),
 	__ATTR(temp, S_IRUGO | S_IWUSR, rockchip_thermal_temp_test_show
 		, rockchip_thermal_temp_test_store),
+};
+
+static void rockchip_dump_temperature(void)
+{
+	struct rockchip_thermal_data *thermal = rockchip_thermal_get_data();
+	struct platform_device *pdev;
+
+	if (!thermal)
+		return;
+
+	pdev = thermal->pdev;
+
+	if (thermal->cpu_temp != INVALID_TEMP)
+		dev_warn(&pdev->dev, "cpu channal temperature(%d C)\n",
+			 thermal->cpu_temp);
+
+	if (thermal->regs) {
+		pr_warn("THERMAL REGS:\n");
+		print_hex_dump(KERN_WARNING, "", DUMP_PREFIX_OFFSET,
+			       32, 4, thermal->regs, 0x88, false);
+	}
+}
+
+static int rockchip_thermal_panic(struct notifier_block *this,
+				  unsigned long ev, void *ptr)
+{
+	rockchip_dump_temperature();
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block rockchip_thermal_panic_block = {
+	.notifier_call = rockchip_thermal_panic,
 };
 
 static int rockchip_thermal_probe(struct platform_device *pdev)
@@ -1285,6 +1324,9 @@ static int rockchip_thermal_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, thermal);
+
+	atomic_notifier_chain_register(&panic_notifier_list,
+				       &rockchip_thermal_panic_block);
 
 	return 0;
 

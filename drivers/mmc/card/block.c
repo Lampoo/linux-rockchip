@@ -1392,6 +1392,7 @@ static int mmc_blk_err_check(struct mmc_card *card,
 {
 	struct mmc_queue_req *mq_mrq = container_of(areq, struct mmc_queue_req,
 						    mmc_active);
+	struct mmc_host *host = card->host;
 	struct mmc_blk_request *brq = &mq_mrq->brq;
 	struct request *req = mq_mrq->req;
 	int need_retune = card->host->need_retune;
@@ -1438,7 +1439,6 @@ static int mmc_blk_err_check(struct mmc_card *card,
 	 * program mode, which we have to wait for it to complete.
 	 */
 	if (!mmc_host_is_spi(card->host) && rq_data_dir(req) != READ) {
-		u32 status;
 		unsigned long timeout;
 
 		/* Check stop command response */
@@ -1450,20 +1450,10 @@ static int mmc_blk_err_check(struct mmc_card *card,
 		}
 
 		timeout = jiffies + msecs_to_jiffies(MMC_BLK_TIMEOUT_MS);
-		do {
-			int err = get_card_status(card, &status, 5);
-			if (err) {
-				pr_err("%s: error %d requesting status\n",
-				       req->rq_disk->disk_name, err);
-				return MMC_BLK_CMD_ERR;
-			}
 
-			if (status & R1_ERROR) {
-				pr_err("%s: %s: general error sending status command, card status %#x\n",
-				       req->rq_disk->disk_name, __func__,
-				       status);
-				gen_err = 1;
-			}
+		do {
+			if (host->ops->card_busy && !host->ops->card_busy(host))
+				break;
 
 			/* Timeout if the device never becomes ready for data
 			 * and never leaves the program state.
@@ -1480,8 +1470,8 @@ static int mmc_blk_err_check(struct mmc_card *card,
 			 * so make sure to check both the busy
 			 * indication and the card state.
 			 */
-		} while (!(status & R1_READY_FOR_DATA) ||
-			 (R1_CURRENT_STATE(status) == R1_STATE_PRG));
+			usleep_range(1000, 3000);
+		} while (1);
 	}
 
 	/* if general error occurs, retry the write operation. */

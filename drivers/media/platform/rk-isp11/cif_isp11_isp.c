@@ -246,6 +246,7 @@
 #define CIFISP_MODULE_DPF_TIME 5
 #define CIFISP_MODULE_DPF_STRENGTH_TIME 2
 #define CIFISP_MODULE_CSM_PROC_TIME	8
+#define CIFISP_MODULE_WDR_TIME 8
 
 /* For Debugging only!!! */
 
@@ -828,7 +829,6 @@ static int cifisp_wdr_param(struct cif_isp11_isp_dev *isp_dev,
 	CIFISP_MODULE_UPDATE(
 		isp_dev->other_cfgs.module_updates,
 		CIFISP_MODULE_WDR);
-
 end:
 	spin_unlock_irqrestore(&isp_dev->config_lock, lock_flags);
 
@@ -3675,10 +3675,6 @@ static void cifisp_send_measurement(
 	spin_lock_irqsave(&isp_dev->irq_lock, lock_flags);
 	if (isp_dev->frame_id != meas_work->frame_id) {
 		spin_unlock_irqrestore(&isp_dev->irq_lock, lock_flags);
-		CIFISP_DPRINT(CIFISP_ERROR,
-			"Measurement late(%d, %d)\n",
-			isp_dev->frame_id,
-			meas_work->frame_id);
 		goto end;
 	}
 
@@ -3717,10 +3713,6 @@ static void cifisp_send_measurement(
 
 	if (isp_dev->frame_id != meas_work->frame_id) {
 		spin_unlock_irqrestore(&isp_dev->irq_lock, lock_flags);
-		CIFISP_DPRINT(CIFISP_ERROR,
-			"Measurement late(%d, %d)\n",
-			isp_dev->frame_id,
-			meas_work->frame_id);
 		goto end;
 	}
 
@@ -4147,6 +4139,28 @@ static inline bool cifisp_isp_isr_other_config(
 		*time_left -= CIFISP_MODULE_DPF_STRENGTH_TIME;
 		CIFISP_DPRINT(CIFISP_DEBUG,
 			"dpf strength time-left :%d\n",
+			*time_left);
+	}
+
+	if (CIFISP_MODULE_IS_UPDATE(
+		isp_dev->other_cfgs.module_updates,
+		CIFISP_MODULE_WDR) &&
+		*time_left >= CIFISP_MODULE_WDR_TIME) {
+
+		if (CIFISP_MODULE_IS_EN(*ens, CIFISP_MODULE_WDR)) {
+			cifisp_wdr_config(isp_dev);
+			cifisp_wdr_en(isp_dev);
+		} else {
+			cifisp_wdr_end(isp_dev);
+		}
+
+		CIFISP_MODULE_CLR_UPDATE(
+			isp_dev->other_cfgs.module_updates,
+			CIFISP_MODULE_WDR);
+
+		*time_left -= CIFISP_MODULE_WDR_TIME;
+		CIFISP_DPRINT(CIFISP_DEBUG,
+			"wdr time-left :%d\n",
 			*time_left);
 	}
 

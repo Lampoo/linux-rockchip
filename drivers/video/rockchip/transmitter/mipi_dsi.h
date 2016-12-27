@@ -27,6 +27,8 @@ drivers/video/rockchip/transmitter/mipi_dsi.h
 #define DTYPE_GEN_SWRITE_2P		0x23 
 #define DTYPE_GEN_SWRITE_1P		0x13
 #define DTYPE_GEN_SWRITE_0P		0x03
+#define DTYPE_DPI_SHUT_DOWN		0x22
+#define DTYPE_DPI_TURN_ON		0x32
 
 //command transmit mode
 #define HSDT			0x00
@@ -112,7 +114,7 @@ typedef unsigned long u64;
 
 //iomux
 #define OLD_RK_IOMUX 0
-#define CMD_LEN_MAX 0x100
+#define CMD_LEN_MAX 0x400
 
 struct spi_t {
 	u32 cs;

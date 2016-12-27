@@ -156,11 +156,12 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
 dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb
 dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += \
-	rk1108-fpga.dtb \
-	rk1108-cvr-hx108.dtb \
-	rk1108-evb-v10.dtb \
-	rk1108-evb-v11.dtb \
-	rk1108-evb-v12.dtb \
+	rv1108-fpga.dtb \
+	rv1108-cvr-hx108.dtb \
+	rv1108-evb-v10.dtb \
+	rv1108-evb-v11.dtb \
+	rv1108-evb-v12.dtb \
+	rv1108-ipc-v10.dtb \
 	rk3036-fpga.dtb \
 	rk3036-new.dtb \
 	rk3036-rk88.dtb \
@@ -185,7 +186,8 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	rk3288-popmetal.dtb \
 	rk3288-tb_8846.dtb \
 	rk3288-tb.dtb \
-	rk3288-vr.dtb
+	rk3288-vr.dtb \
+	px3se-sdk.dtb
 dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
 	hrefprev60.dtb \
 	hrefv60plus.dtb \

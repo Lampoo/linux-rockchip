@@ -347,6 +347,11 @@ int rockchip_get_leakage(int ch)
 	return 0;
 }
 
+int rockchip_get_hdmi_flag(void)
+{
+	return efuse_buf[29] & 2;
+}
+
 int rockchip_get_cvbs_adjust(void)
 {
 	return efuse_buf[29] >> 3;
@@ -484,7 +489,7 @@ void __init rockchip_efuse_init(void)
 {
 	int ret;
 
-	if (cpu_is_rk3288() || cpu_is_rk322x() || cpu_is_rk1108()) {
+	if (cpu_is_rk3288() || cpu_is_rk322x() || cpu_is_rv1108()) {
 		rk3288_efuse_init();
 	} else if (cpu_is_rk312x()) {
 		ret = rk312x_efuse_readregs(0, 32, efuse_buf);

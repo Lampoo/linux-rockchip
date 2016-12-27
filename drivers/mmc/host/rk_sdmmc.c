@@ -57,6 +57,7 @@
 #include "rk_sdmmc_dbg.h"
 #include <linux/regulator/rockchip_io_vol_domain.h>
 #include "../../clk/rockchip/clk-ops.h"
+#include <linux/rk_keys.h>
 
 #define RK_SDMMC_DRIVER_VERSION "Ver 2.00 2015-06-10"
 
@@ -115,7 +116,6 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host);
 static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host);
 static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
 static void dw_mci_disable_low_power(struct dw_mci_slot *slot);
-extern void rk_send_wakeup_key(void);
 static void rockchip_mmc_reset_controller(struct reset_control *reset);
 
 #if defined(CONFIG_DEBUG_FS)
@@ -4048,6 +4048,8 @@ int dw_mci_probe(struct dw_mci *host)
 
 	init_dma_attrs(&dw_mci_direct_attrs);
 	dma_set_attr(DMA_ATTR_SKIP_CPU_SYNC, &dw_mci_direct_attrs);
+
+	dma_coerce_mask_and_coherent(host->dev, DMA_BIT_MASK(32));
 
 	host->dma_ops = host->pdata->dma_ops;
 	dw_mci_init_dma(host);

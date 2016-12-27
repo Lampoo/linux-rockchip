@@ -25,6 +25,7 @@
 #include <linux/reboot.h>
 #include <linux/rockchip/cpu.h>
 #include <linux/tick.h>
+#include <linux/cpu.h>
 #include <dt-bindings/clock/rk_system_status.h>
 #include "../../../drivers/clk/rockchip/clk-pd.h"
 #include "efuse.h"
@@ -222,6 +223,33 @@ static int sys_stat_notifier_call(struct notifier_block *nb,
 
 static struct notifier_block sys_stat_notifier = {
 		.notifier_call = sys_stat_notifier_call,
+};
+
+#define RK322XH_CPU_MIN_RATE_4K		816000000
+#define RK322XH_CPU_MAX_RATE_4K		816000000
+static int rk322xh_sys_stat_notifier_call(struct notifier_block *nb,
+					  unsigned long val, void *data)
+{
+	if (!clk_cpu_dvfs_node)
+		return NOTIFY_OK;
+
+	if (val & (SYS_STATUS_VIDEO_4K_10B | SYS_STATUS_VIDEO_4K)) {
+		clk_cpu_dvfs_node->min_rate = RK322XH_CPU_MIN_RATE_4K;
+		clk_cpu_dvfs_node->max_rate = RK322XH_CPU_MAX_RATE_4K;
+		cpu_down(3);
+		cpu_down(2);
+	} else {
+		dvfs_get_rate_range(clk_cpu_dvfs_node);
+		cpu_up(2);
+		cpu_up(3);
+	}
+	dvfs_clk_set_rate(clk_cpu_dvfs_node,
+			  clk_cpu_dvfs_node->last_set_rate);
+	return NOTIFY_OK;
+}
+
+static struct notifier_block rk322xh_sys_stat_notifier = {
+		.notifier_call = rk322xh_sys_stat_notifier_call,
 };
 
 #define DVFS_REGULATOR_MODE_STANDBY	1
@@ -1403,6 +1431,15 @@ static void dvfs_temp_limit(struct dvfs_node *dvfs_node, int temp)
 		 temp, dvfs_node->temp_limit_rate);
 }
 
+static BLOCKING_NOTIFIER_HEAD(dvfs_notifier_list);
+void register_dvfs_notifier_callback(struct dvfs_node *dvfs_node,
+				     notifier_fn_t callback)
+{
+	dvfs_node->dvfs_nb.notifier_call = callback;
+	blocking_notifier_chain_register(&dvfs_notifier_list,
+					 &dvfs_node->dvfs_nb);
+}
+
 static void dvfs_temp_limit_work_func(struct work_struct *work)
 {
 	unsigned long delay = HZ/10;
@@ -1438,6 +1475,9 @@ static void dvfs_temp_limit_work_func(struct work_struct *work)
 		if (temp != INVALID_TEMP)
 			dvfs_temp_limit(clk_gpu_dvfs_node, temp);
 	}
+
+	blocking_notifier_call_chain(&dvfs_notifier_list, 0, NULL);
+
 	mutex_unlock(&temp_limit_mutex);
 }
 static DECLARE_DELAYED_WORK(dvfs_temp_limit_work, dvfs_temp_limit_work_func);
@@ -2529,6 +2569,9 @@ int of_dvfs_init(void)
 		DVFS_ERR("%s get dvfs dev node err\n", __func__);
 		return PTR_ERR(dvfs_dev_node);
 	}
+
+	if (of_device_is_compatible(dvfs_dev_node, "rockchip,rk322xh-dvfs"))
+		rockchip_register_system_status_notifier(&rk322xh_sys_stat_notifier);
 
 	for_each_available_child_of_node(dvfs_dev_node, vd_dev_node) {
 		vd = kzalloc(sizeof(struct vd_node), GFP_KERNEL);

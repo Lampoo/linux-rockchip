@@ -44,8 +44,8 @@
 
 #include "rk1108.dtsi"
 //#include "lcd-ili9806e_mipi.dtsi" /* dispaly board v10 v11 */
-#include "lcd-e555hbm2_mipi.dtsi" /* display board v20*/
-//#include "lcd-ili9807_mipi.dtsi" /* display board v30 */
+//#include "lcd-e555hbm2_mipi.dtsi" /* display board v20*/
+#include "lcd-ili9807_mipi.dtsi" /* display board v30 */
 #include "dt-bindings/suspend/rockchip-pm.h"
 
 / {
@@ -342,8 +342,8 @@
 	status = "okay";
 
 //#include "rk1108-camb-v11.dtsi" /* camera board v11 */
-#include "rk1108-camb-v12.dtsi" /* camera board v12 */
-//#include "rk1108-camb-v13.dtsi" /* camera board v13 */
+//#include "rk1108-camb-v12.dtsi" /* camera board v12 */
+#include "rk1108-camb-v13.dtsi" /* camera board v13 */
 };
 
 &cif1to4 {
@@ -395,7 +395,7 @@
 };
 
 &pwm0 {
-	status = "disabled";
+	status = "okay";
 };
 
 &emmc {

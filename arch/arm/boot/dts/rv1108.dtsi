@@ -48,6 +48,7 @@
 #include "rv1108-clocks.dtsi"
 #include "skeleton.dtsi"
 #include <dt-bindings/rkfb/rk_fb.h>
+#include <rv1108_dram_default_timing.dtsi>
 
 / {
 	compatible = "rockchip,rv1108";
@@ -241,6 +242,23 @@
 						>;
 				};
 			};
+			pd_ddr {
+				clk_ddr_dvfs_table: clk_ddr {
+					operating-points = <
+						/* KHz    uV */
+						400000 900000
+						600000 1000000
+						800000 1050000
+						>;
+					freq-table = <
+						/*status		freq(KHz)*/
+						SYS_STATUS_LOW_POWER	400000
+						SYS_STATUS_NORMAL	600000
+						SYS_STATUS_PERFORMANCE	800000
+						>;
+					status = "okay";
+				};
+			};
 			pd_dsp {
 				clk_dsp_dvfs_table: clk_dsp {
 					operating-points = <
@@ -387,7 +405,7 @@
 	};
 
 	i2c0: i2c@20000000 {
-		compatible = "rockchip,rk1108-i2c";
+		compatible = "rockchip,rv1108-i2c";
 		reg = <0x20000000 0x1000>;
 		interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
 		#address-cells = <1>;
@@ -400,7 +418,7 @@
 	};
 
 	i2c1: i2c@10240000 {
-		compatible = "rockchip,rk1108-i2c";
+		compatible = "rockchip,rv1108-i2c";
 		reg = <0x10240000 0x1000>;
 		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
 		#address-cells = <1>;
@@ -413,7 +431,7 @@
 	};
 
 	i2c2: i2c@10250000 {
-		compatible = "rockchip,rk1108-i2c";
+		compatible = "rockchip,rv1108-i2c";
 		reg = <0x10250000 0x1000>;
 		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
 		#address-cells = <1>;
@@ -426,7 +444,7 @@
 	};
 
 	i2c3: i2c@10260000 {
-		compatible = "rockchip,rk1108-i2c";
+		compatible = "rockchip,rv1108-i2c";
 		reg = <0x10260000 0x1000>;
 		interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
 		#address-cells = <1>;
@@ -502,17 +520,17 @@
 	};
 
 	grf: syscon@10300000 {
-		compatible = "rockchip,rk1108-grf", "rockchip,grf", "syscon";
+		compatible = "rockchip,rv1108-grf", "rockchip,grf", "syscon";
 		reg = <0x10300000 0x1000>;
 	};
 
 	pmugrf: syscon@20060000 {
-		compatible = "rockchip,rk1108-pmugrf", "rockchip,pmugrf", "syscon";
+		compatible = "rockchip,rv1108-pmugrf", "rockchip,pmugrf", "syscon";
 		reg = <0x20060000 0x1000>;
 	};
 
 	usbgrf: syscon@202a0000 {
-		compatible = "rockchip,rk1108-usbgrf", "rockchip,usbgrf", "syscon";
+		compatible = "rockchip,rv1108-usbgrf", "rockchip,usbgrf", "syscon";
 		reg = <0x202a0000 0x1000>;
 	};
 
@@ -537,7 +555,7 @@
 	};
 
 	tsadc: tsadc@10370000 {
-		compatible = "rockchip,rk1108-tsadc";
+		compatible = "rockchip,rv1108-tsadc";
 		reg = <0x10370000 0x100>;
 		interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
 		clock-frequency = <750000>;
@@ -613,7 +631,7 @@
 	};
 
 	cru: syscon@20200000 {
-		compatible = "rockchip,rk1108-cru", "rockchip,cru", "syscon";
+		compatible = "rockchip,rv1108-cru", "rockchip,cru", "syscon";
 		reg = <0x20200000 0x1000>;
 	};
 
@@ -625,7 +643,7 @@
 	};
 
 	codec: codec@20230000 {
-		compatible = "rockchip,rk1108-codec";
+		compatible = "rockchip,rv1108-codec";
 		reg = <0x20230000 0x1000>;
 		rockchip,grf = <&grf>;
 		clocks = <&clk_gates14 6>;
@@ -639,7 +657,7 @@
 	};
 
 	rkvenc: rkvenc@28000000 {
-		compatible = "rockchip,rk1108-rkvenc", "rockchip,rkvenc";
+		compatible = "rockchip,rv1108-rkvenc", "rockchip,rkvenc";
 		rockchip,grf = <&grf>;
 		iommu_enabled = <0>;
 		reg = <0x28000000 0x400>;
@@ -657,7 +675,7 @@
 	};
 
 	vpu: vpu_service@30000000 {
-		compatible = "rockchip,rk1108-vpu", "vpu_service";
+		compatible = "rockchip,rv1108-vpu", "vpu_service";
 		rockchip,grf = <&grf>;
 		iommu_enabled = <0>;
 		reg = <0x30000000 0x800>;
@@ -674,7 +692,7 @@
 	};
 
 	rkvdec: rkvdec@30010000 {
-		compatible = "rockchip,rk1108-rkvdec", "rockchip,rkvdec";
+		compatible = "rockchip,rv1108-rkvdec", "rockchip,rkvdec";
 		rockchip,grf = <&grf>;
 		iommu_enabled = <0>;
 		reg = <0x30010000 0x400>;
@@ -702,7 +720,7 @@
 	};
 
 	cif_isp0: cif_isp@30020000 {
-		compatible = "rockchip,rk1108-cif-isp";
+		compatible = "rockchip,rv1108-cif-isp";
 		rockchip,grf = <&grf>;
 		reg = <0x30020000 0x10000>, <0x20258000 0x8000>, <0x20200000 0x1000>;
 		reg-names = "register", "csiphy_base", "cru_base";
@@ -747,7 +765,7 @@
 	};
 
 	tve: tve@30040e00 {
-		compatible = "rockchip,rk1108-tve";
+		compatible = "rockchip,rv1108-tve";
 		reg = <0x30040e00 0x100>,
 		      <0x20250000 0x10000>;
 		clocks = <&clk_gates14 9>;
@@ -773,7 +791,7 @@
 	};
 
 	cif1to4: cif1to4 {
-		compatible = "rockchip,rk1108-cif1to4","rockchip,cif1to4";
+		compatible = "rockchip,rv1108-cif1to4","rockchip,cif1to4";
 		rockchip,grf = <&grf>;
 		clocks = <&clk_gates7 8>, <&pclkin_vip>, <&pclkin_vip_inv>;
 		clock-names = "cif1to4_pclk", "pclkin_vip", "pclkin_vip_inv";
@@ -783,7 +801,7 @@
 	};
 
 	cif_cif0: cif_cif@30060000 {
-		compatible = "rockchip,rk1108-cif-cif";
+		compatible = "rockchip,rv1108-cif-cif";
 		rockchip,grf = <&grf>;
 		reg = <0x30060000 0x10000>;
 		clocks = <&clk_gates18 6>, <&clk_gates18 7>, <&clk_gates7 9>,
@@ -799,7 +817,7 @@
 	};
 
 	cvbsin: cvbsin@30070000 {
-		compatible = "rockchip,rk1108-cvbsin", "rockchip,cvbsin";
+		compatible = "rockchip,rv1108-cvbsin", "rockchip,cvbsin";
 		rockchip,grf = <&grf>;
 		reg = <0x30070000 0x10000>;
 		device_type = "v4l2-pltfrm-subdev";
@@ -811,7 +829,7 @@
 	};
 
 	cif_cif1: cif_cif@30080000 {
-		compatible = "rockchip,rk1108-cif-cif";
+		compatible = "rockchip,rv1108-cif-cif";
 		rockchip,grf = <&grf>;
 		reg = <0x30080000 0x10000>;
 		clocks = <&clk_gates17 6>, <&clk_gates17 7>, <&clk_gates7 10>,
@@ -827,7 +845,7 @@
 	};
 
 	cif_cif2: cif_cif@30090000 {
-		compatible = "rockchip,rk1108-cif-cif";
+		compatible = "rockchip,rv1108-cif-cif";
 		rockchip,grf = <&grf>;
 		reg = <0x30090000 0x10000>;
 		clocks = <&clk_gates17 8>, <&clk_gates17 9>, <&clk_gates7 11>,
@@ -843,7 +861,7 @@
 	};
 
 	cif_cif3: cif_cif@300a0000 {
-		compatible = "rockchip,rk1108-cif-cif";
+		compatible = "rockchip,rv1108-cif-cif";
 		rockchip,grf = <&grf>;
 		reg = <0x300a0000 0x10000>;
 		clocks = <&clk_gates17 10>, <&clk_gates17 11>, <&clk_gates7 12>,
@@ -859,7 +877,7 @@
 	};
 
 	mipi_dsi: mipi_dsi@300e0000 {
-		compatible = "rockchip,rk1108-dsi";
+		compatible = "rockchip,rv1108-dsi";
 		rockchip,prop = <0>;
 		reg = <0x300e0000 0x10000>, <0x20228000 0x8000>;
 		reg-names = "mipi_dsi_host", "mipi_dsi_phy";
@@ -870,7 +888,7 @@
 	};
 
 	hdmi: hdmi@300c0000 {
-		compatible = "rockchip,rk1108-hdmi";
+		compatible = "rockchip,rv1108-hdmi";
 		reg = <0x300c0000 0x20000>,
 		      <0x20220000 0x8000>;
 		interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>,
@@ -902,7 +920,7 @@
 	};
 
 	emmc: rksdmmc@30110000 {
-		compatible = "rockchip,rk_mmc", "rockchip,rk1108-sdmmc";
+		compatible = "rockchip,rk_mmc", "rockchip,rv1108-sdmmc";
 		reg = <0x30110000 0x10000>;
 		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
 		#address-cells = <1>;
@@ -919,7 +937,7 @@
 	};
 
 	sdio: rksdmmc@30120000 {
-		compatible = "rockchip,rk_mmc", "rockchip,rk1108-sdmmc";
+		compatible = "rockchip,rk_mmc", "rockchip,rv1108-sdmmc";
 		reg = <0x30120000 0x10000>;
 		interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
 		#address-cells = <1>;
@@ -939,7 +957,7 @@
 	};
 
 	sdmmc: rksdmmc@30130000 {
-		compatible = "rockchip,rk_mmc", "rockchip,rk1108-sdmmc";
+		compatible = "rockchip,rk_mmc", "rockchip,rv1108-sdmmc";
 		reg = <0x30130000 0x10000>;
 		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
 		#address-cells = <1>;
@@ -959,7 +977,7 @@
 	};
 
 	dwc_control_usb: dwc-control-usb {
-		compatible = "rockchip,rk1108-dwc-control-usb";
+		compatible = "rockchip,rv1108-dwc-control-usb";
 		rockchip,grf = <&grf>;
 		rockchip,usbgrf = <&usbgrf>;
 		interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
@@ -970,7 +988,7 @@
 	};
 
 	u2phy: usb2-phy {
-		compatible = "rockchip,rk1108-usb2phy";
+		compatible = "rockchip,rv1108-usb2phy";
 		rockchip,grf = <&grf>;
 		rockchip,usbgrf = <&usbgrf>;
 		interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
@@ -998,7 +1016,7 @@
 	};
 
 	usb_otg: usb@30180000 {
-		compatible = "rockchip,rk1108_usb20_otg";
+		compatible = "rockchip,rv1108_usb20_otg";
 		reg = <0x30180000 0x40000>;
 		interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
 		/* 0-Normal, 1-Force Host, 2-Force Device */
@@ -1017,7 +1035,7 @@
 	};
 
 	gmac: eth@30200000 {
-		compatible = "rockchip,rk1108-gmac";
+		compatible = "rockchip,rv1108-gmac";
 		reg = <0x30200000 0x10000>;
 		rockchip,grf = <&grf>;
 		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
@@ -1046,7 +1064,7 @@
 	};
 
 	dsp: dsp@33000000 {
-		compatible = "rockchip,rk1108-dsp", "rockchip,dsp";
+		compatible = "rockchip,rv1108-dsp", "rockchip,dsp";
 		reg = <0x33800000 0x10000>,
 		      <0x33000000 0x800000>,
 		      <0x33810000 0x10000>;
@@ -1064,7 +1082,7 @@
 	};
 
 	pinctrl: pinctrl {
-		compatible = "rockchip,rk1108-pinctrl";
+		compatible = "rockchip,rv1108-pinctrl";
 		rockchip,grf = <&grf>;
 		rockchip,pmugrf = <&pmugrf>;
 		#address-cells = <1>;

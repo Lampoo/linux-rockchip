@@ -681,7 +681,14 @@ static void rk322xh_vop_win_csc_mode(struct vop_device *vop_dev,
 		r2y_en = 0;
 		y2r_en = 1;
 		/* y2r csc mode depend on data color space */
-		win_csc_mode = win->colorspace;
+		if (win->colorspace == CSC_BT2020)
+			win_csc_mode = VOP_CSC_BT2020;
+		else if (win->colorspace == CSC_BT709)
+			win_csc_mode = VOP_CSC_BT709L;
+		else if (win->colorspace == CSC_BT601F)
+			win_csc_mode = VOP_CSC_BT601F;
+		else
+			win_csc_mode = VOP_CSC_BT601L;
 	} else if (!IS_YUV_COLOR(win_csc) && (overlay_mode == VOP_YUV_DOMAIN)) {
 		r2y_en = 1;
 		y2r_en = 0;
@@ -1660,19 +1667,19 @@ static void rk322xh_vop_bcsh_path_sel(struct rk_lcdc_driver *dev_drv)
 	u64 val = 0;
 
 	vop_msk_reg(vop_dev, SYS_CTRL, V_OVERLAY_MODE(dev_drv->overlay_mode));
-	vop_msk_reg(vop_dev, SYS_CTRL1,
-		    V_LEVEL2_OVERLAY_EN(dev_drv->pre_overlay) |
-		    V_ALPHA_HARD_CALC(dev_drv->pre_overlay));
 	/* BG color */
 	if (IS_YUV_COLOR(dev_drv->output_color)) {
 		val = V_DSP_OUT_RGB_YUV(1);
 		vop_msk_reg(vop_dev, POST_SCL_CTRL, val);
+	} else {
+		val = V_DSP_OUT_RGB_YUV(0);
+		vop_msk_reg(vop_dev, POST_SCL_CTRL, val);
+	}
+	if (dev_drv->overlay_mode == VOP_YUV_DOMAIN) {
 		val = V_DSP_BG_BLUE(0x200) | V_DSP_BG_GREEN(0x40) |
 			V_DSP_BG_RED(0x200);
 		vop_msk_reg(vop_dev, DSP_BG, val);
 	} else {
-		val = V_DSP_OUT_RGB_YUV(0);
-		vop_msk_reg(vop_dev, POST_SCL_CTRL, val);
 		val = V_DSP_BG_BLUE(0) | V_DSP_BG_GREEN(0) |
 			V_DSP_BG_RED(0);
 		vop_msk_reg(vop_dev, DSP_BG, val);
@@ -1910,22 +1917,23 @@ static int vop_load_screen(struct rk_lcdc_driver *dev_drv, bool initscreen)
 			val |= V_SW_P2I_EN(0);
 		vop_msk_reg(vop_dev, DSP_CTRL0, val);
 
-		if (screen->mode.vmode & FB_VMODE_INTERLACED)
-			vop_msk_reg(vop_dev, SYS_CTRL1, V_REG_DONE_FRM(1));
-		else
-			vop_msk_reg(vop_dev, SYS_CTRL1, V_REG_DONE_FRM(0));
+		vop_msk_reg(vop_dev, SYS_CTRL1, V_REG_DONE_FRM(1));
+		vop_dev->interlace_flag = 0;
 		dev_drv->output_color = screen->color_mode;
 		rk322xh_vop_csc_cfg(dev_drv);
 		/* BG color */
 		if (IS_YUV_COLOR(dev_drv->output_color)) {
 			val = V_DSP_OUT_RGB_YUV(1);
 			vop_msk_reg(vop_dev, POST_SCL_CTRL, val);
+		} else {
+			val = V_DSP_OUT_RGB_YUV(0);
+			vop_msk_reg(vop_dev, POST_SCL_CTRL, val);
+		}
+		if (dev_drv->overlay_mode == VOP_YUV_DOMAIN) {
 			val = V_DSP_BG_BLUE(0x200) | V_DSP_BG_GREEN(0x40) |
 				V_DSP_BG_RED(0x200);
 			vop_msk_reg(vop_dev, DSP_BG, val);
 		} else {
-			val = V_DSP_OUT_RGB_YUV(0);
-			vop_msk_reg(vop_dev, POST_SCL_CTRL, val);
 			val = V_DSP_BG_BLUE(0) | V_DSP_BG_GREEN(0) |
 				V_DSP_BG_RED(0);
 			vop_msk_reg(vop_dev, DSP_BG, val);
@@ -1987,9 +1995,9 @@ static int vop_enable_irq(struct rk_lcdc_driver *dev_drv)
 
 	vop_mask_writel(vop_dev, INTR_CLEAR0, INTR_MASK, INTR_MASK);
 
-	val = INTR_FS | INTR_LINE_FLAG0 | INTR_BUS_ERROR | INTR_LINE_FLAG1 |
+	val = INTR_LINE_FLAG0 | INTR_BUS_ERROR | INTR_LINE_FLAG1 |
 		INTR_WIN0_EMPTY | INTR_WIN1_EMPTY | INTR_HWC_EMPTY |
-		INTR_POST_BUF_EMPTY;
+		INTR_POST_BUF_EMPTY | INTR_FS_FIELD;
 
 	vop_mask_writel(vop_dev, INTR_EN0, INTR_MASK, val);
 
@@ -3393,7 +3401,7 @@ static int vop_fps_mgr(struct rk_lcdc_driver *dev_drv, int fps, bool set)
 		ret = clk_set_rate(vop_dev->dclk, dotclk);
 	}
 
-	pixclock = div_u64(1000000000000llu, clk_get_rate(vop_dev->dclk));
+	pixclock = div_u64(1000000000000llu, screen->mode.pixclock);
 	vop_dev->pixclock = pixclock;
 	dev_drv->pixclock = vop_dev->pixclock;
 	fps = rk_fb_calc_fps(screen, pixclock);
@@ -3448,6 +3456,7 @@ static int vop_config_done(struct rk_lcdc_driver *dev_drv)
 	int i, layer2_alpha_en = 0;
 	u64 val;
 	struct rk_lcdc_win *win = NULL;
+	struct rk_screen *screen = dev_drv->cur_screen;
 
 	spin_lock(&vop_dev->reg_lock);
 	vop_post_cfg(dev_drv);
@@ -3509,6 +3518,10 @@ static int vop_config_done(struct rk_lcdc_driver *dev_drv)
 		}
 		win->last_state = win->state;
 	}
+	if ((screen->mode.vmode & FB_VMODE_INTERLACED) &&
+	    (vop_dev->interlace_flag == 2))
+		vop_msk_reg(vop_dev, SYS_CTRL1, V_REG_DONE_FRM(0));
+	vop_dev->interlace_flag++;
 	vop_cfg_done(vop_dev);
 	spin_unlock(&vop_dev->reg_lock);
 	return 0;
@@ -3884,11 +3897,14 @@ static irqreturn_t vop_isr(int irq, void *dev_id)
 	if (!intr_status)
 		return IRQ_NONE;
 
-	if (intr_status & INTR_FS) {
+	if (intr_status & INTR_FS_FIELD) {
+		vop_msk_reg(vop_dev, SYS_CTRL1,
+			    V_LEVEL2_OVERLAY_EN(vop_dev->driver.pre_overlay) |
+			    V_ALPHA_HARD_CALC(vop_dev->driver.pre_overlay));
 		timestamp = ktime_get();
 		vop_dev->driver.vsync_info.timestamp = timestamp;
 		wake_up_interruptible_all(&vop_dev->driver.vsync_info.wait);
-		intr_status &= ~INTR_FS;
+		intr_status &= ~INTR_FS_FIELD;
 	}
 
 	if (intr_status & INTR_LINE_FLAG0)

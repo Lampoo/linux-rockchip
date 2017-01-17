@@ -16,6 +16,7 @@
 
 #include <linux/clk.h>
 #include <linux/delay.h>
+#include <linux/debugfs.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
@@ -31,6 +32,7 @@
 #include <linux/regmap.h>
 #include <linux/reset.h>
 #include <linux/usb/phy.h>
+#include <linux/uaccess.h>
 
 #define U3PHY_PORT_NUM	2
 #define U3PHY_MAX_CLKS	4
@@ -92,6 +94,8 @@ struct rockchip_u3phy_grfcfg {
 	struct u3phy_reg	ls_det_st;
 	struct u3phy_reg	um_ls;
 	struct u3phy_reg	um_hstdct;
+	struct u3phy_reg	u2_only_ctrl;
+	struct u3phy_reg	u3_disable;
 	struct u3phy_reg	pp_pwr_st;
 	struct u3phy_reg	pp_pwr_en[PIPE_PWR_MAX];
 };
@@ -118,6 +122,8 @@ struct rockchip_u3phy_cfg {
 	int (*phy_tuning)(struct rockchip_u3phy *,
 			  struct rockchip_u3phy_port *,
 			  struct device_node *);
+	int (*phy_cp_test)(struct rockchip_u3phy *,
+			   struct rockchip_u3phy_port *);
 };
 
 struct rockchip_u3phy_port {
@@ -134,8 +140,11 @@ struct rockchip_u3phy_port {
 struct rockchip_u3phy {
 	struct device	*dev;
 	struct regmap	*u3phy_grf;
+	struct regmap	*grf;
 	int		um_ls_irq;
 	struct clk	*clks[U3PHY_MAX_CLKS];
+	struct dentry	*root;
+	int		gpio_vbus;
 	struct reset_control *rsts[U3PHY_RESET_MAX];
 	struct rockchip_u3phy_apbcfg	apbcfg;
 	const struct rockchip_u3phy_cfg	*cfgs;
@@ -171,6 +180,129 @@ static inline bool param_exped(void __iomem *base,
 
 	tmp = (orig & mask) >> reg->bitstart;
 	return tmp == value;
+}
+
+static int rockchip_u3phy_usb2_only_show(struct seq_file *s, void *unused)
+{
+	struct rockchip_u3phy	*u3phy = s->private;
+
+	if (param_exped(u3phy->u3phy_grf, &u3phy->cfgs->grfcfg.u2_only_ctrl, 1))
+		dev_info(u3phy->dev, "u2\n");
+	else
+		dev_info(u3phy->dev, "u3\n");
+
+	return 0;
+}
+
+static int rockchip_u3phy_usb2_only_open(struct inode *inode,
+					 struct file *file)
+{
+	return single_open(file, rockchip_u3phy_usb2_only_show,
+			   inode->i_private);
+}
+
+static ssize_t rockchip_u3phy_usb2_only_write(struct file *file,
+					      const char __user *ubuf,
+					      size_t count, loff_t *ppos)
+{
+	struct seq_file			*s = file->private_data;
+	struct rockchip_u3phy		*u3phy = s->private;
+	struct rockchip_u3phy_port	*u3phy_port;
+	char				buf[32];
+	u8				index;
+
+	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+		return -EFAULT;
+
+	if (!strncmp(buf, "u3", 2) &&
+	    param_exped(u3phy->u3phy_grf,
+			&u3phy->cfgs->grfcfg.u2_only_ctrl, 1)) {
+		dev_info(u3phy->dev, "Set usb3.0 and usb2.0 mode successfully\n");
+
+		if (gpio_is_valid(u3phy->gpio_vbus))
+			gpio_set_value(u3phy->gpio_vbus, 0);
+
+		param_write(u3phy->grf,
+			    &u3phy->cfgs->grfcfg.u3_disable, false);
+		param_write(u3phy->u3phy_grf,
+			    &u3phy->cfgs->grfcfg.u2_only_ctrl, false);
+
+		for (index = 0; index < U3PHY_PORT_NUM; index++) {
+			u3phy_port = &u3phy->ports[index];
+			/* enable u3 rx termimation */
+			if (u3phy_port->type == U3PHY_TYPE_PIPE)
+				writel(0x30, u3phy_port->base + 0xd8);
+		}
+
+		atomic_notifier_call_chain(&u3phy->usb_phy.notifier, 0, NULL);
+
+		if (gpio_is_valid(u3phy->gpio_vbus))
+			gpio_set_value(u3phy->gpio_vbus, 1);
+	} else if (!strncmp(buf, "u2", 2) &&
+		   param_exped(u3phy->u3phy_grf,
+			       &u3phy->cfgs->grfcfg.u2_only_ctrl, 0)) {
+		dev_info(u3phy->dev, "Set usb2.0 only mode successfully\n");
+
+		if (gpio_is_valid(u3phy->gpio_vbus))
+			gpio_set_value(u3phy->gpio_vbus, 0);
+
+		param_write(u3phy->grf,
+			    &u3phy->cfgs->grfcfg.u3_disable, true);
+		param_write(u3phy->u3phy_grf,
+			    &u3phy->cfgs->grfcfg.u2_only_ctrl, true);
+
+		for (index = 0; index < U3PHY_PORT_NUM; index++) {
+			u3phy_port = &u3phy->ports[index];
+			/* disable u3 rx termimation */
+			if (u3phy_port->type == U3PHY_TYPE_PIPE)
+				writel(0x20, u3phy_port->base + 0xd8);
+		}
+
+		atomic_notifier_call_chain(&u3phy->usb_phy.notifier, 0, NULL);
+
+		if (gpio_is_valid(u3phy->gpio_vbus))
+			gpio_set_value(u3phy->gpio_vbus, 1);
+	} else {
+		dev_info(u3phy->dev, "Same or illegal mode\n");
+	}
+
+	return count;
+}
+
+static const struct file_operations rockchip_u3phy_usb2_only_fops = {
+	.open			= rockchip_u3phy_usb2_only_open,
+	.write			= rockchip_u3phy_usb2_only_write,
+	.read			= seq_read,
+	.llseek			= seq_lseek,
+	.release		= single_release,
+};
+
+int rockchip_u3phy_debugfs_init(struct rockchip_u3phy *u3phy)
+{
+	struct dentry		*root;
+	struct dentry		*file;
+	int			ret;
+
+	root = debugfs_create_dir(dev_name(u3phy->dev), NULL);
+	if (!root) {
+		ret = -ENOMEM;
+		goto err0;
+	}
+
+	u3phy->root = root;
+
+	file = debugfs_create_file("u3phy_mode", 0644, root,
+				   u3phy, &rockchip_u3phy_usb2_only_fops);
+	if (!file) {
+		ret = -ENOMEM;
+		goto err1;
+	}
+	return 0;
+
+err1:
+	debugfs_remove_recursive(root);
+err0:
+	return ret;
 }
 
 static const char *get_rest_name(enum rockchip_u3phy_rest_req rst)
@@ -359,6 +491,33 @@ done:
 	return 0;
 }
 
+static int rockchip_u3phy_cp_test(struct phy *phy)
+{
+	struct rockchip_u3phy_port *u3phy_port = phy_get_drvdata(phy);
+	struct rockchip_u3phy *u3phy = dev_get_drvdata(phy->dev.parent);
+	int ret;
+
+	if (u3phy->cfgs->phy_cp_test) {
+		/*
+		 * When do USB3 compliance test, we may connect the oscilloscope
+		 * front panel Aux Out to the DUT SSRX+, the Aux Out of the
+		 * oscilloscope outputs a negative pulse whose width is between
+		 * 300- 400 ns which may trigger some DUTs to change the CP test
+		 * pattern.
+		 *
+		 * The Inno USB3 PHY disable the function to detect the negative
+		 * pulse in SSRX+ by default, so we need to enable the function
+		 * to toggle the CP test pattern before do USB3 compliance test.
+		 */
+		dev_dbg(u3phy->dev, "prepare for u3phy compliance test\n");
+		ret = u3phy->cfgs->phy_cp_test(u3phy, u3phy_port);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
 static __maybe_unused
 struct phy *rockchip_u3phy_xlate(struct device *dev,
 				 struct of_phandle_args *args)
@@ -393,6 +552,7 @@ static struct phy_ops rockchip_u3phy_ops = {
 	.exit		= rockchip_u3phy_exit,
 	.power_on	= rockchip_u3phy_power_on,
 	.power_off	= rockchip_u3phy_power_off,
+	.cp_test	= rockchip_u3phy_cp_test,
 	.owner		= THIS_MODULE,
 };
 
@@ -548,7 +708,7 @@ static int rockchip_u3phy_parse_dt(struct rockchip_u3phy *u3phy,
 		return -ENXIO;
 	}
 
-	gpio = of_get_named_gpio(np, "usb30-drv", 0);
+	gpio = of_get_named_gpio(np, "usb30-drv-gpio", 0);
 	if (gpio_is_valid(gpio)) {
 		ret = devm_gpio_request(dev, gpio, "usb30_drv_pullup");
 		if (ret) {
@@ -556,6 +716,7 @@ static int rockchip_u3phy_parse_dt(struct rockchip_u3phy *u3phy,
 				gpio, ret);
 			return ret;
 		}
+		u3phy->gpio_vbus = gpio;
 		gpio_direction_output(gpio, 1);
 	}
 
@@ -717,6 +878,11 @@ static int rockchip_u3phy_probe(struct platform_device *pdev)
 	if (IS_ERR(u3phy->u3phy_grf))
 		return PTR_ERR(u3phy->u3phy_grf);
 
+	u3phy->grf =
+		syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
+	if (IS_ERR(u3phy->grf))
+		return PTR_ERR(u3phy->grf);
+
 	if (of_property_read_u32_array(np, "reg", reg, 2)) {
 		dev_err(dev, "the reg property is not assigned in %s node\n",
 			np->name);
@@ -788,6 +954,8 @@ static int rockchip_u3phy_probe(struct platform_device *pdev)
 	u3phy->usb_phy.notify_disconnect = rk322xh_u3phy_on_disconnect;
 	usb_add_phy(&u3phy->usb_phy, USB_PHY_TYPE_USB3);
 	ATOMIC_INIT_NOTIFIER_HEAD(&u3phy->usb_phy.notifier);
+
+	rockchip_u3phy_debugfs_init(u3phy);
 
 	dev_info(dev, "Rockchip u3phy initialized successfully\n");
 	return 0;
@@ -905,21 +1073,23 @@ static int rk322xh_u3phy_tuning(struct rockchip_u3phy *u3phy,
 		writel(0x08, u3phy_port->base + 0x000);
 		writel(0x0c, u3phy_port->base + 0x120);
 
-		/* rx compliance tuning */
-		writel(0x70, u3phy_port->base + 0x150);
-		writel(0x12, u3phy_port->base + 0x0c8);
-		writel(0x05, u3phy_port->base + 0x148);
-		writel(0x0c, u3phy_port->base + 0x068);
-		writel(0xf4, u3phy_port->base + 0x160);
-		writel(0xf0, u3phy_port->base + 0x1c4);
-		writel(0xff, u3phy_port->base + 0x070);
-		writel(0x0f, u3phy_port->base + 0x06c);
-		writel(0xe0, u3phy_port->base + 0x060);
-
 		/* increase the voltage of LFPS */
 		writel(0x08, u3phy_port->base + 0x180);
 	} else {
 		dev_err(u3phy->dev, "invalid u3phy port type\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int rk322xh_u3phy_cp_test_enable(struct rockchip_u3phy *u3phy,
+					struct rockchip_u3phy_port *u3phy_port)
+{
+	if (u3phy_port->type == U3PHY_TYPE_PIPE) {
+		writel(0x0c, u3phy_port->base + 0x408);
+	} else {
+		dev_err(u3phy->dev, "The u3phy type is not pipe\n");
 		return -EINVAL;
 	}
 
@@ -931,18 +1101,21 @@ static const struct rockchip_u3phy_cfg rk322xh_u3phy_cfgs[] = {
 		.reg		= 0xff470000,
 		.grfcfg		= {
 			.um_suspend	= { 0x0004, 15, 0, 0x1452, 0x15d1 },
+			.u2_only_ctrl	= { 0x0020, 15, 15, 0, 1 },
 			.um_ls		= { 0x0030, 5, 4, 0, 1 },
 			.um_hstdct	= { 0x0030, 7, 7, 0, 1 },
 			.ls_det_en	= { 0x0040, 0, 0, 0, 1 },
 			.ls_det_st	= { 0x0044, 0, 0, 0, 1 },
 			.pp_pwr_st	= { 0x0034, 14, 13, 0, 0},
-			.pp_pwr_en	= { {0x0020, 15, 0, 0x0014, 0x0005},
-					    {0x0020, 15, 0, 0x0014, 0x000d},
-					    {0x0020, 15, 0, 0x0014, 0x0015},
-					    {0x0020, 15, 0, 0x0014, 0x001d} },
+			.pp_pwr_en	= { {0x0020, 14, 0, 0x0014, 0x0005},
+					    {0x0020, 14, 0, 0x0014, 0x000d},
+					    {0x0020, 14, 0, 0x0014, 0x0015},
+					    {0x0020, 14, 0, 0x0014, 0x001d} },
+			.u3_disable	= { 0x04c4, 15, 0, 0x1100, 0x101},
 		},
 		.phy_pipe_power	= rk322xh_u3phy_pipe_power,
 		.phy_tuning	= rk322xh_u3phy_tuning,
+		.phy_cp_test	= rk322xh_u3phy_cp_test_enable,
 	},
 	{ /* sentinel */ }
 };

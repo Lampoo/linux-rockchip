@@ -110,6 +110,32 @@ static ssize_t show_screen_info(struct device *dev,
 			fps, screen->type, screen->mode.vmode);
 }
 
+static ssize_t set_screen_info(struct device *dev,
+			       struct device_attribute *attr,
+			       const char *buf, size_t count)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct rk_fb_par *fb_par = (struct rk_fb_par *)fbi->par;
+	struct rk_lcdc_driver *dev_drv = fb_par->lcdc_drv;
+	int xmirror = 0, ymirror = 0, ret = 0, rotate = 0;
+
+	ret = kstrtoint(buf, 0, &rotate);
+	if (ret)
+		return ret;
+	xmirror = !!(rotate & X_MIRROR);
+	ymirror = !!(rotate & Y_MIRROR);
+	dev_drv->cur_screen->x_mirror = xmirror;
+	dev_drv->cur_screen->y_mirror = ymirror;
+	mutex_lock(&dev_drv->output_lock);
+	mutex_lock(&dev_drv->win_config);
+	if (dev_drv->ops->extern_func)
+		dev_drv->ops->extern_func(dev_drv, SET_DSP_MIRROR);
+	mutex_unlock(&dev_drv->win_config);
+	mutex_unlock(&dev_drv->output_lock);
+
+	return count;
+}
+
 static ssize_t show_disp_info(struct device *dev,
 			      struct device_attribute *attr, char *buf)
 {
@@ -193,6 +219,8 @@ static int dump_win(struct ion_client *ion_client,
 		nr_pages = roundup(width * height * (bits >> 3), PAGE_SIZE);
 		nr_pages /= PAGE_SIZE;
 		pages = kzalloc(sizeof(struct page) * nr_pages, GFP_KERNEL);
+		if (!pages)
+			return -ENOMEM;
 		while (i < nr_pages) {
 			pages[i] = phys_to_page(start);
 			start += PAGE_SIZE;
@@ -224,7 +252,7 @@ static int dump_win(struct ion_client *ion_client,
 	pr_info("dump win == > %s\n", name);
 	filp = filp_open(name, flags, 0x600);
 	if (!filp)
-		printk("fail to create %s\n", name);
+		pr_err("fail to create %s\n", name);
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
@@ -248,7 +276,7 @@ static int dump_win(struct ion_client *ion_client,
 }
 
 static ssize_t show_dump_buffer(struct device *dev,
-			      struct device_attribute *attr, char *buf)
+				struct device_attribute *attr, char *buf)
 {
 	ssize_t size;
 
@@ -497,8 +525,8 @@ static ssize_t show_dsp_buffer(struct device *dev,
 extern int __close_fd(struct files_struct *files, unsigned fd);
 
 static ssize_t set_dsp_buffer(struct device *dev,
-			       struct device_attribute *attr,
-			       const char *buf, size_t count)
+			      struct device_attribute *attr,
+			      const char *buf, size_t count)
 {
 	struct fb_info *fbi = dev_get_drvdata(dev);
 	struct rk_fb_par *fb_par = (struct rk_fb_par *)fbi->par;
@@ -511,7 +539,7 @@ static ssize_t set_dsp_buffer(struct device *dev,
 	const char *start = buf;
 	struct ion_handle *handle = NULL;
 	char __iomem *screen_base;
-	struct rk_fb_win_cfg_data win_config;
+	struct rk_fb_win_cfg_data *win_config = NULL;
 	struct rk_screen *screen = dev_drv->cur_screen;
 	int space_max = 10;
 	int format;
@@ -569,39 +597,43 @@ static ssize_t set_dsp_buffer(struct device *dev,
 	}
 	screen_base = ion_map_kernel(rk_fb->ion_client, handle);
 	read_buffer(filp, screen_base, mem_size, 0);
+	win_config =
+		kzalloc(sizeof(*win_config), GFP_KERNEL);
+	if (!win_config)
+		return -ENOMEM;
 
-	memset(&win_config, 0, sizeof(win_config));
-	win_config.wait_fs = 0;
-	win_config.win_par[0].win_id = 0;
-	win_config.win_par[0].z_order = 0;
-	win_config.win_par[0].area_par[0].data_format = format;
-	win_config.win_par[0].area_par[0].ion_fd = fd;
-	win_config.win_par[0].area_par[0].x_offset = 0;
-	win_config.win_par[0].area_par[0].y_offset = 0;
-	win_config.win_par[0].area_par[0].xpos = 0;
-	win_config.win_par[0].area_par[0].ypos = 0;
-	win_config.win_par[0].area_par[0].xsize = screen->mode.xres;
-	win_config.win_par[0].area_par[0].ysize = screen->mode.yres;
-	win_config.win_par[0].area_par[0].xact = width;
-	win_config.win_par[0].area_par[0].yact = height;
-	win_config.win_par[0].area_par[0].xvir = width;
-	win_config.win_par[0].area_par[0].yvir = height;
+	memset(win_config, 0, sizeof(struct rk_fb_win_cfg_data));
+	win_config->wait_fs = 0;
+	win_config->win_par[0].win_id = 0;
+	win_config->win_par[0].z_order = 0;
+	win_config->win_par[0].area_par[0].data_format = format;
+	win_config->win_par[0].area_par[0].ion_fd = fd;
+	win_config->win_par[0].area_par[0].x_offset = 0;
+	win_config->win_par[0].area_par[0].y_offset = 0;
+	win_config->win_par[0].area_par[0].xpos = 0;
+	win_config->win_par[0].area_par[0].ypos = 0;
+	win_config->win_par[0].area_par[0].xsize = screen->mode.xres;
+	win_config->win_par[0].area_par[0].ysize = screen->mode.yres;
+	win_config->win_par[0].area_par[0].xact = width;
+	win_config->win_par[0].area_par[0].yact = height;
+	win_config->win_par[0].area_par[0].xvir = width;
+	win_config->win_par[0].area_par[0].yvir = height;
 
 	for (i = 0; i < frame_num; i++) {
-		win_config.win_par[0].area_par[0].y_offset = height * i;
+		win_config->win_par[0].area_par[0].y_offset = height * i;
 		fbi->fbops->fb_ioctl(fbi, RK_FBIOSET_CONFIG_DONE,
-				     (unsigned long)(&win_config));
+				     (unsigned long)(win_config));
 		for (j = 0; j < RK_MAX_BUF_NUM; j++) {
-			if (win_config.rel_fence_fd[j] > 0) {
+			if (win_config->rel_fence_fd[j] > 0) {
 				acq_fence =
-				sync_fence_fdget(win_config.rel_fence_fd[j]);
+				sync_fence_fdget(win_config->rel_fence_fd[j]);
 				sync_fence_put(acq_fence);
 			}
 		}
 
-		if (win_config.ret_fence_fd > 0) {
+		if (win_config->ret_fence_fd > 0) {
 			acq_fence =
-			sync_fence_fdget(win_config.ret_fence_fd);
+			sync_fence_fdget(win_config->ret_fence_fd);
 			sync_fence_put(acq_fence);
 		}
 	}
@@ -612,7 +644,7 @@ static ssize_t set_dsp_buffer(struct device *dev,
 
 	set_fs(old_fs);
 	filp_close(filp, NULL);
-
+	kfree(win_config);
 	return count;
 }
 
@@ -820,7 +852,7 @@ static ssize_t show_hwc_lut(struct device *dev,
 static ssize_t set_hwc_lut(struct device *dev, struct device_attribute *attr,
 			   const char *buf, size_t count)
 {
-	int hwc_lut[256];
+	int *hwc_lut = NULL;
 	const char *start = buf;
 	int i = 256, temp;
 	int space_max;
@@ -829,6 +861,9 @@ static ssize_t set_hwc_lut(struct device *dev, struct device_attribute *attr,
 	struct rk_fb_par *fb_par = (struct rk_fb_par *)fbi->par;
 	struct rk_lcdc_driver *dev_drv = fb_par->lcdc_drv;
 
+	hwc_lut = kzalloc(256 * 4, GFP_KERNEL);
+	if (!hwc_lut)
+		return -ENOMEM;
 	/*printk("count:%d\n>>%s\n\n",count,start);*/
 	for (i = 0; i < 256; i++) {
 		space_max = 15;	/*max space number 15*/
@@ -846,6 +881,7 @@ static ssize_t set_hwc_lut(struct device *dev, struct device_attribute *attr,
 	}
 	if (dev_drv->ops->set_hwc_lut)
 		dev_drv->ops->set_hwc_lut(dev_drv, hwc_lut, 1);
+	kfree(hwc_lut);
 
 	return count;
 }
@@ -859,7 +895,7 @@ static ssize_t show_cabc_lut(struct device *dev,
 static ssize_t set_cabc_lut(struct device *dev, struct device_attribute *attr,
 			    const char *buf, size_t count)
 {
-	int cabc_lut[256];
+	int *cabc_lut = NULL;
 	const char *start = buf;
 	int i = 256, temp;
 	int space_max = 10;
@@ -868,6 +904,9 @@ static ssize_t set_cabc_lut(struct device *dev, struct device_attribute *attr,
 	struct rk_fb_par *fb_par = (struct rk_fb_par *)fbi->par;
 	struct rk_lcdc_driver *dev_drv = fb_par->lcdc_drv;
 
+	cabc_lut = kzalloc(256 * 4, GFP_KERNEL);
+	if (!cabc_lut)
+		return -ENOMEM;
 	for (i = 0; i < 256; i++) {
 		temp = i;
 		/*init by default value*/
@@ -890,6 +929,7 @@ static ssize_t set_cabc_lut(struct device *dev, struct device_attribute *attr,
 	if (dev_drv->ops->set_cabc_lut)
 		dev_drv->ops->set_cabc_lut(dev_drv, cabc_lut);
 
+	kfree(cabc_lut);
 	return count;
 }
 
@@ -902,7 +942,7 @@ static ssize_t show_dsp_lut(struct device *dev,
 static ssize_t set_dsp_lut(struct device *dev, struct device_attribute *attr,
 			   const char *buf, size_t count)
 {
-	int dsp_lut[256];
+	int *dsp_lut = NULL;
 	const char *start = buf;
 	int i = 256, temp;
 	int space_max = 10;
@@ -911,6 +951,9 @@ static ssize_t set_dsp_lut(struct device *dev, struct device_attribute *attr,
 	struct rk_fb_par *fb_par = (struct rk_fb_par *)fbi->par;
 	struct rk_lcdc_driver *dev_drv = fb_par->lcdc_drv;
 
+	dsp_lut = kzalloc(256 * 4, GFP_KERNEL);
+	if (!dsp_lut)
+		return -ENOMEM;
 	for (i = 0; i < 256; i++) {
 		temp = i;
 		/*init by default value*/
@@ -934,6 +977,7 @@ static ssize_t set_dsp_lut(struct device *dev, struct device_attribute *attr,
 	if (dev_drv->ops->set_dsp_lut)
 		dev_drv->ops->set_dsp_lut(dev_drv, dsp_lut);
 
+	kfree(dsp_lut);
 	return count;
 }
 
@@ -955,7 +999,8 @@ static ssize_t set_dsp_cabc(struct device *dev, struct device_attribute *attr,
 	struct fb_info *fbi = dev_get_drvdata(dev);
 	struct rk_fb_par *fb_par = (struct rk_fb_par *)fbi->par;
 	struct rk_lcdc_driver *dev_drv = fb_par->lcdc_drv;
-	int space_max, ret = 0, mode = 0, calc = 0, up = 0, down = 0, global = 0;
+	int space_max, ret = 0;
+	int mode = 0, calc = 0, up = 0, down = 0, global = 0;
 	const char *start = buf;
 
 	space_max = 10;	/*max space number 10*/
@@ -988,8 +1033,9 @@ static ssize_t set_dsp_cabc(struct device *dev, struct device_attribute *attr,
 	start++;
 	global = simple_strtoul(start, NULL, 10);
 
-    if (dev_drv->ops->set_dsp_cabc)
-		ret = dev_drv->ops->set_dsp_cabc(dev_drv, mode, calc, up, down, global);
+	if (dev_drv->ops->set_dsp_cabc)
+		ret = dev_drv->ops->set_dsp_cabc(dev_drv, mode,
+						 calc, up, down, global);
 	if (ret < 0)
 		return ret;
 
@@ -1203,8 +1249,8 @@ static ssize_t show_dsp_mode(struct device *dev,
 }
 
 static ssize_t show_win_property(struct device *dev,
-			    struct device_attribute *attr,
-			    char *buf)
+				 struct device_attribute *attr,
+				 char *buf)
 {
 	struct fb_info *fbi = dev_get_drvdata(dev);
 	struct rk_fb_par *fb_par = (struct rk_fb_par *)fbi->par;
@@ -1321,7 +1367,8 @@ static struct device_attribute rkfb_attrs[] = {
 	__ATTR(disp_info, S_IRUGO, show_disp_info, NULL),
 	__ATTR(dump_buf, S_IRUGO | S_IWUSR, show_dump_buffer, set_dump_buffer),
 	__ATTR(dsp_buf, S_IRUGO | S_IWUSR, show_dsp_buffer, set_dsp_buffer),
-	__ATTR(screen_info, S_IRUGO, show_screen_info, NULL),
+	__ATTR(screen_info, S_IRUGO | S_IWUSR,
+	       show_screen_info, set_screen_info),
 	__ATTR(dual_mode, S_IRUGO, show_dual_mode, NULL),
 	__ATTR(enable, S_IRUGO | S_IWUSR, show_fb_state, set_fb_state),
 	__ATTR(overlay, S_IRUGO | S_IWUSR, show_overlay, set_overlay),

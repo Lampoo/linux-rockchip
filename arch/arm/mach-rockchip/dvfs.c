@@ -43,7 +43,7 @@ static int pd_gpu_off, early_suspend;
 static DEFINE_MUTEX(switch_vdd_gpu_mutex);
 struct regulator *vdd_gpu_regulator;
 static DEFINE_MUTEX(temp_limit_mutex);
-static u32 cpu_target_temp;
+static int cpu_target_temp;
 static bool temp_limit_4k;
 
 static int dvfs_get_rate_range(struct dvfs_node *clk_dvfs_node);
@@ -234,11 +234,17 @@ static int __cpuinit rk322xh_sys_stat_notifier_call(struct notifier_block *nb,
 		return NOTIFY_OK;
 
 	if (val & (SYS_STATUS_VIDEO_4K_10B | SYS_STATUS_VIDEO_4K)) {
+		if (temp_limit_4k)
+			return NOTIFY_OK;
+		temp_limit_4k = true;
 		clk_cpu_dvfs_node->min_rate = RK322XH_CPU_MIN_RATE_4K;
 		clk_cpu_dvfs_node->max_rate = RK322XH_CPU_MAX_RATE_4K;
 		cpu_down(3);
 		cpu_down(2);
 	} else {
+		if (!temp_limit_4k)
+			return NOTIFY_OK;
+		temp_limit_4k = false;
 		dvfs_get_rate_range(clk_cpu_dvfs_node);
 		cpu_up(2);
 		cpu_up(3);

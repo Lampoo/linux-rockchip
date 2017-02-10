@@ -192,7 +192,8 @@ static int imx_camera_module_write_config(
 	}
 
 	if (!IS_ERR_OR_NULL(cam_mod->custom.set_flip))
-		cam_mod->custom.set_flip(cam_mod);
+		cam_mod->custom.set_flip(cam_mod,
+			reg_table, reg_table_num_entries);
 
 	ret = pltfrm_camera_module_write_reglist(&cam_mod->sd,
 		reg_table, reg_table_num_entries);
@@ -412,6 +413,27 @@ err:
 	pltfrm_camera_module_pr_err(&cam_mod->sd,
 		"failed with error %d\n", ret);
 	return ret;
+}
+
+int imx_camera_module_g_frame_interval(
+	struct v4l2_subdev *sd,
+	struct v4l2_subdev_frame_interval *interval)
+{
+	struct imx_camera_module *cam_mod = to_imx_camera_module(sd);
+
+	if (cam_mod->active_config) {
+		if (cam_mod->state == IMX_CAMERA_MODULE_STREAMING) {
+			if (cam_mod->frm_intrvl_valid) {
+				*interval = cam_mod->frm_intrvl;
+				return 0;
+			} else {
+				*interval = cam_mod->active_config->frm_intrvl;
+				return 0;
+			}
+		}
+	}
+
+	return -EFAULT;
 }
 
 /* ======================================================================== */
@@ -635,6 +657,16 @@ int imx_camera_module_g_ctrl(struct v4l2_subdev *sd,
 		return 0;
 	}
 
+	if (ctrl->id == V4L2_CID_BAND_STOP_FILTER) {
+		struct v4l2_subdev *ircut_ctrl;
+
+		ircut_ctrl = pltfrm_camera_module_get_ircut_ctrl(sd);
+		if (!IS_ERR_OR_NULL(ircut_ctrl)) {
+			ret = v4l2_subdev_call(ircut_ctrl, core, g_ctrl, ctrl);
+			return ret;
+		}
+	}
+
 	if ((cam_mod->state != IMX_CAMERA_MODULE_SW_STANDBY) &&
 		(cam_mod->state != IMX_CAMERA_MODULE_STREAMING)) {
 		pltfrm_camera_module_pr_err(&cam_mod->sd,
@@ -648,16 +680,6 @@ int imx_camera_module_g_ctrl(struct v4l2_subdev *sd,
 		af_ctrl = pltfrm_camera_module_get_af_ctrl(sd);
 		if (!IS_ERR_OR_NULL(af_ctrl)) {
 			ret = v4l2_subdev_call(af_ctrl, core, g_ctrl, ctrl);
-			return ret;
-		}
-	}
-
-	if (ctrl->id == V4L2_CID_BAND_STOP_FILTER) {
-		struct v4l2_subdev *ircut_ctrl;
-
-		ircut_ctrl = pltfrm_camera_module_get_ircut_ctrl(sd);
-		if (!IS_ERR_OR_NULL(ircut_ctrl)) {
-			ret = v4l2_subdev_call(ircut_ctrl, core, g_ctrl, ctrl);
 			return ret;
 		}
 	}

@@ -1501,13 +1501,13 @@ static int rk_fb_get_list_stat(struct rk_lcdc_driver *dev_drv)
 
 void rk_fd_fence_wait(struct rk_lcdc_driver *dev_drv, struct sync_fence *fence)
 {
-	int err = sync_fence_wait(fence, 1000);
+	int err = sync_fence_wait(fence, MSEC_PER_SEC);
 
 	if (err >= 0)
 		return;
 
 	if (err == -ETIME)
-		err = sync_fence_wait(fence, 10 * MSEC_PER_SEC);
+		err = sync_fence_wait(fence, MSEC_PER_SEC);
 
 	if (err < 0)
 		pr_info("error waiting on fence\n");
@@ -3265,6 +3265,7 @@ static int rk_fb_set_par(struct fb_info *info)
 	else
 		win = dev_drv->win[win_id];
 
+#ifdef CONFIG_RK_FB_FOR_ANDROID_EXTEND
 	/* if the application has specific the hor and ver display size */
 	if (var->grayscale >> 8) {
 		xsize = (var->grayscale >> 8) & 0xfff;
@@ -3277,7 +3278,10 @@ static int rk_fb_set_par(struct fb_info *info)
 		xsize = screen->mode.xres;
 		ysize = screen->mode.yres;
 	}
-
+#else
+	xsize = screen->mode.xres;
+	ysize = screen->mode.yres;
+#endif
 	win->colorspace = CSC_FORMAT(data_format);
 	data_format &= ~CSC_MASK;
 	fb_data_fmt = rk_fb_data_fmt(data_format, var->bits_per_pixel);
@@ -3656,10 +3660,12 @@ int rk_fb_switch_screen(struct rk_screen *screen, int enable, int lcdc_id)
 			dev_drv->ops->load_screen(dev_drv, 1);
 			/* force modify dsp size */
 			info = rk_fb->fb[dev_drv->fb_index_base];
+#ifdef CONFIG_RK_FB_FOR_ANDROID_EXTEND
 			info->var.grayscale &= 0xff;
 			info->var.grayscale |=
 				(dev_drv->cur_screen->mode.xres << 8) +
 				(dev_drv->cur_screen->mode.yres << 20);
+#endif
 			mutex_lock(&dev_drv->win_config);
 			info->var.xoffset = 0;
 			info->var.yoffset = 0;
@@ -3703,12 +3709,23 @@ int rk_fb_switch_screen(struct rk_screen *screen, int enable, int lcdc_id)
 		mutex_unlock(&dev_drv->switch_screen);
 		return 0;
 	} else {
-		if (dev_drv->uboot_logo) {
-			if (dev_drv->cur_screen->mode.xres !=
-				screen->mode.xres ||
-			    dev_drv->cur_screen->mode.yres !=
-				screen->mode.yres)
-				load_screen = 1;
+		if ((dev_drv->uboot_logo) &&
+		    (dev_drv->cur_screen->mode.xres != screen->mode.xres ||
+		     dev_drv->cur_screen->mode.yres != screen->mode.yres ||
+		     dev_drv->cur_screen->mode.vmode != screen->mode.vmode)) {
+			pr_info("uboot logo: %d, cur mode: %d*%d_%d, set mode: %d*%d_%d\n",
+				dev_drv->uboot_logo,
+				dev_drv->cur_screen->mode.xres,
+				dev_drv->cur_screen->mode.yres,
+				dev_drv->cur_screen->mode.vmode,
+				screen->mode.xres, screen->mode.yres,
+				screen->mode.vmode);
+			load_screen = 0;
+			for (i = 0; i < dev_drv->lcdc_win_num; i++) {
+				if (dev_drv->win[i] && dev_drv->win[i]->state &&
+					dev_drv->ops->win_direct_en)
+				dev_drv->ops->win_direct_en(dev_drv, i, 0);
+			}
 		}
 		if (dev_drv->screen1)
 			dev_drv->cur_screen = dev_drv->screen1;
@@ -3730,12 +3747,14 @@ int rk_fb_switch_screen(struct rk_screen *screen, int enable, int lcdc_id)
 				dev_drv->ops->load_screen(dev_drv, 1);
 
 				info->var.activate |= FB_ACTIVATE_FORCE;
+#ifdef CONFIG_RK_FB_FOR_ANDROID_EXTEND
 				if (rk_fb->disp_mode == ONE_DUAL) {
 					info->var.grayscale &= 0xff;
 					info->var.grayscale |=
 						(dev_drv->cur_screen->xsize << 8) +
 						(dev_drv->cur_screen->ysize << 20);
 				}
+#endif
 				if (dev_drv->uboot_logo && win->state) {
 					if (win->area[0].xpos ||
 					    win->area[0].ypos) {
@@ -3854,10 +3873,12 @@ int rk_fb_disp_scale(u8 scale_x, u8 scale_y, u8 lcdc_id)
 		if (inf->disp_mode == ONE_DUAL) {
 			var->nonstd &= 0xff;
 			var->nonstd |= (xpos << 8) + (ypos << 20);
+#ifdef CONFIG_RK_FB_FOR_ANDROID_EXTEND
 			var->grayscale &= 0xff;
 			var->grayscale |=
 				(dev_drv->cur_screen->xsize << 8) +
 				(dev_drv->cur_screen->ysize << 20);
+#endif
 		}
 	}
 
@@ -4236,8 +4257,10 @@ int rk_fb_register(struct rk_lcdc_driver *dev_drv,
 		fb_videomode_to_var(&fbi->var, &dev_drv->cur_screen->mode);
 		fbi->var.width = dev_drv->cur_screen->width;
 		fbi->var.height = dev_drv->cur_screen->height;
+#ifdef CONFIG_RK_FB_FOR_ANDROID_EXTEND
 		fbi->var.grayscale |=
 		    (fbi->var.xres << 8) + (fbi->var.yres << 20);
+#endif
 #if defined(CONFIG_LOGO_LINUX_BMP)
 		fbi->var.bits_per_pixel = 32;
 #else

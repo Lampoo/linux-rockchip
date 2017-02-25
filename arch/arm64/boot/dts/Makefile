@@ -1,8 +1,10 @@
 dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	px5-sdk.dtb \
-	rk3228h-demo.dts \
+	rk3228h-demo.dtb \
 	rk3228h-evb.dtb \
 	rk3228h-z.dtb \
+	rk3328-box.dtb \
+	rk3328-evb.dtb \
 	rk3368-box.dtb \
 	rk3368-box-r88_808.dtb \
 	rk3368-box-r88.dtb \

@@ -72,6 +72,8 @@ static struct map_desc rv1108_io_desc[] __initdata = {
 	RK_DEVICE(RK_PMU_MEM_VIRT, RV1108_PMU_MEM_PHYS, RV1108_PMU_MEM_SIZE),
 	RK_DEVICE(RK_PWM_VIRT, RV1108_PWM_PHYS, RV1108_PWM_SIZE),
 	RK_DEVICE(RK_PMU_VIRT, RV1108_PMU_PHYS, RV1108_PMU_SIZE),
+	RK_DEVICE(RK_SERVICE_MSCH_VIRT, RV1108_SERVICE_MSCH_PHYS,
+			RV1108_SERVICE_MSCH_SIZE),
 };
 
 static void __init rv1108_boot_mode_init(void)
@@ -240,6 +242,7 @@ static int __init rv1108_ddr_init(void)
 		ddr_change_freq = _ddr_change_freq;
 		ddr_round_rate = _ddr_round_rate;
 		ddr_set_auto_self_refresh = _ddr_set_auto_self_refresh;
+		ddr_freq_scale_send_event = _ddr_freq_scale_send_event;
 		np = of_find_node_by_name(np, "ddr_timing");
 		ddr_init(0, np);
 	}

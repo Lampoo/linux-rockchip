@@ -1640,7 +1640,7 @@ static int vop_get_backlight_device(struct rk_lcdc_driver *dev_drv)
 		return -EINVAL;
 	max = length / sizeof(u32);
 	last = max - 1;
-	brightness_levels = kmalloc(256, GFP_KERNEL);
+	brightness_levels = kmalloc(sizeof(*brightness_levels) * max, GFP_KERNEL);
 	if (!brightness_levels)
 		return -ENOMEM;
 
@@ -2559,8 +2559,12 @@ static irqreturn_t vop_isr(int irq, void *dev_id)
 	if (intr_status & INTR_LINE_FLAG0)
 		intr_status &= ~INTR_LINE_FLAG0;
 
-	if (intr_status & INTR_LINE_FLAG1)
+	if (intr_status & INTR_LINE_FLAG1) {
 		intr_status &= ~INTR_LINE_FLAG1;
+		if (ddr_freq_scale_send_event)
+			ddr_freq_scale_send_event(VOP_EVENT,
+				rk_fb_get_prmry_screen_vbt() * 8 / 10);
+	}
 
 	if (intr_status & INTR_BUS_ERROR) {
 		intr_status &= ~INTR_BUS_ERROR;

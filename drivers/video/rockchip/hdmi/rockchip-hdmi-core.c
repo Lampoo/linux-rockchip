@@ -193,19 +193,11 @@ static void hdmi_wq_set_video(struct hdmi *hdmi)
 		video->eotf = 0;
 	} else {
 		video->vic = hdmi->vic & HDMI_VIC_MASK;
-		video->eotf = 0;
-		if (hdmi->eotf) {
-			if (hdmi->eotf & hdmi->edid.hdr.hdrinfo.eotf) {
-				video->eotf = hdmi->eotf;
-			} else {
-				pr_err("sink eotf %x not support eotf %x\n",
-				       hdmi->edid.hdr.hdrinfo.eotf,
-				       hdmi->eotf);
-				if (hdmi->edid.hdr.hdrinfo.eotf &
-				    EOTF_TRADITIONAL_GMMA_SDR)
-					video->eotf = EOTF_TRADITIONAL_GMMA_SDR;
-			}
-		}
+
+		if (hdmi->eotf & hdmi->edid.hdr.hdrinfo.eotf)
+			video->eotf = hdmi->eotf;
+		else
+			video->eotf = 0;
 		/* ST_2084 must be 10bit and bt2020 */
 		if (video->eotf & EOTF_ST_2084) {
 			if (deepcolor & HDMI_DEEP_COLOR_30BITS)
@@ -227,6 +219,48 @@ static void hdmi_wq_set_video(struct hdmi *hdmi)
 	hdmi_set_lcdc(hdmi);
 	if (hdmi->ops->setvideo)
 		hdmi->ops->setvideo(hdmi, video);
+}
+
+static void hdmi_wq_set_hdr(struct hdmi *hdmi)
+{
+	struct hdmi_video *video = &hdmi->video;
+	int deepcolor = 8;
+
+	if (hdmi->vic & HDMI_VIDEO_YUV420)
+		deepcolor = hdmi->edid.deepcolor_420;
+	else
+		deepcolor = hdmi->edid.deepcolor;
+
+	if ((hdmi->property->feature & SUPPORT_DEEP_10BIT) &&
+	    (deepcolor & HDMI_DEEP_COLOR_30BITS) &&
+	     hdmi->colordepth == 10)
+		deepcolor = 10;
+
+	if (deepcolor == video->color_output_depth &&
+	    hdmi->ops->sethdr && hdmi->ops->setavi &&
+	    hdmi->edid.sink_hdmi) {
+		if (hdmi->eotf & hdmi->edid.hdr.hdrinfo.eotf)
+			video->eotf = hdmi->eotf;
+		else
+			video->eotf = 0;
+
+		/* ST_2084 must be 10bit and bt2020 */
+		if (video->eotf & EOTF_ST_2084) {
+			if (video->color_output > HDMI_COLOR_RGB_16_235)
+				video->colorimetry =
+					HDMI_COLORIMETRY_EXTEND_BT_2020_YCC;
+			else
+				video->colorimetry =
+					HDMI_COLORIMETRY_EXTEND_BT_2020_RGB;
+		} else {
+			video->colorimetry = hdmi->colorimetry;
+		}
+		hdmi_set_lcdc(hdmi);
+		hdmi->ops->sethdr(hdmi, hdmi->eotf, &hdmi->hdr);
+		hdmi->ops->setavi(hdmi, video);
+	} else {
+		hdmi_submit_work(hdmi, HDMI_SET_COLOR, 0, 0);
+	}
 }
 
 static void hdmi_wq_parse_edid(struct hdmi *hdmi)
@@ -523,6 +557,9 @@ static void hdmi_work_queue(struct work_struct *work)
 		hdmi_wq_set_audio(hdmi);
 		hdmi_wq_set_output(hdmi, hdmi->mute);
 		break;
+	case HDMI_SET_HDR:
+		hdmi_wq_set_hdr(hdmi);
+		break;
 	case HDMI_ENABLE_HDCP:
 		if (hdmi->hotplug == HDMI_HPD_ACTIVATED && hdmi->ops->hdcp_cb)
 			hdmi->ops->hdcp_cb(hdmi);
@@ -595,7 +632,7 @@ struct hdmi *rockchip_hdmi_register(struct hdmi_property *property,
 		hdmi->vic = hdmi->property->defaultmode;
 	}
 	hdmi->colormode = HDMI_VIDEO_DEFAULT_COLORMODE;
-	hdmi->colordepth = HDMI_VIDEO_DEFAULT_COLORDEPTH;
+	hdmi->colordepth = hdmi->property->defaultdepth;
 	hdmi->colorimetry = HDMI_COLORIMETRY_NO_DATA;
 	hdmi->mode_3d = HDMI_3D_NONE;
 	hdmi->audio.type = HDMI_AUDIO_DEFAULT_TYPE;
@@ -729,7 +766,6 @@ int snd_config_hdmi_audio(struct snd_pcm_hw_params *params)
 		rate = HDMI_AUDIO_FS_192000;
 		break;
 	default:
-		pr_err("rate %d unsupport.\n", params_rate(params));
 		rate = HDMI_AUDIO_FS_44100;
 	}
 

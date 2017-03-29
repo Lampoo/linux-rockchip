@@ -34,6 +34,8 @@
 #include "rkflash_api.h"
 #include "rkflash_blk.h"
 
+#include "../soc/rockchip/flash_vendor_storage.h"
+
 static struct flash_boot_ops nandc_nand_ops = {
 #ifdef	CONFIG_RK_NANDC_NAND
 	FLASH_TYPE_NANDC_NAND,
@@ -118,7 +120,6 @@ void ftl_free(void *p, int size)
 	kfree(p);
 }
 
-#define RK_PARTITION_TAG 0x50464B52
 static unsigned int rk_partition_init(struct flash_part *part)
 {
 	int i, part_num = 0;
@@ -186,27 +187,6 @@ static int rkflash_create_procfs(void)
 	return 0;
 }
 
-static struct mutex g_rkflash_ops_mutex;
-static void rkflash_device_lock_init(void)
-{
-	mutex_init(&g_rkflash_ops_mutex);
-}
-
-void rkflash_device_lock(void)
-{
-	mutex_lock(&g_rkflash_ops_mutex);
-}
-
-int rkflash_device_trylock(void)
-{
-	return mutex_trylock(&g_rkflash_ops_mutex);
-}
-
-void rkflash_device_unlock(void)
-{
-	mutex_unlock(&g_rkflash_ops_mutex);
-}
-
 static int rkflash_xfer(struct flash_blk_dev *dev,
 			unsigned long start,
 			unsigned long nsector,
@@ -223,7 +203,6 @@ static int rkflash_xfer(struct flash_blk_dev *dev,
 	}
 
 	start += dev->off_size;
-	rkflash_device_lock();
 
 	switch (cmd) {
 	case READ:
@@ -247,7 +226,6 @@ static int rkflash_xfer(struct flash_blk_dev *dev,
 		break;
 	}
 
-	rkflash_device_unlock();
 	return ret;
 }
 
@@ -576,7 +554,6 @@ static int rkflash_blk_register(struct flash_blk_ops *blk_ops)
 	spin_lock_init(&blk_ops->queue_lock);
 	init_completion(&blk_ops->thread_exit);
 	init_waitqueue_head(&blk_ops->thread_wq);
-	rkflash_device_lock_init();
 
 	blk_ops->rq = blk_init_queue(rkflash_blk_request, &blk_ops->queue_lock);
 	if (!blk_ops->rq) {
@@ -667,6 +644,16 @@ int rkflash_dev_init(void __iomem *reg_addr, enum flash_con_type con_type)
 	}
 	pr_info("rkflash[%d] init success\n", tmp_id);
 	g_flash_type = tmp_id;
+	mytr.quit = 1;
+	flash_vendor_dev_ops_register(g_boot_ops[g_flash_type]->read,
+				      g_boot_ops[g_flash_type]->write);
+#ifdef CONFIG_RK_SFC_NOR_MTD
+	if (g_flash_type == FLASH_TYPE_SFC_NOR) {
+		pr_info("sfc_nor flash registered as a mtd device\n");
+		rkflash_dev_initialised = 1;
+		return 0;
+	}
+#endif
 	ret = rkflash_blk_register(&mytr);
 	if (ret) {
 		pr_err("rkflash_blk_register fail\n");
@@ -691,14 +678,12 @@ int rkflash_dev_exit(void)
 
 int rkflash_dev_suspend(void)
 {
-	rkflash_device_lock();
 	return 0;
 }
 
 int rkflash_dev_resume(void __iomem *reg_addr)
 {
 	g_boot_ops[g_flash_type]->resume(reg_addr);
-	rkflash_device_unlock();
 	return 0;
 }
 

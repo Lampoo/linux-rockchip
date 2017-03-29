@@ -13,6 +13,7 @@
 #include <linux/semaphore.h>
 
 #define MAX_PART_COUNT 32
+#define RK_PARTITION_TAG	0x50464B52
 
 enum flash_con_type {
 	FLASH_CON_TYPE_NANDC = 0,
@@ -125,7 +126,5 @@ void rkflash_dev_shutdown(void);
 void rkflash_dev_flush(void);
 int rkflash_dev_init(void __iomem *reg_addr, enum flash_con_type type);
 int rkflash_dev_exit(void);
-void rkflash_device_unlock(void);
-void rkflash_device_lock(void);
 
 #endif

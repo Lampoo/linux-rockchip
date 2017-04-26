@@ -82,7 +82,7 @@
 	};
 
 	chosen {
-		bootargs = "rockchip_jtag noinitrd root=/dev/mtdblock3 rootfstype=squashfs";
+		bootargs = "user_debug=31 rockchip_jtag noinitrd root=/dev/mtdblock3 rootfstype=squashfs";
 	};
 
 	ion {
@@ -118,7 +118,6 @@
 		vccio2-supply = <&rk805_ldo2_reg>;
 		vccio3-supply = <&rk805_dcdc4_reg>;
 		vccio5-supply = <&rk805_ldo2_reg>;
-		vccio6-supply = <&rk805_dcdc4_reg>;
 
 		/* PMU_GRF_IO_VSEL */
 		pmu-supply = <&rk805_dcdc4_reg>;
@@ -133,10 +132,10 @@
 
 	wireless-wlan {
 		compatible = "wlan-platdata";
-		wifi_chip_type = "rtl8723cs";
+		wifi_chip_type = "rtl8189fs";
 		sdio_vref = <0>;
-		WIFI,poweren_gpio = <&gpio3 GPIO_B6 GPIO_ACTIVE_HIGH>;
-		WIFI,host_wake_irq = <&gpio3 GPIO_A7 GPIO_ACTIVE_HIGH>;
+		WIFI,poweren_gpio = <&gpio0 GPIO_A2 GPIO_ACTIVE_HIGH>;
+		WIFI,host_wake_irq = <&gpio0 GPIO_A3 GPIO_ACTIVE_HIGH>;
 		status = "okay";
 	};
 
@@ -177,11 +176,13 @@
 			label = "led0";
 			gpios = <&rk805 0 GPIO_ACTIVE_LOW>;
 			default-state = "off";
+			linux,default-trigger = "blink";
 		};
 		led1 {
 			label = "led1";
 			gpios = <&rk805 1 GPIO_ACTIVE_LOW>;
 			default-state = "off";
+			linux,default-trigger = "blink";
 		};
 	};
 };
@@ -511,6 +512,7 @@
 };
 
 &usb_otg {
+	rockchip,high-bandwidth;
 	status = "okay";
 };
 

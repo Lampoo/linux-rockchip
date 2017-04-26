@@ -102,9 +102,15 @@
 *1. Fix module enable isn't match current value, if new module parameters set,
 *but enable bit isn't switch;
 *
+*v0.2.4:
+*1. Isp metadata is independent;
+*
+*v0.2.5:
+*1. Fix cifisp_configure_isp is invalidate if isp parameter not update,
+*this is trigger when two path enable;
 */
 
-#define CONFIG_CIFISP11_DRIVER_VERSION KERNEL_VERSION(0, 2, 3)
+#define CONFIG_CIFISP11_DRIVER_VERSION KERNEL_VERSION(0, 2, 5)
 
 
 #endif

@@ -126,6 +126,7 @@ static void __init rk3036_dt_map_io(void)
 	dsb();
 
 	rk3036_boot_mode_init();
+	rockchip_efuse_init();
 }
 
 extern void secondary_startup(void);
@@ -174,6 +175,7 @@ static void __init rk3036_dt_init_timer(void)
 	rockchip_pmu_ops.set_idle_request = rk3036_pmu_set_idle_request;
 	of_clk_init(NULL);
 	clocksource_of_init();
+	of_dvfs_init();
 }
 
 #ifdef CONFIG_PM
@@ -683,7 +685,7 @@ static void rk3036_restart(char mode, const char *cmd)
 	dsb();
 
 	/* pll enter slow mode */
-	writel_relaxed(0x30110000, RK_CRU_VIRT + RK3036_CRU_MODE_CON);
+	writel_relaxed(0x30010000, RK_CRU_VIRT + RK3036_CRU_MODE_CON);
 	dsb();
 	writel_relaxed(0xeca8, RK_CRU_VIRT + RK3036_CRU_GLB_SRST_SND_VALUE);
 	dsb();

@@ -351,13 +351,21 @@ extern void dwc_otg_hub_disconnect_device(struct usb_hub *hub);
 void dwc_otg_force_host(dwc_otg_core_if_t *core_if)
 {
 	dwc_otg_device_t *otg_dev = core_if->otg_dev;
+	struct dwc_otg_platform_data *pdata = otg_dev->pldata;
 	dctl_data_t dctl = {.d32 = 0 };
 	unsigned long flags;
 
 	if (core_if->op_state == A_HOST) {
-		printk("dwc_otg_force_host,already in A_HOST mode,everest\n");
+		dev_info(pdata->dev,
+			 "dwc_otg_force_host,already in A_HOST mode,everest\n");
+		return;
+	} else if (pdata->get_status(USB_STATUS_BVABLID) &&
+		   core_if->pmic_vbus) {
+		dev_info(pdata->dev,
+			 "Please disconnect the USB cable first, and try again!\n");
 		return;
 	}
+
 	core_if->op_state = A_HOST;
 
 	cancel_delayed_work(&otg_dev->pcd->check_vbus_work);
@@ -1113,6 +1121,9 @@ static int host20_driver_probe(struct platform_device *_dev)
 		goto fail;
 	}
 
+	/* Initialize last_id */
+	dwc_otg_device->last_id = -1;
+
 	clk_set_rate(pldata->phyclk_480m, 480000000);
 	/*
 	 * Enable the global interrupt after all the interrupt
@@ -1464,6 +1475,16 @@ static int otg20_driver_probe(struct platform_device *_dev)
 		goto fail;
 	}
 
+	dwc_otg_device->core_if->high_bandwidth_en = of_property_read_bool(node,
+						"rockchip,high-bandwidth");
+
+	/*
+	 * If support high bandwidth endpoint, use 'Dedicated FIFO Mode
+	 * with Thresholding', and enable thresholding for isochronous IN
+	 * endpoints. Note: Thresholding is supported only in device mode.
+	 */
+	if (dwc_otg_device->core_if->high_bandwidth_en)
+		dwc_otg_module_params.thr_ctl = 2;
 	/*
 	 * Validate parameter values.
 	 */
@@ -1520,6 +1541,13 @@ static int otg20_driver_probe(struct platform_device *_dev)
 	else
 		dwc_otg_device->core_if->usb_early_detect = val;
 
+	/* Indicate usb vbus get from pmic (e.g. rk81x) */
+	dwc_otg_device->core_if->pmic_vbus = of_property_read_bool(node,
+						"rockchip,usb-pmic-vbus");
+	/* usb pd off support */
+	dwc_otg_device->core_if->usb_pd_off =
+		of_property_read_bool(node, "rockchip,usb-pd-off");
+
 #ifndef DWC_HOST_ONLY
 	/*
 	 * Initialize the PCD
@@ -1542,6 +1570,9 @@ static int otg20_driver_probe(struct platform_device *_dev)
 		goto fail;
 	}
 #endif
+	/* Initialize last_id */
+	dwc_otg_device->last_id = -1;
+
 	/*
 	 * Enable the global interrupt after all the interrupt
 	 * handlers are installed if there is no ADP support else
@@ -1582,6 +1613,9 @@ static int dwc_otg_pm_suspend(struct device *dev)
 
 	dev_dbg(dev, "dwc_otg PM suspend\n");
 
+	if (dwc_otg_device->core_if->usb_pd_off)
+		cancel_delayed_work(&dwc_otg_device->pcd->check_id_work);
+
 	if (dwc_otg_device->core_if->op_state == B_PERIPHERAL)
 		return 0;
 
@@ -1599,6 +1633,11 @@ static int dwc_otg_pm_resume(struct device *dev)
 	dwc_otg_device = dev_get_platdata(dev);
 
 	dev_dbg(dev, "dwc_otg PM resume\n");
+
+	if (dwc_otg_device->core_if->usb_pd_off) {
+		dwc_otg_device->last_id = -1;
+		schedule_delayed_work(&dwc_otg_device->pcd->check_id_work, HZ);
+	}
 
 	if (dwc_otg_device->core_if->op_state == B_PERIPHERAL)
 		return 0;

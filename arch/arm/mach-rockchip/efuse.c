@@ -11,6 +11,7 @@
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/rockchip/cpu.h>
+#include <linux/rockchip/cru.h>
 #include <linux/rockchip/iomap.h>
 #ifdef CONFIG_ARM
 #include <linux/rockchip/psci.h>
@@ -312,6 +313,43 @@ int rk312x_efuse_readregs(u32 addr, u32 length, u8 *buf)
 		efuse_writel(efuse_readl(REG_EFUSE_CTRL) &
 				(~EFUSE_STROBE), REG_EFUSE_CTRL);
 		udelay(2);
+
+		buf++;
+		addr++;
+	} while (--length);
+	udelay(2);
+	efuse_writel(efuse_readl(REG_EFUSE_CTRL) &
+			(~EFUSE_LOAD), REG_EFUSE_CTRL);
+	udelay(1);
+
+	return ret;
+}
+
+int rk3036_efuse_readregs(u32 addr, u32 length, u8 *buf)
+{
+	int ret = length;
+
+	if (!length)
+		return 0;
+
+	efuse_writel(EFUSE_LOAD, REG_EFUSE_CTRL);
+	udelay(2);
+	do {
+		efuse_writel(efuse_readl(REG_EFUSE_CTRL) &
+				(~(RK3036_EFUSE_A_MASK << RK3036_EFUSE_A_SHIFT)),
+				REG_EFUSE_CTRL);
+		efuse_writel(efuse_readl(REG_EFUSE_CTRL) |
+				((addr & RK3036_EFUSE_A_MASK) << RK3036_EFUSE_A_SHIFT),
+				REG_EFUSE_CTRL);
+		udelay(2);
+		efuse_writel(efuse_readl(REG_EFUSE_CTRL) |
+				EFUSE_STROBE, REG_EFUSE_CTRL);
+		udelay(2);
+		*buf = efuse_readl(REG_EFUSE_DOUT);
+		efuse_writel(efuse_readl(REG_EFUSE_CTRL) &
+				(~EFUSE_STROBE), REG_EFUSE_CTRL);
+		udelay(2);
+
 		buf++;
 		addr++;
 	} while (--length);
@@ -489,7 +527,7 @@ void __init rockchip_efuse_init(void)
 {
 	int ret;
 
-	if (cpu_is_rk3288() || cpu_is_rk322x() || cpu_is_rv1108()) {
+	if (cpu_is_rk3288() || cpu_is_rk322x() || cpu_is_rv110x()) {
 		rk3288_efuse_init();
 	} else if (cpu_is_rk312x()) {
 		ret = rk312x_efuse_readregs(0, 32, efuse_buf);
@@ -497,6 +535,16 @@ void __init rockchip_efuse_init(void)
 			efuse.get_leakage = rk3288_get_leakage;
 		else
 			pr_err("failed to read eFuse, return %d\n", ret);
+	} else if (cpu_is_rk3036()) {
+		ret = rk3036_efuse_readregs(0, 32, efuse_buf);
+		if (ret == 32) {
+			efuse.efuse_version = rk3288_get_efuse_version();
+			efuse.process_version = rk3288_get_process_version();
+			rockchip_set_cpu_version((efuse_buf[6] >> 4) & 3);
+			rk3288_set_system_serial();
+		} else {
+			pr_err("failed to read eFuse, return %d\n", ret);
+		}
 	}
 }
 
@@ -520,6 +568,12 @@ static int __init rockchip_efuse_probe(struct platform_device *pdev)
 		efuse.process_version = rk322xh_get_process_version();
 		rockchip_set_cpu_version((efuse_buf[26] >> 3) & 7);
 		rk3288_set_system_serial();
+		/*
+		 * efuse_buf[28] bit6 represent sign, raise or down avs,
+		 * efuse_buf[28] bit4-5 represent delta.
+		 */
+		rk322xh_adjust_avs((efuse_buf[28] >> 6) & 0x01,
+				   ((efuse_buf[28] >> 4) & 0x03) * 4);
 
 		return 0;
 	}

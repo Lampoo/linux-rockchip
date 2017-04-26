@@ -117,6 +117,8 @@ static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host);
 static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
 static void dw_mci_disable_low_power(struct dw_mci_slot *slot);
 static void rockchip_mmc_reset_controller(struct reset_control *reset);
+static void dw_mci_wait_unbusy(struct dw_mci *host, u32 cmd_flags);
+static int dw_mci_idmac_init(struct dw_mci *host);
 
 #if defined(CONFIG_DEBUG_FS)
 static int dw_mci_req_show(struct seq_file *s, void *v)
@@ -309,6 +311,7 @@ static void dw_mci_start_command(struct dw_mci *host,
 			__LINE__, __FUNCTION__,mmc_hostname(host->mmc));
 
 		cmd_flags |= SDMMC_CMD_VOLT_SWITCH;
+		slot->host->state = STATE_SENDING_CMD11;
 	}
 
 	mci_writel(host, CMDARG, cmd->arg);
@@ -405,15 +408,30 @@ static void dw_mci_idmac_complete_dma(void *arg)
         }
 }
 
-static void dw_mci_translate_sglist(struct dw_mci *host, struct mmc_data *data,
+static int dw_mci_translate_sglist(struct dw_mci *host, struct mmc_data *data,
 				    unsigned int sg_len)
 {
 	int i;
 	struct idmac_desc *desc = host->sg_cpu;
+	unsigned long timeout;
 
 	for (i = 0; i < sg_len; i++, desc++) {
 		unsigned int length = sg_dma_len(&data->sg[i]);
 		u32 mem_addr = sg_dma_address(&data->sg[i]);
+
+		/*
+		 * Wait for the former clear OWN bit operation
+		 * of IDMAC to make sure that this descriptor
+		 * isn't still owned by IDMAC as IDMAC's write
+		 * ops and CPU's read ops are asynchronous.
+		 */
+		timeout = jiffies + msecs_to_jiffies(100);
+		while (readl(&desc->des0) &
+			   cpu_to_le32(IDMAC_DES0_OWN)) {
+			if (time_after(jiffies, timeout))
+				goto err_own_bit;
+			udelay(10);
+		}
 
 		/* Set the OWN bit and disable interrupts for this descriptor */
 		desc->des0 = IDMAC_DES0_OWN | IDMAC_DES0_DIC | IDMAC_DES0_CH;
@@ -435,13 +453,24 @@ static void dw_mci_translate_sglist(struct dw_mci *host, struct mmc_data *data,
 	desc->des0 |= IDMAC_DES0_LD;
 
 	wmb();
+	return 0;
+
+err_own_bit:
+	/* restore the descriptor chain as it's polluted */
+	dev_err(host->dev, "descriptor is still owned by IDMAC.\n");
+	memset(host->sg_cpu, 0, PAGE_SIZE);
+	dw_mci_idmac_init(host);
+	return -EINVAL;
 }
 
-static void dw_mci_idmac_start_dma(struct dw_mci *host, unsigned int sg_len)
+static int dw_mci_idmac_start_dma(struct dw_mci *host, unsigned int sg_len)
 {
 	u32 temp;
+	int ret;
 
-	dw_mci_translate_sglist(host, host->data, sg_len);
+	ret = dw_mci_translate_sglist(host, host->data, sg_len);
+	if (ret)
+		goto out;
 
 	/* Select IDMAC interface */
 	temp = mci_readl(host, CTRL);
@@ -457,6 +486,9 @@ static void dw_mci_idmac_start_dma(struct dw_mci *host, unsigned int sg_len)
 
 	/* Start it running */
 	mci_writel(host, PLDMND, 1);
+
+out:
+	return ret;
 }
 
 static int dw_mci_idmac_init(struct dw_mci *host)
@@ -526,7 +558,7 @@ static void dw_mci_edmac_complete_dma(void *arg)
 	}
 }
 
-static void dw_mci_edmac_start_dma(struct dw_mci *host, unsigned int sg_len)
+static int dw_mci_edmac_start_dma(struct dw_mci *host, unsigned int sg_len)
 {
 	struct dma_slave_config slave_config;
 	struct dma_async_tx_descriptor *desc = NULL;
@@ -577,7 +609,7 @@ static void dw_mci_edmac_start_dma(struct dw_mci *host, unsigned int sg_len)
 	if (ret) {
 		dev_err(host->dev,
 			"Error in dw_mci edmac write configuration.\n");
-		return;
+		return -EBUSY;
 	}
 
 	desc = dmaengine_prep_slave_sg(host->dms->ch, sgl, sg_len,
@@ -586,7 +618,7 @@ static void dw_mci_edmac_start_dma(struct dw_mci *host, unsigned int sg_len)
 	if (!desc) {
 		dev_err(host->dev,
 			 "Cannot prepare slave write sg the dw_mci edmac!\n");
-		return;
+		return -EBUSY;
 	}
 
 	/* Set dw_mci_edmac_complete_dma as callback */
@@ -600,6 +632,8 @@ static void dw_mci_edmac_start_dma(struct dw_mci *host, unsigned int sg_len)
 				       sg_elems, DMA_TO_DEVICE);
 
 	dma_async_issue_pending(host->dms->ch);
+
+	return 0;
 }
 
 static int dw_mci_edmac_init(struct dw_mci *host)
@@ -861,7 +895,14 @@ static int dw_mci_submit_data_dma(struct dw_mci *host, struct mmc_data *data)
 	mci_writel(host, INTMASK, temp);
 	spin_unlock_irqrestore(&host->slock, flags);
 
-	host->dma_ops->start(host, sg_len);
+	if (host->dma_ops->start(host, sg_len)) {
+		host->dma_ops->stop(host);
+		/* We can't do DMA, try PIO for this one */
+		dev_err(host->dev,
+			"%s: fall back to PIO mode for current transfer\n",
+			__func__);
+		return -ENODEV;
+	}
 
 	return 0;
 }
@@ -936,35 +977,11 @@ static void mci_send_cmd(struct dw_mci_slot *slot, u32 cmd, u32 arg)
 	struct dw_mci *host = slot->host;	
 	unsigned long timeout = jiffies + msecs_to_jiffies(500);
 	unsigned int cmd_status = 0;
-
-#ifdef SDMMC_WAIT_FOR_UNBUSY
-	bool ret = true;
-	timeout = jiffies + msecs_to_jiffies(SDMMC_WAIT_FOR_UNBUSY);
-	
-	if (test_bit(DW_MMC_CARD_PRESENT, &slot->flags)) {
-		while (ret) {
-			ret =  time_before(jiffies, timeout);
-			cmd_status = mci_readl(host, STATUS);
-			if (!(cmd_status &
-				(SDMMC_STAUTS_DATA_BUSY |
-				SDMMC_STAUTS_MC_BUSY)))
-				break;
-		};
-
-		if(false == ret)
-			MMC_DBG_ERR_FUNC(host->mmc,
-				"mci_send_cmd: wait for unbusy timeout! [%s]",
-				mmc_hostname(host->mmc));
-	}
-#endif
  
 	mci_writel(host, CMDARG, arg);
 	wmb();
+	dw_mci_wait_unbusy(host, cmd);
 	mci_writel(host, CMD, SDMMC_CMD_START | cmd);
-	if(cmd & SDMMC_CMD_UPD_CLK)
-		timeout = jiffies + msecs_to_jiffies(50);
-	else
-		timeout = jiffies + msecs_to_jiffies(500);
 
 	while (time_before(jiffies, timeout)) {
 		cmd_status = mci_readl(host, CMD);
@@ -984,20 +1001,20 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
 	u32 div;
 	u32 clk_en_a;
 	u32 sdio_int;
+	u32 sdmmc_cmd_bits = SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT;
 
 	MMC_DBG_INFO_FUNC(host->mmc,
 			"%s: clock=%d, current_speed=%d, bus_hz=%d, forc=%d[%s]\n",
 			__FUNCTION__, clock, host->current_speed, host->bus_hz,
 			force_clkinit, mmc_hostname(host->mmc));
 
+	/* We must continue to set bit 28 in CMD until the change is complete */
+	if (host->state == STATE_WAITING_CMD11_DONE)
+		sdmmc_cmd_bits |= SDMMC_CMD_VOLT_SWITCH;
+
 	if (!clock) {
 		mci_writel(host, CLKENA, 0);
-		#ifdef CONFIG_MMC_DW_ROCKCHIP_SWITCH_VOLTAGE
-                if(host->svi_flags == 0)
-                        mci_send_cmd(slot, SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT, 0);
-                #else
-                mci_send_cmd(slot, SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT, 0);
-                #endif
+		mci_send_cmd(slot, sdmmc_cmd_bits, 0);
 	} else if (clock != host->current_speed || force_clkinit) {
 		div = host->bus_hz / clock;
 		if (host->bus_hz % clock && host->bus_hz > clock)
@@ -1025,8 +1042,7 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
 		mci_writel(host, CLKSRC, 0);
 
 		/* inform CIU */
-		mci_send_cmd(slot,
-			     SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT, 0);
+		mci_send_cmd(slot, sdmmc_cmd_bits, 0);
                         
                 if(clock <= 400*1000){
 	                MMC_DBG_BOOT_FUNC(host->mmc,
@@ -1096,8 +1112,7 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
 		mci_writel(host, CLKDIV, div);
 
 		/* inform CIU */
-		mci_send_cmd(slot,
-			     SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT, 0);
+		mci_send_cmd(slot, sdmmc_cmd_bits, 0);
 
 		/* enable clock; only low power if no SDIO */
 		clk_en_a = SDMMC_CLKEN_ENABLE << slot->id;
@@ -1112,8 +1127,7 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
 		mci_writel(host, CLKENA, clk_en_a);
 
 		/* inform CIU */
-		mci_send_cmd(slot,
-			     SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT, 0);
+		mci_send_cmd(slot, sdmmc_cmd_bits, 0);
 		/* keep the clock with reflecting clock dividor */
 		slot->__clk_old = clock << div;
 	}
@@ -1179,7 +1193,6 @@ static void dw_mci_wait_unbusy(struct dw_mci *host, u32 cmd_flags)
 	}
 }
 
-#ifdef CONFIG_MMC_DW_ROCKCHIP_SWITCH_VOLTAGE
 /*
 *   result: 
 *   0--status is busy. 
@@ -1188,25 +1201,17 @@ static void dw_mci_wait_unbusy(struct dw_mci *host, u32 cmd_flags)
 int dw_mci_card_busy(struct mmc_host *mmc)
 {
 	struct dw_mci_slot *slot = mmc_priv(mmc);
-	struct dw_mci *host = slot->host;
+	u32 status;
 
-        MMC_DBG_INFO_FUNC(host->mmc, "dw_mci_card_busy: svi_flags = %d [%s]", \
-                                host->svi_flags, mmc_hostname(host->mmc));	
-    
-        /* svi toggle*/
-        if(host->svi_flags == 0){
-                /*first svi*/
-                host->svi_flags = 1;
-                return host->svi_flags;           
-    
-        }else{
-                host->svi_flags = 0;
-                return host->svi_flags;   
-    	}
-    	
+	/*
+	 * Check the busy bit which is low when DAT[3:0]
+	 * (the data lines) are 0000
+	 */
+	status = mci_readl(slot->host, STATUS);
 
+	return !!(status & SDMMC_STAUTS_DATA_BUSY);
 }
-#endif
+
 static void __dw_mci_start_request(struct dw_mci *host,
 				   struct dw_mci_slot *slot,
 				   struct mmc_command *cmd)
@@ -1276,6 +1281,17 @@ static void dw_mci_queue_request(struct dw_mci *host, struct dw_mci_slot *slot,
 
 	slot->mrq = mrq;
 
+	if (host->state == STATE_WAITING_CMD11_DONE) {
+		dev_warn(&slot->mmc->class_dev,
+			 "Voltage change didn't complete\n");
+		/*
+		 * this case isn't expected to happen, so we can
+		 * either crash here or just try to continue on
+		 * in the closest possible state
+		 */
+		host->state = STATE_IDLE;
+	}
+
 	if (host->state == STATE_IDLE) {
 		host->state = STATE_SENDING_CMD;
 		dw_mci_start_request(host, slot);
@@ -1324,43 +1340,6 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	const struct dw_mci_drv_data *drv_data = host->drv_data;
 	const struct dw_mci_rockchip_priv_data *priv = host->priv;
 	u32 regs;
-	
-        #ifdef SDMMC_WAIT_FOR_UNBUSY
-	unsigned long   time_loop;
-	bool ret = true;
-
-	time_loop = jiffies + msecs_to_jiffies(SDMMC_WAIT_FOR_UNBUSY);
-
-        #ifdef CONFIG_MMC_DW_ROCKCHIP_SWITCH_VOLTAGE
-        if (host->svi_flags == 1)
-                time_loop = jiffies + msecs_to_jiffies(SDMMC_DATA_TIMEOUT_SD);
-	#endif
-        
-	if (!test_bit(DW_MMC_CARD_PRESENT, &slot->flags)) {
-		dev_info(host->dev, "%s:  no card. [%s]\n",
-			 __FUNCTION__, mmc_hostname(mmc));
-		goto EXIT_POWER;
-	}
-    
-	while (ret) {
-		ret = time_before(jiffies, time_loop);
-		regs = mci_readl(slot->host, STATUS);
-		if (!(regs & (SDMMC_STAUTS_DATA_BUSY |
-			SDMMC_STAUTS_MC_BUSY)))
-    			break;
-	};
-	
-	if (false == ret) {
-		dev_info(host->dev, "slot->flags = %lu ", slot->flags);
-		#ifdef CONFIG_MMC_DW_ROCKCHIP_SWITCH_VOLTAGE
-                if (host->svi_flags != 1)
-                #endif
-		dump_stack();
-		dev_err(host->dev,
-			"%s:  wait for unbusy timeout.. STATUS = 0x%x [%s]\n",
-			__FUNCTION__, regs, mmc_hostname(mmc));
-	}
-        #endif
         
 	switch (ios->bus_width) {
 	case MMC_BUS_WIDTH_4:
@@ -1413,7 +1392,6 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	/* Slot specific timing and width adjustment */
 	dw_mci_setup_bus(slot, false);
 
-EXIT_POWER:
 	switch (ios->power_mode) {
 	case MMC_POWER_UP:
 	/* Power up slot */
@@ -1430,7 +1408,7 @@ EXIT_POWER:
 		mci_writel(slot->host, PWREN, regs);
 
 		if ((mmc->restrict_caps & RESTRICT_CARD_TYPE_SD) &&
-		    !IS_ERR(host->pins_default) && cpu_is_rv1108()) {
+		    !IS_ERR(host->pins_default) && cpu_is_rv110x()) {
 			if (pinctrl_select_state(host->pinctrl,
 						 host->pins_default) < 0)
 				dev_err(host->dev, "pins_default pinctrl setting failed\n");
@@ -1439,7 +1417,7 @@ EXIT_POWER:
 	case MMC_POWER_OFF:
 	/* Power down slot */
 		if ((mmc->restrict_caps & RESTRICT_CARD_TYPE_SD) &&
-		    !IS_ERR(host->pins_idle) && cpu_is_rv1108()) {
+		    !IS_ERR(host->pins_idle) && cpu_is_rv110x()) {
 			if (pinctrl_select_state(host->pinctrl,
 						 host->pins_idle) < 0)
 				dev_err(host->dev, "pins_idle pinctrl setting failed\n");
@@ -1459,6 +1437,9 @@ EXIT_POWER:
 	default:
 		break;
 	}
+
+	if (slot->host->state == STATE_WAITING_CMD11_DONE && ios->clock != 0)
+		slot->host->state = STATE_IDLE;
 }
 
 static int dw_mci_get_ro(struct mmc_host *mmc)
@@ -1701,7 +1682,6 @@ static void dw_mci_enable_sdio_irq(struct mmc_host *mmc, int enb)
 	spin_unlock_irqrestore(&host->slock, flags);
 }
 
-#ifdef CONFIG_MMC_DW_ROCKCHIP_SWITCH_VOLTAGE
 enum{
 	IO_DOMAIN_12 = 1200,
 	IO_DOMAIN_18 = 1800,
@@ -1901,8 +1881,6 @@ static int dw_mci_start_signal_voltage_switch(struct mmc_host *mmc,
 	return err;
 }
 
-#endif
-
 static int dw_mci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 {
 	struct dw_mci_slot *slot = mmc_priv(mmc);
@@ -1944,10 +1922,8 @@ static void dw_mci_post_tmo(struct mmc_host *mmc)
 {
 	struct dw_mci_slot *slot = mmc_priv(mmc);
 	struct dw_mci *host = slot->host;
-	u32 i, regs, cmd_flags;
+	u32 i, regs;
 	u32 sdio_int;
-	unsigned long timeout = 0;
-	bool ret_timeout = true;
 	u32 opcode, int_val;
 
 	/* unmask irq */
@@ -1975,40 +1951,11 @@ static void dw_mci_post_tmo(struct mmc_host *mmc)
 		 "[%s] -- Timeout recovery procedure start --\n",
 		 mmc_hostname(host->mmc));
 
-retry_stop:
-	/* send stop cmd */
-	mci_writel(host, CMDARG, 0);
-	wmb();
-	cmd_flags = SDMMC_CMD_STOP | SDMMC_CMD_RESP_CRC |
-			SDMMC_CMD_RESP_EXP | MMC_STOP_TRANSMISSION;
-
-	if (host->mmc->hold_reg_flag)
-		cmd_flags |= SDMMC_CMD_USE_HOLD_REG;
-
-	mci_writel(host, CMD, cmd_flags | SDMMC_CMD_START);
-	wmb();
-	timeout = jiffies + msecs_to_jiffies(10);
-
-	while(ret_timeout) {
-		ret_timeout = time_before(jiffies, timeout);
-		if(!(mci_readl(host, CMD) & SDMMC_CMD_START))
-			break;
-	}
-
-	if (false == ret_timeout) {
-		MMC_DBG_ERR_FUNC(host->mmc, "stop cmd recovery failed![%s]",
-				 mmc_hostname(host->mmc));
-		/* pd_peri mmc AHB bus software reset request */
-		rockchip_mmc_reset_controller(host->reset);
-		goto retry_stop;
-	}
-
 	if (!dw_mci_ctrl_all_reset(host)) {
-		MMC_DBG_ERR_FUNC(host->mmc, "all reset recovery failed![%s]",
+		MMC_DBG_ERR_FUNC(host->mmc, "dw_mci host reset failed![%s]",
 				 mmc_hostname(host->mmc));
 		/* pd_peri mmc AHB bus software reset request */
 		rockchip_mmc_reset_controller(host->reset);
-		goto retry_stop;
 	}
 
 #ifdef CONFIG_MMC_DW_IDMAC
@@ -2091,11 +2038,9 @@ static const struct mmc_host_ops dw_mci_ops = {
 	.enable_sdio_irq	= dw_mci_enable_sdio_irq,
 	.execute_tuning		= dw_mci_execute_tuning,
         .post_tmo		= dw_mci_post_tmo,
-	#ifdef CONFIG_MMC_DW_ROCKCHIP_SWITCH_VOLTAGE
         .start_signal_voltage_switch
 				= dw_mci_start_signal_voltage_switch,
         .card_busy		= dw_mci_card_busy,
-        #endif
 	.sdio_switch_iovel	= dw_mci_sdio_switch_iovel,
 };
 
@@ -2136,7 +2081,10 @@ static void dw_mci_request_end(struct dw_mci *host, struct mmc_request *mrq)
 		dw_mci_start_request(host, slot);
 	} else {
 		dev_vdbg(host->dev, "list empty\n");
-		host->state = STATE_IDLE;
+		if (host->state == STATE_SENDING_CMD11)
+			host->state = STATE_WAITING_CMD11_DONE;
+		else
+			host->state = STATE_IDLE;
 	}
 
 	spin_unlock(&host->lock);
@@ -2224,8 +2172,10 @@ static void dw_mci_tasklet_func(unsigned long priv)
 
 		switch (state) {
 		case STATE_IDLE:
+		case STATE_WAITING_CMD11_DONE:
 			break;
 
+		case STATE_SENDING_CMD11:
 		case STATE_SENDING_CMD:
 			if (!test_and_clear_bit(EVENT_CMD_COMPLETE,
 						&host->pending_events))
@@ -2891,6 +2841,15 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
 	}
 
 	if (pending) {
+		/* Check volt switch first, since it can look like an error */
+		if ((host->state == STATE_SENDING_CMD11) &&
+		    (pending & SDMMC_INT_VSI)) {
+			mci_writel(host, RINTSTS, SDMMC_INT_VSI);
+			pending &= ~SDMMC_INT_VSI;
+
+			dw_mci_cmd_interrupt(host, pending);
+		}
+
 		if (pending & DW_MCI_CMD_ERROR_FLAGS) {
 			mci_writel(host, RINTSTS, DW_MCI_CMD_ERROR_FLAGS);
 			host->cmd_status = pending;
@@ -3047,7 +3006,9 @@ static void dw_mci_work_routine_card(struct work_struct *work)
 
 						switch (host->state) {
 						case STATE_IDLE:
+						case STATE_WAITING_CMD11_DONE:
 							break;
+						case STATE_SENDING_CMD11:
 						case STATE_SENDING_CMD:
 							mrq->cmd->error = -ENOMEDIUM;
 							if (!mrq->data)
@@ -3559,9 +3520,11 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
 	if (drv_data && drv_data->hold_reg_flag)
 		mmc->hold_reg_flag |= drv_data->hold_reg_flag[ctrl_id];		
 
-	/* set the compatibility of driver. */
-	mmc->caps |= MMC_CAP_UHS_SDR12 | MMC_CAP_UHS_SDR25 | MMC_CAP_UHS_SDR50 
-	                | MMC_CAP_UHS_SDR104 | MMC_CAP_ERASE ;
+	/*
+	 * Support MMC_CAP_ERASE by default.
+	 * It needs to use trim/discard/erase commands.
+	 */
+	mmc->caps |= MMC_CAP_ERASE;
 
 	if (host->pdata->caps2)
 		mmc->caps2 = host->pdata->caps2;
@@ -4044,7 +4007,6 @@ int dw_mci_probe(struct dw_mci *host)
 	host->irq_state = true;
 	host->set_speed = 0;
 	host->set_div = 0;
-	host->svi_flags = 0;
 
 	spin_lock_init(&host->lock);
 	spin_lock_init(&host->slock);

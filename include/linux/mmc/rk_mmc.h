@@ -28,6 +28,8 @@ enum dw_mci_state {
 	STATE_DATA_BUSY,
 	STATE_SENDING_STOP,
 	STATE_DATA_ERROR,
+	STATE_SENDING_CMD11,
+	STATE_WAITING_CMD11_DONE,
 };
 
 enum {
@@ -204,7 +206,6 @@ struct dw_mci {
 	/* Workaround flags */
 	u32			quirks;
 	bool	    irq_state;
-	u32                     svi_flags; /* Switch voltage interrupt flags */
 	struct regulator	*vmmc;	/* Power regulator */
 	unsigned long		irq_flags; /* IRQ flags */
 	int			irq;
@@ -228,7 +229,7 @@ struct dw_mci {
 struct dw_mci_dma_ops {
 	/* DMA Ops */
 	int (*init)(struct dw_mci *host);
-	void (*start)(struct dw_mci *host, unsigned int sg_len);
+	int (*start)(struct dw_mci *host, unsigned int sg_len);
 	void (*complete)(void *host);
 	void (*stop)(struct dw_mci *host);
 	void (*cleanup)(struct dw_mci *host);

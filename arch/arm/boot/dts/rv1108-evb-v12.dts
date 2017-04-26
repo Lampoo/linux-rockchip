@@ -81,7 +81,7 @@
 	};
 
 	chosen {
-		bootargs = "rockchip_jtag noinitrd root=/dev/rootfs rootfstype=squashfs";
+		bootargs = "user_debug=31 rockchip_jtag noinitrd root=/dev/rootfs rootfstype=squashfs";
 	};
 
 	ion {
@@ -98,7 +98,7 @@
 		ion_cma: rockchip,ion-heap@4 { /* CMA HEAP */
 			compatible = "rockchip,ion-heap";
 			rockchip,ion_heap = <4>;
-			reg = <0x00000000 0x04000000>; /* 64MB */
+			reg = <0x00000000 0x04400000>; /* 68MB */
 		};
 		rockchip,ion-heap@0 { /* VMALLOC HEAP */
 			compatible = "rockchip,ion-heap";
@@ -156,7 +156,6 @@
 		vccio2-supply = <&rk805_ldo2_reg>;
 		vccio3-supply = <&rk805_dcdc4_reg>;
 		vccio5-supply = <&rk805_ldo2_reg>;
-		vccio6-supply = <&rk805_dcdc4_reg>;
 
 		/* PMU_GRF_IO_VSEL */
 		pmu-supply = <&rk805_dcdc4_reg>;
@@ -467,6 +466,7 @@
 };
 
 &usb_otg {
+	rockchip,high-bandwidth;
 	status = "okay";
 };
 
@@ -529,5 +529,9 @@
 };
 
 &hdmi {
+	status = "okay";
+};
+
+&tve {
 	status = "okay";
 };

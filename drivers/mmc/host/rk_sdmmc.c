@@ -1136,9 +1136,35 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
 extern struct mmc_card *this_card;
 static void dw_mci_wait_unbusy(struct dw_mci *host, u32 cmd_flags)
 {
+        unsigned int timeout = SDMMC_DATA_TIMEOUT_SDIO;
         unsigned long time_loop;
+        unsigned int tmo = 300000;
+	/* Secure erase flag */
+	u32 se_flag = 0;
 
-	time_loop = jiffies + msecs_to_jiffies(500);
+        MMC_DBG_INFO_FUNC(host->mmc,
+		"dw_mci_wait_unbusy, status=0x%x ", mci_readl(host, STATUS));
+    
+        if (host->mmc->restrict_caps & RESTRICT_CARD_TYPE_EMMC) {
+                if (host->cmd && (host->cmd->opcode == MMC_ERASE) && this_card) {
+                /* Special care for (secure)erase timeout calculation */
+			if ((host->cmd->arg & (0x1 << 31)) == 1)
+				se_flag = 0x1;
+
+			if (((this_card->ext_csd.erase_group_def) & 0x1) == 1)
+				se_flag ?
+				(timeout = (this_card->ext_csd.hc_erase_timeout) *
+				tmo * (this_card->ext_csd.sec_erase_mult)) :
+				(timeout = (this_card->ext_csd.hc_erase_timeout) * tmo);
+                }
+        
+                if(timeout < SDMMC_DATA_TIMEOUT_EMMC)
+                        timeout = SDMMC_DATA_TIMEOUT_EMMC;
+        } else if (host->mmc->restrict_caps & RESTRICT_CARD_TYPE_SD) {
+                timeout = SDMMC_DATA_TIMEOUT_SD;
+        }
+
+	time_loop = jiffies + msecs_to_jiffies(timeout);
 
 	if ((cmd_flags & SDMMC_CMD_PRV_DAT_WAIT) &&
 	    !(cmd_flags & SDMMC_CMD_VOLT_SWITCH)) {
@@ -1153,20 +1179,34 @@ static void dw_mci_wait_unbusy(struct dw_mci *host, u32 cmd_flags)
 	}
 }
 
+#ifdef CONFIG_MMC_DW_ROCKCHIP_SWITCH_VOLTAGE
+/*
+*   result: 
+*   0--status is busy. 
+*   1--status is unbusy.
+*/
 int dw_mci_card_busy(struct mmc_host *mmc)
 {
 	struct dw_mci_slot *slot = mmc_priv(mmc);
-	u32 status;
+	struct dw_mci *host = slot->host;
 
-	/*
-	 * Check the busy bit which is low when DAT[3:0]
-	 * (the data lines) are 0000
-	 */
-	status = mci_readl(slot->host, STATUS);
+        MMC_DBG_INFO_FUNC(host->mmc, "dw_mci_card_busy: svi_flags = %d [%s]", \
+                                host->svi_flags, mmc_hostname(host->mmc));	
+    
+        /* svi toggle*/
+        if(host->svi_flags == 0){
+                /*first svi*/
+                host->svi_flags = 1;
+                return host->svi_flags;           
+    
+        }else{
+                host->svi_flags = 0;
+                return host->svi_flags;   
+    	}
+    	
 
-	return !!(status & SDMMC_STAUTS_DATA_BUSY);
 }
-
+#endif
 static void __dw_mci_start_request(struct dw_mci *host,
 				   struct dw_mci_slot *slot,
 				   struct mmc_command *cmd)
@@ -2054,8 +2094,8 @@ static const struct mmc_host_ops dw_mci_ops = {
 	#ifdef CONFIG_MMC_DW_ROCKCHIP_SWITCH_VOLTAGE
         .start_signal_voltage_switch
 				= dw_mci_start_signal_voltage_switch,
-	#endif
         .card_busy		= dw_mci_card_busy,
+        #endif
 	.sdio_switch_iovel	= dw_mci_sdio_switch_iovel,
 };
 

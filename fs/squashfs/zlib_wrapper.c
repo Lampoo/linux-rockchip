@@ -118,6 +118,15 @@ static int zlib_uncompress(struct squashfs_sb_info *msblk, void *strm,
 	return stream->total_out;
 
 out:
+	if (k < b) {
+		int i;
+		printk(KERN_WARNING "inflate err: %d, k=%d, b=%d, length=%d, stream->next_out=%p, stream->avail_out=%d\n", zlib_err, k, b, length, stream->next_out, stream->avail_out);
+		for (i = 0; i < msblk->devblksize; i++) {
+			printk(KERN_WARNING "%hhx ", bh[k]->b_data[i]);
+		}
+		printk(KERN_WARNING "\n");
+	}
+
 	for (; k < b; k++)
 		put_bh(bh[k]);
 

@@ -1150,35 +1150,9 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
 extern struct mmc_card *this_card;
 static void dw_mci_wait_unbusy(struct dw_mci *host, u32 cmd_flags)
 {
-        unsigned int timeout = SDMMC_DATA_TIMEOUT_SDIO;
         unsigned long time_loop;
-        unsigned int tmo = 300000;
-	/* Secure erase flag */
-	u32 se_flag = 0;
 
-        MMC_DBG_INFO_FUNC(host->mmc,
-		"dw_mci_wait_unbusy, status=0x%x ", mci_readl(host, STATUS));
-    
-        if (host->mmc->restrict_caps & RESTRICT_CARD_TYPE_EMMC) {
-                if (host->cmd && (host->cmd->opcode == MMC_ERASE) && this_card) {
-                /* Special care for (secure)erase timeout calculation */
-			if ((host->cmd->arg & (0x1 << 31)) == 1)
-				se_flag = 0x1;
-
-			if (((this_card->ext_csd.erase_group_def) & 0x1) == 1)
-				se_flag ?
-				(timeout = (this_card->ext_csd.hc_erase_timeout) *
-				tmo * (this_card->ext_csd.sec_erase_mult)) :
-				(timeout = (this_card->ext_csd.hc_erase_timeout) * tmo);
-                }
-        
-                if(timeout < SDMMC_DATA_TIMEOUT_EMMC)
-                        timeout = SDMMC_DATA_TIMEOUT_EMMC;
-        } else if (host->mmc->restrict_caps & RESTRICT_CARD_TYPE_SD) {
-                timeout = SDMMC_DATA_TIMEOUT_SD;
-        }
-
-	time_loop = jiffies + msecs_to_jiffies(timeout);
+	time_loop = jiffies + msecs_to_jiffies(500);
 
 	if ((cmd_flags & SDMMC_CMD_PRV_DAT_WAIT) &&
 	    !(cmd_flags & SDMMC_CMD_VOLT_SWITCH)) {

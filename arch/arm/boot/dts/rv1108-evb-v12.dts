@@ -168,6 +168,12 @@
 		status = "okay";
 	};
 
+	gps_pwr {
+		compatible = "gps_pwr";
+		GPS,pwr_en = <&gpio0 GPIO_C6 GPIO_ACTIVE_HIGH>;
+		status = "okay";
+	};
+
 	wireless-wlan {
 		compatible = "wlan-platdata";
 		wifi_chip_type = "rtl8723cs";
@@ -534,5 +540,9 @@
 };
 
 &tve {
+	status = "okay";
+};
+
+&uart1 {
 	status = "okay";
 };

@@ -166,6 +166,12 @@
 		status = "okay";
 	};
 
+	gps_pwr {
+		compatible = "gps_pwr";
+		GPS,pwr_en = <&gpio0 GPIO_C3 GPIO_ACTIVE_HIGH>;
+		status = "okay";
+	};
+
 	wireless-wlan {
 		compatible = "wlan-platdata";
 		wifi_chip_type = "ap6212";
@@ -408,7 +414,7 @@
 		cs-gpio  = <&gpio1 GPIO_D1 GPIO_ACTIVE_LOW>;
 		sdi-gpio = <&gpio0 GPIO_A7 GPIO_ACTIVE_LOW>;
 		scl-gpio = <&gpio1 GPIO_D0 GPIO_ACTIVE_LOW>;
-		rst-gpio = <&gpio0 GPIO_C3 GPIO_ACTIVE_LOW>;
+		/* rst-gpio = <&gpio0 GPIO_C3 GPIO_ACTIVE_LOW>; */
 	};
 };
 
@@ -440,5 +446,9 @@
 };
 
 &hdmi {
+	status = "okay";
+};
+
+&uart1 {
 	status = "okay";
 };

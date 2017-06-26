@@ -1,0 +1,11 @@
+#
+# GPS device configuration
+#
+
+#if GPS_SUPPORT
+config GPS
+	tristate "GPS power enalbed"
+	default y
+	help
+	  Rv1108 GPS Driver
+#endif

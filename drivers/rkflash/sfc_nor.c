@@ -672,15 +672,12 @@ static int sfc_write_mtd(struct mtd_info *mtd, loff_t to, size_t len,
 	return 0;
 }
 
-static u8* nor_dma_buf;
-
 static int sfc_read_mtd(struct mtd_info *mtd, loff_t from, size_t len,
 			size_t *retlen, u_char *buf)
 {
 	u32 addr, size, chunk;
 	u8 *p_buf =  (u8 *)buf;
 	int ret = SFC_OK;
-	int i = 0;
 
 	struct SFNOR_DEV *p_dev = mtd_to_sfc(mtd);
 
@@ -695,19 +692,11 @@ static int sfc_read_mtd(struct mtd_info *mtd, loff_t from, size_t len,
 	while (size > 0) {
 		chunk = (size < NOR_PAGE_SIZE) ? size : NOR_PAGE_SIZE;
 		ret = snor_read_data(addr, p_dev->dma_buf, chunk);
-		ret = snor_read_data(addr, nor_dma_buf, chunk);
 		if (ret != SFC_OK) {
 			PRINT_E("snor_read_data %x ret=%d\n", addr, ret);
 			*retlen = len - size;
 			mutex_unlock(&p_dev->lock);
 			return ret;
-		}
-		if (memcmp(p_dev->dma_buf, nor_dma_buf, chunk)) {
-			PRINT_E("%s: dump\n", __func__);
-			for (i=0; i<chunk; i++)
-				PRINT_E("%x ", p_dev->dma_buf[i]);
-			PRINT_E("%s: dump done\n", __func__);
-
 		}
 		memcpy(p_buf, p_dev->dma_buf, chunk);
 		size -= chunk;
@@ -741,13 +730,6 @@ static int sfc_nor_mtd_init(struct SFNOR_DEV *p_dev)
 
 	p_dev->dma_buf = kmalloc(NOR_PAGE_SIZE, GFP_KERNEL | GFP_DMA);
 	if (!p_dev->dma_buf) {
-		PRINT_E("kmalloc size=0x%x failed\n", NOR_PAGE_SIZE);
-		ret = -ENOMEM;
-		goto out;
-	}
-
-	nor_dma_buf = kmalloc(NOR_PAGE_SIZE, GFP_KERNEL | GFP_DMA);
-	if (!nor_dma_buf) {
 		PRINT_E("kmalloc size=0x%x failed\n", NOR_PAGE_SIZE);
 		ret = -ENOMEM;
 		goto out;

@@ -163,25 +163,25 @@
 	operating-points = <
 		/* KHz    uV */
 		400000 900000
+		600000 1000000
+		666000 1000000
 		800000 1050000
 		>;
 
 	freq-table = <
 		/*status		freq(KHz)*/
 		SYS_STATUS_NORMAL	786000
-		SYS_STATUS_SUSPEND	192000
+		SYS_STATUS_SUSPEND	786000
 		SYS_STATUS_VIDEO_1080P  786000
 		SYS_STATUS_VIDEO_4K     786000
 		SYS_STATUS_PERFORMANCE  786000
-		SYS_STATUS_DUALVIEW	600000
-		SYS_STATUS_BOOST	396000
-		SYS_STATUS_ISP		528000
+		SYS_STATUS_DUALVIEW	786000
+		SYS_STATUS_BOOST	786000
+		SYS_STATUS_ISP		786000
 		>;
 	auto-freq-table = <
-		240000
-		324000
-		396000
-		528000
+		786000
+		786000
 		>;
 	auto-freq = <0>;
 
@@ -300,6 +300,7 @@
 	ignore-pm-notify;
 	keep-power-in-suspend;
 	cap-sdio-irq;
+	supports-UHS_SDR104;
 	status = "okay";
 };
 
@@ -520,15 +521,15 @@
 		};
 
 		rk805_ldo3_reg: regulator@6 {
-			regulator-name = "vdd_10";
-			regulator-min-microvolt = <1000000>;
-			regulator-max-microvolt = <1000000>;
+			regulator-name = "vdd_11";
+			regulator-min-microvolt = <1100000>;
+			regulator-max-microvolt = <1100000>;
 			regulator-initial-state = <3>;
 			regulator-boot-on;
 			regulator-always-on;
 			regulator-state-mem {
 				regulator-state-enabled;
-				regulator-state-uv = <1000000>;
+				regulator-state-uv = <1100000>;
 			};
 		};
 	};

@@ -156,9 +156,13 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
 dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb
 dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += \
+	px3se-android-sdk.dtb \
+	px3se-emmc-minifs-sdk.dtb \
 	px3se-sdk.dtb \
-	px3se-spi-sdk.dtb \
+	px3se-sfc-sdk.dtb \
+	px3se-slc-sdk.dtb \
 	rk3036-echo.dtb \
+	rk3036-echo-sfc.dtb \
 	rk3036-fpga.dtb \
 	rk3036-new.dtb \
 	rk3036-rk88.dtb \
@@ -173,6 +177,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	rk3128-box.dtb \
 	rk3128-box-ns.dtb \
 	rk3128-box-rk88.dtb \
+	rk3128-fireprime.dtb \
 	rk3128-sdk.dtb \
 	rk3228a-box-2layer.dtb \
 	rk3228b-box_805.dtb \
@@ -188,6 +193,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	rk3288-tb_8846.dtb \
 	rk3288-tb.dtb \
 	rk3288-vr.dtb \
+	rv1107-ipc-v10.dtb \
 	rv1108-cvr-hx108.dtb \
 	rv1108-evb-v10.dtb \
 	rv1108-evb-v11.dtb \
@@ -196,7 +202,9 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	rv1108-fpga.dtb \
 	rv1108-ipc-v10.dtb \
 	rv1108-ipc-emmc-v10.dtb \
-	rv1108-ketong.dtb
+	rv1108-ketong.dtb \
+	rv1108-minievb-v10.dtb \
+	rv1108-sportdv-v10.dtb
 dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
 	hrefprev60.dtb \
 	hrefv60plus.dtb \

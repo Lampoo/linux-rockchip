@@ -1669,7 +1669,7 @@ static int cif_isp11_config_isp(
 
 			if (dev->mp_stream.state == CIF_ISP11_STATE_READY) {
 				output->quantization =
-					dev->config.mi_config.sp.output.quantization;
+					dev->config.mi_config.mp.output.quantization;
 			}
 			if (dev->y12_stream.state == CIF_ISP11_STATE_READY) {
 				output->quantization =
@@ -3624,6 +3624,7 @@ static void cif_isp11_init_stream(
 	stream->updt_cfg = false;
 	stream->stop = false;
 	stream->stall = false;
+	spin_lock_init(&stream->metadata.spinlock);
 
 	cif_isp11_pltfrm_event_clear(dev->dev, &stream->done);
 	stream->state = CIF_ISP11_STATE_INACTIVE;
@@ -4416,6 +4417,7 @@ static int cif_isp11_mi_frame_end(
 				stream->curr_buf->state = VIDEOBUF_DONE;
 			wake_now = false;
 
+			spin_lock(&stream->metadata.spinlock);
 			if (stream->metadata.d && dev->isp_dev.streamon) {
 				struct v4l2_buffer_metadata_s *metadata;
 
@@ -4461,6 +4463,7 @@ static int cif_isp11_mi_frame_end(
 			} else {
 				wake_now = true;
 			}
+			spin_unlock(&stream->metadata.spinlock);
 
 			if (stream->next_buf != NULL) {
 				if (wake_now) {
@@ -4528,9 +4531,11 @@ static void cif_isp11_stream_metadata_reset(
 )
 {
 	unsigned int i;
+	unsigned long flags = 0;
 	struct v4l2_buffer_metadata_s *metadata;
 	struct cifisp_isp_metadata *isp_metadata;
 
+	spin_lock_irqsave(&stream_dev->metadata.spinlock, flags);
 	if (stream_dev->metadata.d) {
 		for (i = 0; i < stream_dev->metadata.cnt; i++) {
 			metadata = (struct v4l2_buffer_metadata_s *)
@@ -4542,6 +4547,7 @@ static void cif_isp11_stream_metadata_reset(
 			isp_metadata->meas_cfg.s_frame_id = 0xffffffff;
 		}
 	}
+	spin_unlock_irqrestore(&stream_dev->metadata.spinlock, flags);
 
 	return;
 }
@@ -5101,13 +5107,16 @@ static int cif_isp11_start(
 		cifisp_frame_id_reset(&dev->isp_dev);
 		dev->isp_dev.frame_id_setexp = 0;
 		videobuf_queue_lock(&dev->isp_dev.vbq_stat);
-		list_for_each_entry_safe(
-			vb, n, &dev->isp_dev.vbq_stat.stream, queue) {
-			if (vb->state == VIDEOBUF_DONE) {
-				vb->field_count = -1;
-				cif_isp11_pltfrm_pr_info(
-					dev->dev,
-					"discard vb: %d\n", vb->i);
+
+		if (dev->isp_dev.streamon) {
+			list_for_each_entry_safe(
+				vb, n, &dev->isp_dev.vbq_stat.stream, queue) {
+				if (vb && vb->state == VIDEOBUF_DONE) {
+					vb->field_count = -1;
+					cif_isp11_pltfrm_pr_err(
+						dev->dev,
+						"discard vb: %d\n", vb->i);
+				}
 			}
 		}
 		videobuf_queue_unlock(&dev->isp_dev.vbq_stat);
@@ -6089,6 +6098,7 @@ int cif_isp11_release(
 	int stream_ids)
 {
 	int ret;
+	unsigned long flags = 0;
 	struct cif_isp11_stream *strm_dev;
 
 	cif_isp11_pltfrm_pr_dbg(NULL, "0x%08x\n", stream_ids);
@@ -6117,11 +6127,13 @@ int cif_isp11_release(
 		strm_dev = NULL;
 
 	if (strm_dev) {
+		spin_lock_irqsave(&strm_dev->metadata.spinlock, flags);
 		if (strm_dev->metadata.d != NULL) {
 			vfree(strm_dev->metadata.d);
 			strm_dev->metadata.d = NULL;
 			strm_dev->metadata.cnt = 0;
 		}
+		spin_unlock_irqrestore(&strm_dev->metadata.spinlock, flags);
 	}
 
 	if (stream_ids & CIF_ISP11_STREAM_SP) {
@@ -6378,6 +6390,7 @@ int cif_isp11_reqbufs(
 	enum cif_isp11_stream_id strm,
 	struct v4l2_requestbuffers *req)
 {
+	unsigned long flags = 0;
 	struct cif_isp11_stream *strm_dev;
 
 	switch (strm) {
@@ -6396,7 +6409,9 @@ int cif_isp11_reqbufs(
 		break;
 	}
 
+	spin_lock_irqsave(&strm_dev->metadata.spinlock, flags);
 	strm_dev->metadata.cnt = req->count;
+	spin_unlock_irqrestore(&strm_dev->metadata.spinlock, flags);
 
 	return 0;
 
@@ -6512,6 +6527,7 @@ int cif_isp11_s_vb_metadata(
 	struct cif_isp11_device *dev,
 	struct cif_isp11_isp_readout_work *readout_work)
 {
+	unsigned long flags = 0;
 	unsigned int stream_id =
 		readout_work->stream_id;
 	struct videobuf_buffer *vb =
@@ -6533,10 +6549,24 @@ int cif_isp11_s_vb_metadata(
 	default:
 		cif_isp11_pltfrm_pr_err(dev->dev,
 			"unknown stream id%d\n", stream_id);
-		break;
+		return -1;
 	}
 
+	if (strm_dev->state != CIF_ISP11_STATE_STREAMING) {
+		cif_isp11_pltfrm_pr_err(dev->dev,
+			"stream id%d is not streaming\n", stream_id);
+		return -1;
+	}
+
+	spin_lock_irqsave(&strm_dev->metadata.spinlock, flags);
 	if (vb && strm_dev->metadata.d) {
+		if (vb->i >= strm_dev->metadata.cnt) {
+			cif_isp11_pltfrm_pr_err(dev->dev,
+				"vb->i %d is bigger than metadata.cnt %d\n",
+				vb->i, strm_dev->metadata.cnt);
+			spin_unlock_irqrestore(&strm_dev->metadata.spinlock, flags);
+			return -1;
+		}
 		metadata = (struct v4l2_buffer_metadata_s *)
 			(strm_dev->metadata.d +
 			vb->i*CAMERA_METADATA_LEN);
@@ -6550,6 +6580,7 @@ int cif_isp11_s_vb_metadata(
 		metadata->sensor.gain =
 			sensor_mode.gain;
 	}
+	spin_unlock_irqrestore(&strm_dev->metadata.spinlock, flags);
 
 	if (vb) {
 		cif_isp11_pltfrm_pr_dbg(NULL,
@@ -6568,6 +6599,7 @@ int cif_isp11_mmap(
 	void *mem_vaddr;
 	int retval = 0, pages;
 	unsigned long mem_size;
+	unsigned long flags = 0;
 
 	switch (stream_id) {
 	case CIF_ISP11_STREAM_MP:
@@ -6615,7 +6647,9 @@ int cif_isp11_mmap(
 		goto done;
 	}
 
+	spin_lock_irqsave(&strm_dev->metadata.spinlock, flags);
 	strm_dev->metadata.d = (unsigned char *)mem_vaddr;
+	spin_unlock_irqrestore(&strm_dev->metadata.spinlock, flags);
 
 	vma->vm_private_data = (void *)&strm_dev->metadata;
 

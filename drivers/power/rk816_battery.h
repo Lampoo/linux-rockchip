@@ -124,12 +124,12 @@
 #define CHRG_TIMER_CCCV_EN	(1 << 2)
 #define CHRG_EN			(1 << 7)
 
-#define BOOST_MASK		((0x1 << 5) | (0x1 << 1))
-#define BOOST_ON		((0x1 << 5) | (0x1 << 1))
-#define BOOST_OFF		((0x1 << 5) | (0x0 << 1))
-#define OTG_MASK		((0x1 << 6) | (0x1 << 2))
-#define OTG_ON			((0x1 << 6) | (0x1 << 2))
-#define OTG_OFF			((0x1 << 6) | (0x0 << 2))
+#define BOOST_OTG_MASK		((0x3 << 5) | (0x3 << 1))
+#define BOOST_OTG_ON		((0x3 << 5) | (0x3 << 1))
+#define BOOST_OTG_OFF		((0x3 << 5) | (0x0 << 1))
+#define BOOST_OFF_OTG_ON	((0x3 << 5) | (0x2 << 1))
+
+#define OTG_BOOST_SLP_ON	(0x3 << 5)
 
 /* MISC_MARK_REG */
 #define FG_INIT			BIT(3)
@@ -184,6 +184,7 @@ struct battery_platform_data {
 	u32 dc_det_adc;
 	int dc_det_pin;
 	u8  dc_det_level;
+	int otg5v_suspend_enable;
 };
 
 enum work_mode {
@@ -227,7 +228,7 @@ static const u16 CHRG_CUR_SEL[] = {
 };
 
 static const u16 CHRG_CUR_INPUT[] = {
-	450, 800, 850, 1000, 1250, 1500, 1750, 2000
+	450, 80, 850, 1000, 1250, 1500, 1750, 2000
 };
 
 void kernel_power_off(void);

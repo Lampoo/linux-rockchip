@@ -103,6 +103,7 @@ struct rockchip_i2c {
 	unsigned int		count;
 
 	unsigned int		check_idle;
+	unsigned int		bus_recovery;
 	int			sda_gpio, scl_gpio;
 	struct pinctrl_state	*gpio_state;
 };
@@ -249,9 +250,12 @@ static inline void rockchip_i2c_enable(struct rockchip_i2c *i2c, unsigned int la
 
 	con |= I2C_CON_EN;
 	con |= I2C_CON_MOD(i2c->mode);
-	if (lastnak)
-		con |= I2C_CON_LASTACK;
 	con |= I2C_CON_START;
+
+	/* if we want to react to NACK, set ACTACK bit */
+	if (!(i2c->msg->flags & I2C_M_IGNORE_NAK))
+		con |= I2C_CON_ACTACK;
+
 	i2c_writel(con, i2c->regs + I2C_CON);
 }
 
@@ -366,13 +370,8 @@ static void rockchip_i2c_stop(struct rockchip_i2c *i2c, int ret)
 
 	i2c->msg_ptr = 0;
 	i2c->msg = NULL;
-	if (ret == -EAGAIN) {
-		i2c->state = STATE_IDLE;
-		i2c->is_busy = 0;
-		wake_up(&i2c->wait);
-		return;
-	}
 	i2c->error = ret;
+
 	i2c_writel(I2C_STOPIEN, i2c->regs + I2C_IEN);
 	i2c->state = STATE_STOP;
 	rockchip_i2c_send_stop(i2c);
@@ -380,12 +379,18 @@ static void rockchip_i2c_stop(struct rockchip_i2c *i2c, int ret)
 
 static inline void rockchip_set_rx_mode(struct rockchip_i2c *i2c, unsigned int lastnak)
 {
-	unsigned long con = i2c_readl(i2c->regs + I2C_CON);
+	unsigned int con = i2c_readl(i2c->regs + I2C_CON);
 
-	con &= (~I2C_CON_MASK);
-	con |= (I2C_CON_MOD_RX << 1);
 	if (lastnak)
 		con |= I2C_CON_LASTACK;
+	else
+		con &= ~I2C_CON_LASTACK;
+
+	if (i2c->msg_ptr != 0) {
+		con &= (~I2C_CON_MASK);
+		con |= (I2C_CON_MOD_RX << 1);
+	}
+
 	i2c_writel(con, i2c->regs + I2C_CON);
 }
 
@@ -393,19 +398,19 @@ static void rockchip_irq_read_prepare(struct rockchip_i2c *i2c)
 {
 	unsigned int cnt, len = i2c->msg->len - i2c->msg_ptr;
 
-	if (len <= 32 && i2c->msg_ptr != 0)
-		rockchip_set_rx_mode(i2c, 1);
-	else if (i2c->msg_ptr != 0)
-		rockchip_set_rx_mode(i2c, 0);
-
 	if (is_msgend(i2c)) {
 		rockchip_i2c_stop(i2c, i2c->error);
 		return;
 	}
-	if (len > 32)
+
+	if (len > 32) {
 		cnt = 32;
-	else
+		rockchip_set_rx_mode(i2c, 0);
+	} else {
 		cnt = len;
+		rockchip_set_rx_mode(i2c, 1);
+	}
+
 	i2c_writel(cnt, i2c->regs + I2C_MRXCNT);
 }
 
@@ -540,8 +545,11 @@ static irqreturn_t rockchip_i2c_irq(int irq, void *dev_id)
 
 	if (ipd & I2C_NAKRCVIPD) {
 		i2c_writel(I2C_NAKRCVIPD, i2c->regs + I2C_IPD);
-		i2c->error = -EAGAIN;
-		goto out;
+		ipd &= ~I2C_NAKRCVIPD;
+		if (!(i2c->msg->flags & I2C_M_IGNORE_NAK)) {
+			rockchip_i2c_stop(i2c, -EAGAIN);
+			goto out;
+		}
 	}
 	rockchip_i2c_irq_nextblock(i2c, ipd);
 out:
@@ -725,7 +733,6 @@ static int rockchip_i2c_doxfer(struct rockchip_i2c *i2c,
 
 	i2c_writel(I2C_IPD_ALL_CLEAN, i2c->regs + I2C_IPD);
 	rockchip_i2c_disable_irq(i2c);
-	rockchip_i2c_disable(i2c);
 	spin_unlock_irqrestore(&i2c->lock, flags);
 
 	if (error == -EAGAIN)
@@ -760,7 +767,7 @@ static int rockchip_i2c_xfer(struct i2c_adapter *adap,
 
 	clk_enable(i2c->clk);
 	if (i2c->check_idle) {
-		int state, retry = 10;
+		int state, retry = 5;
 		while (retry) {
 			state = rockchip_i2c_check_idle(i2c);
 			if (state == I2C_IDLE)
@@ -773,7 +780,22 @@ static int rockchip_i2c_xfer(struct i2c_adapter *adap,
 		}
 		if (retry == 0) {
 			dev_err(i2c->dev, "i2c is not in idle(state = %d)\n", state);
-			ret = -EIO;
+			if (i2c->bus_recovery && !i2c_recover_bus(adap)) {
+				u32 val;
+
+				mdelay(1);
+				/* Force a STOP condition without interrupt */
+				val = i2c_readl(i2c->regs  + I2C_CON);
+				val |= I2C_CON_EN | I2C_CON_STOP;
+				i2c_writel(val, i2c->regs  + I2C_CON);
+				mdelay(1);
+
+				/* -EAGAIN for retransfer that overwrite this */
+				ret = -EAGAIN;
+			} else {
+				ret = -EIO;
+			}
+
 			goto out;
 		}
 	}
@@ -806,6 +828,52 @@ out:
 	return (ret < 0) ? ret : num;
 }
 
+static int rockchip_i2c_get_scl_gpio_value(struct i2c_adapter *adap)
+{
+	struct rockchip_i2c *i2c = i2c_get_adapdata(adap);
+
+	gpio_direction_input(i2c->scl_gpio);
+	return gpio_get_value(i2c->scl_gpio);
+}
+
+static void  rockchip_i2c_set_scl_gpio_value(struct i2c_adapter *adap, int val)
+{
+	struct rockchip_i2c *i2c = i2c_get_adapdata(adap);
+
+	gpio_direction_output(i2c->scl_gpio, val);
+}
+
+static int rockchip_i2c_get_sda_gpio_value(struct i2c_adapter *adap)
+{
+	struct rockchip_i2c *i2c = i2c_get_adapdata(adap);
+
+	gpio_direction_input(i2c->sda_gpio);
+	return gpio_get_value(i2c->sda_gpio);
+}
+
+void rockchip_i2c_prepare_recovery(struct i2c_adapter *adap)
+{
+	struct rockchip_i2c *i2c = i2c_get_adapdata(adap);
+
+	pinctrl_select_state(i2c->dev->pins->p, i2c->gpio_state);
+}
+
+void rockchip_i2c_unprepare_recovery(struct i2c_adapter *adap)
+{
+	struct rockchip_i2c *i2c = i2c_get_adapdata(adap);
+
+	pinctrl_select_state(i2c->dev->pins->p, i2c->dev->pins->default_state);
+}
+
+static struct i2c_bus_recovery_info rockchip_i2c_bus_recovery_info = {
+	.get_scl		= rockchip_i2c_get_scl_gpio_value,
+	.get_sda		= rockchip_i2c_get_sda_gpio_value,
+	.set_scl		= rockchip_i2c_set_scl_gpio_value,
+	.prepare_recovery	= rockchip_i2c_prepare_recovery,
+	.unprepare_recovery	= rockchip_i2c_unprepare_recovery,
+	.recover_bus		= i2c_generic_scl_recovery,
+};
+
 /* declare our i2c functionality */
 static u32 rockchip_i2c_func(struct i2c_adapter *adap)
 {
@@ -829,6 +897,7 @@ static int rockchip_i2c_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct device_node *np = pdev->dev.of_node;
 	struct rockchip_i2c_data *data = rockchip_i2c_get_data();
+	struct i2c_adapter *adap;
 	int ret;
 
 	if (!np) {
@@ -852,6 +921,7 @@ static int rockchip_i2c_probe(struct platform_device *pdev)
 	i2c_set_adapdata(&i2c->adap, i2c);
 	i2c->adap.dev.parent = &pdev->dev;
 	i2c->adap.dev.of_node = np;
+	adap = &i2c->adap;
 
 	spin_lock_init(&i2c->lock);
 	init_waitqueue_head(&i2c->wait);
@@ -898,6 +968,13 @@ static int rockchip_i2c_probe(struct platform_device *pdev)
 		gpio_direction_input(i2c->scl_gpio);
 		pinctrl_select_state(i2c->dev->pins->p, i2c->dev->pins->default_state);
 	}
+
+	if (of_property_read_u32(np, "rockchip,bus-recovery",
+				 &i2c->bus_recovery))
+		i2c->bus_recovery = 0;
+
+	if (i2c->bus_recovery)
+		adap->bus_recovery_info = &rockchip_i2c_bus_recovery_info;
 
 	/* setup info block for the i2c core */
 	ret = i2c_add_adapter(&i2c->adap);

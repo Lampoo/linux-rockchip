@@ -290,8 +290,11 @@ static int dsp_work_consume(void *data)
 	dsp_debug_enter();
 
 	while (!kthread_should_stop()) {
+		struct list_head *pending = &service->pending;
+
 		wait_event_interruptible_timeout(service->wait,
-						 !list_empty(&service->pending),
+						 !list_empty(pending) ||
+						 kthread_should_stop(),
 						 HZ);
 
 		mutex_lock(&service->work_lock);
@@ -375,7 +378,8 @@ static int dsp_device_pause(struct dsp_dev_client *client)
 
 	/* Wake up work consumer thread and stop it */
 	wake_up(&service->wait);
-	kthread_stop(service->work_consumer);
+	if (service->work_consumer)
+		kthread_stop(service->work_consumer);
 	service->work_consumer = NULL;
 
 	dsp_debug_leave();
@@ -531,7 +535,7 @@ static long dsp_ioctl(struct file *filp, unsigned int cmd,
 			struct dsp_user_work user_work;
 
 			user_work.id = 0;
-			user_work.magic = DSP_RENDER_WORK_MAGIC;
+			user_work.magic = DSP_ALGORITHM_WORK_MAGIC;
 			if (ret == -EBUSY)
 				user_work.result = DSP_WORK_ETIMEOUT;
 			else
@@ -565,7 +569,6 @@ static int dsp_open(struct inode *inode, struct file *filp)
 
 	dsp_debug_enter();
 
-	mutex_lock(&service->lock);
 	ret = dsp_session_create(service, &session);
 	if (ret) {
 		dsp_err("cannot create a session\n");
@@ -585,10 +588,11 @@ static int dsp_open(struct inode *inode, struct file *filp)
 		}
 	}
 
+	mutex_lock(&service->lock);
 	list_add_tail(&session->list_node, &service->sessions);
+	mutex_unlock(&service->lock);
 	filp->private_data = session;
 out:
-	mutex_unlock(&service->lock);
 	dsp_debug_leave();
 	return ret;
 }
@@ -604,16 +608,15 @@ static int dsp_release(struct inode *inode, struct file *filp)
 	dsp_service_clean_pending_works(service, session);
 
 	mutex_lock(&service->lock);
-
 	list_del(&session->list_node);
+	mutex_unlock(&service->lock);
+
 	dsp_session_destroy(session);
 	atomic_sub(1, &service->ref);
 
 	/* Power off DSP if service has not sessions anymore */
 	if (!atomic_read(&service->ref))
 		service->dev->off(service->dev);
-
-	mutex_unlock(&service->lock);
 
 	dsp_debug_leave();
 	return ret;

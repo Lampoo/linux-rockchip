@@ -429,11 +429,11 @@ enum _VOP_SOC_TYPE {
 	#define v_BCSH_COLOR_BAR_V(x)   BITS_MASK(x, 0xff, 16)
 
 #define BCSH_BCS 		(0xd8)	
-	#define m_BCSH_BRIGHTNESS	BITS(0x1f, 0)	
+	#define m_BCSH_BRIGHTNESS	BITS(0x3f, 0)
 	#define m_BCSH_CONTRAST		BITS(0xff, 8)
 	#define m_BCSH_SAT_CON		BITS(0x1ff, 16)
 
-	#define v_BCSH_BRIGHTNESS(x)	BITS_MASK(x, 0x1f, 0)	
+	#define v_BCSH_BRIGHTNESS(x)	BITS_MASK(x, 0x3f, 0)
 	#define v_BCSH_CONTRAST(x)	BITS_MASK(x, 0xff, 8)	
 	#define v_BCSH_SAT_CON(x)       BITS_MASK(x, 0x1ff, 16)			
 
@@ -653,6 +653,9 @@ enum _vop_overlay_mode {
 			 m_LF_INT_STA | m_BUS_ERR_INT_STA)
 #define INT_CLR_SHIFT	8
 
+#define EMPTY_INT_STA_MSK	(m_WIN0_EMPTY_INT_STA | m_WIN1_EMPTY_INT_STA)
+#define EMPTY_INT_CLR_SHIFT	2
+
 struct rk_lcdc_drvdata {
      u8 soc_type;
      u32 reserve;
@@ -695,6 +698,10 @@ struct lcdc_device {
 	u32 standby;			/* 1:standby,0:work */
 	struct backlight_device *backlight;
 	u32 iommu_status;
+	u32 ttl_sync_mode;
+	struct pinctrl *p;
+	struct pinctrl_state *den_state;
+	struct pinctrl_state *sync_state;
 };
 
 static inline void lcdc_writel(struct lcdc_device *lcdc_dev, u32 offset, u32 v)

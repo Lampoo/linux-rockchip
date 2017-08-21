@@ -69,7 +69,7 @@
 	};
 
 	chosen {
-		bootargs = "vmalloc=496M rockchip_jtag";
+		bootargs = "psci=enable vmalloc=496M rockchip_jtag";
 	};
 };
 
@@ -197,9 +197,9 @@
 	status = "okay";
 
 	backlight = <&backlight>;
-	pinctrl-names = "default", "gpio";
-	pinctrl-0 = <&lcdc0_lcdc>;
-	pinctrl-1 = <&lcdc0_gpio>;
+	pinctrl-names = "den", "sync";
+	pinctrl-0 = <&lcdc0_den>;
+	pinctrl-1 = <&lcdc0_sync>;
 
 	rockchip,fb-win-map = <FB_DEFAULT_ORDER>;
 
@@ -277,6 +277,8 @@
 
 &i2c1 {
 	status = "okay";
+
+	rockchip,bus-recovery = <1>;
 
 	sensor@4c {
 		compatible = "gs_mma7660";
@@ -377,7 +379,7 @@
 };
 
 &uart2 {
-	status = "okay";
+	status = "disabled";
 };
 
 &pinctrl {
@@ -387,7 +389,7 @@
 /include/ "rk816.dtsi"
 &rk816 {
 	gpios = <&gpio1 GPIO_A5 GPIO_ACTIVE_HIGH>, <&gpio1 GPIO_A1 GPIO_ACTIVE_LOW>;
-	rockchip,system-power-controller;
+	rk816,system-power-controller;
 	rk816,support_dc_chg = <1>;/*1: dc chg; 0:usb chg*/
 	io-channels = <&adc 0>;
 	gpio-controller;
@@ -401,7 +403,7 @@
 			regulator-name= "vdd_arm";
 			regulator-min-microvolt = <700000>;
 			regulator-max-microvolt = <1500000>;
-			regulator-initial-mode = <0x2>;
+			regulator-initial-mode = <0x1>;
 			regulator-initial-state = <3>;
 			regulator-always-on;
 			regulator-state-mem {
@@ -415,7 +417,7 @@
 			regulator-name= "vdd_logic";
 			regulator-min-microvolt = <700000>;
 			regulator-max-microvolt = <1500000>;
-			regulator-initial-mode = <0x2>;
+			regulator-initial-mode = <0x1>;
 			regulator-initial-state = <3>;
 			regulator-always-on;
 			regulator-state-mem {
@@ -432,11 +434,6 @@
 			regulator-initial-mode = <0x2>;
 			regulator-initial-state = <3>;
 			regulator-always-on;
-			regulator-state-mem {
-				regulator-state-mode = <0x2>;
-				regulator-state-enabled;
-				regulator-state-uv = <1200000>;
-			};
 		};
 
 		rk816_dcdc4_reg: regulator@3 {

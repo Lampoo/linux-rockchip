@@ -12,11 +12,14 @@ struct primary_win_data {
 	unsigned int		fb_width;
 	unsigned int		fb_height;
 	unsigned int		bpp;
-	dma_addr_t		dma_addr;
+	dma_addr_t		dma_addr[MAX_FB_BUFFER];
 	unsigned int		buf_offsize;
 	unsigned int		line_size;	/* bytes */
 	bool			enabled;
 	bool			resume;
+	unsigned int		pixel_format;
+	unsigned int		src_width;
+	unsigned int		src_height;
 };
 
 struct primary_context {

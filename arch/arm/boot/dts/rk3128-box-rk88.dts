@@ -4,6 +4,7 @@
 #include "rk312x-sdk.dtsi"
 #include "lcd-box.dtsi"
 #include <dt-bindings/input/input.h>
+#include "../../../arm64/boot/dts/rk-stb-keymap.dtsi"
 
 / {
 	 compatible = "rockchip,rk3128";
@@ -227,7 +228,7 @@
 };
 
 &disp_timings {
-	native-mode = <&timing1>;
+	native-mode = <&timing0>;
 };
 
 &rk_screen {

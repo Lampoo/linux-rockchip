@@ -65,6 +65,7 @@
 #define RK805_LDO2_SLP_VSEL_REG			0x3E
 #define RK805_LDO3_ON_VSEL_REG			0x3F
 #define RK805_LDO3_SLP_VSEL_REG			0x40
+#define RK805_DCDC_VRP_REG			0x92
 
 /* IRQ Definitions */
 #define RK805_IRQ_PWRON_RISE			0
@@ -191,6 +192,7 @@
 #define RK816_GPIO_IO_POL_REG			0x50
 #define RK816_BOOST_ON_VESL_REG			0x54
 #define RK816_BOOST_SLP_VSEL_REG		0x55
+#define RK816_DCDC_VRP_REG			0x92
 #define RK816_CHRG_BOOST_CONFIG_REG		0x9A
 #define RK816_SUP_STS_REG			0xA0
 #define RK816_USB_CTRL_REG			0xA1
@@ -353,8 +355,20 @@
 #define PLUGIN_OUT_INT_EN			0xfc
 #define RK816_PWRON_FALL_RISE_INT_EN		0x9f
 #define DEV_OFF					(1 << 0)
-#define BUCK1_2_IMAX_MAX			(0x3 << 6)
-#define BUCK3_4_IMAX_MAX			(0x3 << 3)
+#define BUCK1_2_IMAX_MSK			(0x3 << 6)
+#define BUCK3_4_IMAX_MSK			(0x3 << 3)
+#define BUCK1_2_IMAX_3A				(0x1 << 6)
+#define BUCK3_IMAX_3A				(0x3 << 3)
+#define BUCK4_IMAX_3A				(0x2 << 3)
+#define BUCK4_IMIN_MAX				(0x7 << 0)
+#define BUCK4_IMIN_MSK				(0x7 << 0)
+#define BOOST_EN_MASK				((0x1 << 5) | (0x1 << 1))
+#define BOOST_DISABLE				((0x1 << 5) | (0x0 << 1))
+#define BUCK4_VRP_3PERCENT			0xc0
+#define BUCK4_IMAX_IMIN_MAX			0x2f
+#define PWM_MODE_MSK				BIT(7)
+#define FORCE_PWM_MODE				BIT(7)
+#define AUTO_PWM_MODE				0
 
 enum rk805_reg_id {
 	RK805_ID_DCDC1,
@@ -465,7 +479,9 @@ struct rk8xx_mfd_data {
 	struct regmap_irq_chip *irq_chip;
 	struct regmap_irq_chip *irq_battery_chip;
 	const char *parse_dt_pm_lable;
-	void (*register_pm_power_off)(struct rk816_board *pdev);
+	void (*pm_power_off)(void);
+	void (*pm_power_off_prepare)(void);
+	void (*syscore_pm_power_off)(void);
 };
 
 int rk816_i2c_read(struct rk816 *rk816, char reg, int count, u8 *dest);

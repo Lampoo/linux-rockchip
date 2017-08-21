@@ -426,7 +426,7 @@ int rk_disp_pwr_enable(struct rk_lcdc_driver *dev_drv)
 			if (pwr_ctr->rgl_name)
 				regulator_lcd =
 					regulator_get(NULL, pwr_ctr->rgl_name);
-			if (regulator_lcd == NULL) {
+			if (IS_ERR_OR_NULL(regulator_lcd)) {
 				dev_err(dev_drv->dev,
 					"%s: regulator get failed,regulator name:%s\n",
 					__func__, pwr_ctr->rgl_name);
@@ -450,7 +450,7 @@ int rk_disp_pwr_enable(struct rk_lcdc_driver *dev_drv)
 						break;
 					count--;
 				}
-				if (regulator_enable(regulator_lcd) != 0)
+				if (!regulator_is_enabled(regulator_lcd))
 					dev_err(dev_drv->dev,
 						"regulator_enable failed,count=%d\n",
 						count);
@@ -482,7 +482,7 @@ int rk_disp_pwr_disable(struct rk_lcdc_driver *dev_drv)
 		} else if (pwr_ctr->type == REGULATOR) {
 			if (pwr_ctr->rgl_name)
 				regulator_lcd = regulator_get(NULL, pwr_ctr->rgl_name);
-			if (regulator_lcd == NULL) {
+			if (IS_ERR_OR_NULL(regulator_lcd)) {
 				dev_err(dev_drv->dev,
 					"%s: regulator get failed,regulator name:%s\n",
 					__func__, pwr_ctr->rgl_name);
@@ -495,7 +495,7 @@ int rk_disp_pwr_disable(struct rk_lcdc_driver *dev_drv)
 						break;
 					count--;
 				}
-				if (regulator_enable(regulator_lcd) != 0)
+				if (!regulator_is_enabled(regulator_lcd))
 					dev_err(dev_drv->dev,
 						"regulator_enable failed,count=%d\n",
 						count);
@@ -524,6 +524,8 @@ int rk_disp_pwr_disable(struct rk_lcdc_driver *dev_drv)
 int rk_fb_video_mode_from_timing(const struct display_timing *dt,
 				 struct rk_screen *screen)
 {
+	struct rk_fb *rk_fb = platform_get_drvdata(fb_pdev);
+
 	screen->mode.pixclock = dt->pixelclock.typ;
 	screen->mode.left_margin = dt->hback_porch.typ;
 	screen->mode.right_margin = dt->hfront_porch.typ;
@@ -582,6 +584,12 @@ int rk_fb_video_mode_from_timing(const struct display_timing *dt,
 		screen->swap_dumy = 1;
 	else
 		screen->swap_dumy = 0;
+
+	if ((rk_fb->disp_policy != DISPLAY_POLICY_BOX) &&
+	    (!screen->width || !screen->height)) {
+		pr_err("error: please config lcd physical size at lcd-xxx.dtsi\n");
+		WARN_ON(1);
+	}
 
 	return 0;
 }
@@ -1510,15 +1518,18 @@ static int rk_fb_pan_display(struct fb_var_screeninfo *var,
 	win->area[0].state = 1;
 	win->area_num = 1;
 
-	dev_drv->ops->pan_display(dev_drv, win_id);
-
 #ifdef	CONFIG_FB_MIRRORING
 	if (video_data_to_mirroring)
 		video_data_to_mirroring(info, NULL);
 #endif
 	/* if not want the config effect,set reserved[3] bit[0] 1 */
-	if (likely((var->reserved[3] & 0x1) == 0))
+	if (likely((var->reserved[3] & 0x1) == 0)) {
+		dev_drv->ops->pan_display(dev_drv, win_id);
 		dev_drv->ops->cfg_done(dev_drv);
+	} else {
+		pr_info("%s[%d],var->reserved[3]:0x%x\n",
+			__func__, __LINE__, var->reserved[3]);
+	}
 	if (dev_drv->hdmi_switch)
 		mdelay(100);
 	return 0;
@@ -2266,7 +2277,6 @@ static int rk_fb_set_win_buffer(struct fb_info *info,
 				struct rk_fb_reg_win_data *reg_win_data)
 {
 	struct rk_fb *rk_fb = dev_get_drvdata(info->device);
-	struct fb_fix_screeninfo *fix = &info->fix;
 	struct rk_fb_par *fb_par = (struct rk_fb_par *)info->par;
 	struct rk_lcdc_driver *dev_drv = fb_par->lcdc_drv;
 	/*if hdmi size move to hwc,screen should point to cur_screen
@@ -2428,7 +2438,6 @@ static int rk_fb_set_win_buffer(struct fb_info *info,
 		stride_32bit_2 = ((vir_width_bit * 2 + 31) & (~31)) / 8;
 
 		stride = stride_32bit_1;	/* default rgb */
-		fix->line_length = stride;
 		reg_win_data->reg_area_data[i].y_vir_stride = stride >> 2;
 
 		/* x y mirror ,jump line
@@ -2491,7 +2500,6 @@ static int rk_fb_set_win_buffer(struct fb_info *info,
 		uv_stride = stride_32bit_1;
 		uv_x_off = xoffset;
 		uv_y_off = yoffset;
-		fix->line_length = stride;
 		uv_y_act = win_par->area_par[0].yact >> 1;
 		break;
 	case YUV420:		/* nv12 */
@@ -2502,7 +2510,6 @@ static int rk_fb_set_win_buffer(struct fb_info *info,
 		uv_stride = stride_32bit_1;
 		uv_x_off = xoffset;
 		uv_y_off = yoffset >> 1;
-		fix->line_length = stride;
 		uv_y_act = win_par->area_par[0].yact >> 1;
 		break;
 	case YUV444:
@@ -2512,7 +2519,6 @@ static int rk_fb_set_win_buffer(struct fb_info *info,
 		uv_stride = stride_32bit_2;
 		uv_x_off = xoffset * 2;
 		uv_y_off = yoffset;
-		fix->line_length = stride << 2;
 		uv_y_act = win_par->area_par[0].yact;
 		break;
 	default:
@@ -3394,8 +3400,11 @@ static int rk_fb_set_par(struct fb_info *info)
 			 (win->area[0].format == FBDC_ABGR_888) ||
 			 (win->area[0].format == ABGR888)) ? 1 : 0;
 	win->g_alpha_val = 0;
-
-	dev_drv->ops->set_par(dev_drv, win_id);
+	if (likely((var->reserved[3] & 0x1) == 0))
+		dev_drv->ops->set_par(dev_drv, win_id);
+	else
+		pr_info("%s[%d],var->reserved[3]:0x%x\n",
+			__func__, __LINE__, var->reserved[3]);
 
 	return 0;
 }
@@ -3743,10 +3752,9 @@ int rk_fb_switch_screen(struct rk_screen *screen, int enable, int lcdc_id)
 		mutex_unlock(&dev_drv->switch_screen);
 		return 0;
 	} else {
-		if ((dev_drv->uboot_logo) &&
-		    (dev_drv->cur_screen->mode.xres != screen->mode.xres ||
-		     dev_drv->cur_screen->mode.yres != screen->mode.yres ||
-		     dev_drv->cur_screen->mode.vmode != screen->mode.vmode)) {
+		if (dev_drv->cur_screen->mode.xres != screen->mode.xres ||
+		    dev_drv->cur_screen->mode.yres != screen->mode.yres ||
+		    dev_drv->cur_screen->mode.vmode != screen->mode.vmode) {
 			pr_info("uboot logo: %d, cur mode: %d*%d_%d, set mode: %d*%d_%d\n",
 				dev_drv->uboot_logo,
 				dev_drv->cur_screen->mode.xres,

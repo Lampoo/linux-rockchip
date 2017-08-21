@@ -28,6 +28,7 @@
 #include <asm/opcodes-sec.h>
 #include <linux/dma-mapping.h>
 #endif
+#include <uapi/linux/psci.h>
 
 static int sip_version;
 
@@ -122,6 +123,14 @@ int rockchip_secure_reg_write64(u64 addr_phy, u64 val)
 }
 #endif /*CONFIG_ARM64*/
 
+struct arm_smccc_res sip_smc_dram(u32 arg0, u32 arg1, u32 arg2)
+{
+	struct arm_smccc_res res;
+
+	sip_fn_smc32(PSCI_SIP_DRAM_FREQ_CONFIG, arg0, arg1, arg2, &res);
+	return res;
+}
+
 struct arm_smccc_res rockchip_psci_smc_read(u32 function_id, u32 arg0,
 					    u32 arg1, u32 arg2)
 {
@@ -183,8 +192,8 @@ int psci_set_memory_secure(bool val)
 }
 
 struct arm_smccc_res
-rockchip_request_share_memory(enum share_page_type_t page_type,
-			      u32 page_nums)
+sip_smc_request_share_mem(enum share_page_type_t page_type,
+			  u32 page_nums)
 {
 	struct arm_smccc_res res;
 
@@ -198,6 +207,11 @@ int rockchip_psci_remotectl_config(u32 func, u32 data)
 
 	sip_fn_smc32(PSCI_SIP_REMOTECTL_CFG, func, data, 0, &res);
 	return res.a0;
+}
+
+void arm_psci_sys_reset(void)
+{
+	sip_fn_smc32(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0, NULL);
 }
 
 /*************************** fiq debug *****************************/
@@ -225,8 +239,8 @@ int psci_fiq_debugger_request_share_memory(void)
 		return 0;
 
 	/* request page share memory */
-	res = rockchip_request_share_memory(SHARE_PAGE_TYPE_UARTDBG,
-					    FIQ_UARTDBG_PAGE_NUMS);
+	res = sip_smc_request_share_mem(SHARE_PAGE_TYPE_UARTDBG,
+					FIQ_UARTDBG_PAGE_NUMS);
 	if (IS_SIP_ERROR(res.a0))
 		return res.a0;
 

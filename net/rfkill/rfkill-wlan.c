@@ -728,8 +728,8 @@ static int rockchip_wifi_voltage_select(void)
 	    }
 	} else if (cpu_is_rk3036() || cpu_is_rk312x() || cpu_is_rk322x()) {
 	} else if (of_machine_is_compatible("rockchip,rk3228h") ||
-		of_machine_is_compatible("rockchip,rk3229h")) {
-			LOG("%s: this is rk3228h or rk3229h ,todo......!\n", __func__);
+		of_machine_is_compatible("rockchip,rk3328")) {
+			LOG("%s: this is rk3228h or rk3328 ,todo......!\n", __func__);
 	} else { // rk3368
 #ifdef CONFIG_MFD_SYSCON
 	    if (voltage > 2700 && voltage < 3500) {
@@ -892,6 +892,12 @@ static int wlan_platdata_parse_dt(struct device *dev,
 			data->power_n.enable = (flags == GPIO_ACTIVE_HIGH)? 1:0;
 			LOG("%s: get property: WIFI,poweren_gpio = %d, flags = %d.\n", __func__, gpio, flags);
         } else data->power_n.io = -1;
+	gpio = of_get_named_gpio_flags(node, "WIFI,vbat_gpio", 0, &flags);
+	if (gpio_is_valid(gpio)){
+			data->vbat_n.io = gpio;
+			data->vbat_n.enable = (flags == GPIO_ACTIVE_HIGH)? 1:0;
+			LOG("%s: get property: WIFI,vbat_gpio = %d, flags = %d.\n", __func__, gpio, flags);
+	} else data->vbat_n.io = -1;
         gpio = of_get_named_gpio_flags(node, "WIFI,reset_gpio", 0, &flags);
         if (gpio_is_valid(gpio)){
 			data->reset_n.io = gpio;
@@ -1009,6 +1015,9 @@ static int rfkill_wlan_probe(struct platform_device *pdev)
     LOG("%s: init gpio\n", __func__);
 
     if (!pdata->mregulator.power_ctrl_by_pmu) {
+	ret = rfkill_rk_setup_gpio(&pdata->vbat_n, wlan_name, "wlan_vbat");
+	if (ret) goto fail_alloc;
+
         ret = rfkill_rk_setup_gpio(&pdata->power_n, wlan_name, "wlan_poweren");
         if (ret) goto fail_alloc;
 
@@ -1018,6 +1027,11 @@ static int rfkill_wlan_probe(struct platform_device *pdev)
 
     wake_lock_init(&(rfkill->wlan_irq_wl), WAKE_LOCK_SUSPEND, "rfkill_wlan_wake");
 
+    if (gpio_is_valid(pdata->vbat_n.io))
+    {
+	gpio_direction_output(pdata->vbat_n.io, pdata->vbat_n.enable);
+	msleep(1000);
+    }
     // Turn off wifi power as default
     if (gpio_is_valid(pdata->power_n.io))
     {
@@ -1031,7 +1045,9 @@ static int rfkill_wlan_probe(struct platform_device *pdev)
 
     rockchip_wifi_voltage_select();
 
+#ifdef CONFIG_WIFI_BUILD_MODULE
 	rockchip_wifi_set_carddetect(1);
+#endif
 
 #if BCM_STATIC_MEMORY_SUPPORT
     rockchip_init_wifi_mem();

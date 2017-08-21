@@ -29,10 +29,12 @@
 #include <linux/rockchip/grf.h>
 #include <linux/rockchip/iomap.h>
 #include <linux/rockchip/pmu.h>
+#include <linux/rockchip/psci.h>
 /*#include <asm/cpuidle.h>*/
 #include <asm/cputype.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
+#include <asm/psci.h>
 #include "loader.h"
 #include "rk3126b.h"
 #define CPU 312x
@@ -153,8 +155,12 @@ static void __init rk3126_dt_map_io(void)
 
 	rk312x_dt_map_io();
 
-	if (readl_relaxed(RK_GRF_VIRT + RK312X_GRF_CHIP_TAG) == 0x3136)
-		rockchip_soc_id = ROCKCHIP_SOC_RK3126B;
+	if (readl_relaxed(RK_GRF_VIRT + RK312X_GRF_CHIP_TAG) == 0x3136) {
+		if (readl_relaxed(RK_GRF_VIRT + RK312X_GRF_SOC_CON1) & 0x1)
+			rockchip_soc_id = ROCKCHIP_SOC_RK3126C;
+		else
+			rockchip_soc_id = ROCKCHIP_SOC_RK3126B;
+	}
 }
 
 static void __init rk3128_dt_map_io(void)
@@ -257,7 +263,7 @@ static int rk312x_pmu_set_power_domain(enum pmu_power_domain pd, bool on)
 			rk312x_pmu_set_idle_request(IDLE_REQ_GPU, true);
 		} else if (pd == PD_VIO) {
 			SAVE_QOS(rga_qos, VIO_RGA);
-			if (!soc_is_rk3126b())
+			if (!soc_is_rk3126b() && !soc_is_rk3126c())
 				SAVE_QOS(ebc_qos, VIO_EBC);
 			SAVE_QOS(iep_qos, VIO_IEP);
 			SAVE_QOS(lcdc0_qos, VIO_LCDC0);
@@ -278,7 +284,7 @@ static int rk312x_pmu_set_power_domain(enum pmu_power_domain pd, bool on)
 		} else if (pd == PD_VIO) {
 			rk312x_pmu_set_idle_request(IDLE_REQ_VIO, false);
 			RESTORE_QOS(rga_qos, VIO_RGA);
-			if (!soc_is_rk3126b())
+			if (!soc_is_rk3126b() && !soc_is_rk3126c())
 				RESTORE_QOS(ebc_qos, VIO_EBC);
 			RESTORE_QOS(iep_qos, VIO_IEP);
 			RESTORE_QOS(lcdc0_qos, VIO_LCDC0);
@@ -400,7 +406,7 @@ static void __init rk312x_init_late(void)
 {
 #ifdef CONFIG_PM
 	rockchip_suspend_init();
-	if (soc_is_rk3126b())
+	if (soc_is_rk3126b() || soc_is_rk3126c())
 		rk3126b_init_suspend();
 	else
 		rk312x_init_suspend();
@@ -423,14 +429,23 @@ static void rk312x_restart(char mode, const char *cmd)
 
 	dsb();
 
+#ifdef CONFIG_ARM_PSCI
+	/* PSCI available */
+	if (psci_ops.cpu_on)
+		arm_psci_sys_reset();
+#endif
 	/* pll enter slow mode */
 	writel_relaxed(0x11010000, RK_CRU_VIRT + RK312X_CRU_MODE_CON);
 	dsb();
 	writel_relaxed(0xeca8, RK_CRU_VIRT + RK312X_CRU_GLB_SRST_SND_VALUE);
 	dsb();
+
+	pr_err("system reset done, shouldn't reach here, stop!\n");
+	while (1)
+		;
 }
 
-DT_MACHINE_START(RK3126_DT, "Rockchip RK3126")
+DT_MACHINE_START(RK3126_DT, "Rockchip RK3126C")
 	.smp		= smp_ops(rockchip_smp_ops),
 	.map_io		= rk3126_dt_map_io,
 	.init_time	= rk312x_dt_init_timer,
@@ -458,9 +473,12 @@ static int __init rk312x_pie_init(void)
 {
 	int err;
 
+	if (psci_smp_available())
+		return 0;
+
 	if (!cpu_is_rk312x())
 		return 0;
-	if (soc_is_rk3126b())
+	if (soc_is_rk3126b() || soc_is_rk3126c())
 		return 0;
 
 	err = rockchip_pie_init();
@@ -485,6 +503,9 @@ arch_initcall(rk312x_pie_init);
 #include "ddr_rk3126.c"
 static int __init rk312x_ddr_init(void)
 {
+	if (psci_smp_available())
+		return 0;
+
 	if (soc_is_rk3128() || soc_is_rk3126()) {
 		ddr_change_freq = _ddr_change_freq;
 		ddr_round_rate = _ddr_round_rate;

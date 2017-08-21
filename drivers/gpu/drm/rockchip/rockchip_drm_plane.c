@@ -84,7 +84,7 @@ int rockchip_plane_mode_set(struct drm_plane *plane, struct drm_crtc *crtc,
 	struct rockchip_drm_overlay *overlay = &rockchip_plane->overlay;
 	unsigned int actual_w;
 	unsigned int actual_h;
-	int nr;
+	int nr, i;
 	struct rockchip_gem_object *rk_obj;
 	struct rockchip_gem_object *rk_uv_obj;
 	struct device *dev;
@@ -120,12 +120,15 @@ int rockchip_plane_mode_set(struct drm_plane *plane, struct drm_crtc *crtc,
 	/* set drm framebuffer data. */
 	overlay->fb_x = src_x;
 	overlay->fb_y = src_y;
-	overlay->fb_width = fb->width;
+	overlay->fb_width = fb->pitches[0];	/* fb->width */
 	overlay->fb_height = fb->height;
 	overlay->src_width = src_w;
 	overlay->src_height = src_h;
 	overlay->bpp = fb->bits_per_pixel;
-	overlay->pitch = fb->pitches[0];
+	for (i = 0; i < MAX_FB_BUFFER; i++) {
+		overlay->pitches[i] = fb->pitches[i];
+		overlay->offsets[i] = fb->offsets[i];
+	}
 	overlay->pixel_format = fb->pixel_format;
 
 	/* set overlay range to be displayed. */

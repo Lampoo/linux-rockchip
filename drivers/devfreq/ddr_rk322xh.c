@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Fuzhou Rockchip Electronics Co., Ltd
+ * Copyright (c) 2017, Fuzhou Rockchip Electronics Co., Ltd
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -29,7 +29,7 @@
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 
-#define DDR_VERSION			"V1.00 20161215"
+#define DDR_VERSION			"V1.01 20170517"
 
 #define DDR_PCTL2_MSTR			0x0
 #define DDRMON_CTRL			0x4
@@ -65,15 +65,6 @@
 #define MON_TIMER_CNT_EN		((1 << (0 + 16)) |\
 					(1 << 0))
 
-enum ddr_bandwidth_id {
-	ddrbw_wr_num = 0,
-	ddrbw_rd_num,
-	ddrbw_act_num,
-	ddrbw_time_num,
-	ddrbw_eff,
-	ddrbw_id_end
-};
-
 struct  ddr_dts_config_timing {
 	unsigned int ddr3_speed_bin;
 	unsigned int ddr4_speed_bin;
@@ -92,6 +83,7 @@ struct  ddr_dts_config_timing {
 	unsigned int phy_dll_dis_freq;
 
 	unsigned int ddr3_odt_dis_freq;
+	unsigned int phy_ddr3_odt_dis_freq;
 	unsigned int ddr3_drv;
 	unsigned int ddr3_odt;
 	unsigned int phy_ddr3_ca_drv;
@@ -100,6 +92,7 @@ struct  ddr_dts_config_timing {
 	unsigned int phy_ddr3_odt;
 
 	unsigned int lpddr3_odt_dis_freq;
+	unsigned int phy_lpddr3_odt_dis_freq;
 	unsigned int lpddr3_drv;
 	unsigned int lpddr3_odt;
 	unsigned int phy_lpddr3_ca_drv;
@@ -108,6 +101,7 @@ struct  ddr_dts_config_timing {
 	unsigned int phy_lpddr3_odt;
 
 	unsigned int lpddr4_odt_dis_freq;
+	unsigned int phy_lpddr4_odt_dis_freq;
 	unsigned int lpddr4_drv;
 	unsigned int lpddr4_dq_odt;
 	unsigned int lpddr4_ca_odt;
@@ -117,6 +111,7 @@ struct  ddr_dts_config_timing {
 	unsigned int phy_lpddr4_odt;
 
 	unsigned int ddr4_odt_dis_freq;
+	unsigned int phy_ddr4_odt_dis_freq;
 	unsigned int ddr4_drv;
 	unsigned int ddr4_odt;
 	unsigned int phy_ddr4_ca_drv;
@@ -137,17 +132,13 @@ struct	ddr_de_skew_setting {
 	unsigned int cs1_de_skew[84];
 };
 
-struct init_params {
-	/* these parameters, not use in RK322xh */
+struct share_params {
 	u32 hz;
 	u32 lcdc_type;
 	u32 vop;
+	u32 vop_dclk_mode;
+	u32 sr_idle_en;
 	u32 addr_mcu_el3;
-	/* if need, add parameter after */
-};
-
-struct set_rate_params {
-	u32 hz;
 	/*
 	 * 1: need to wait flag1
 	 * 0: never wait flag1
@@ -158,19 +149,6 @@ struct set_rate_params {
 	 * 0: never wait flag1
 	 */
 	u32 wait_flag0;
-	/* these parameters, not use in RK322xh */
-	u32 lcdc_type;
-	u32 vop;
-	/* if need, add parameter after */
-};
-
-struct round_rate_params {
-	u32 hz;
-	/* if need, add parameter after */
-};
-
-struct set_at_sr_params {
-	u32 en;
 	/* if need, add parameter after */
 };
 
@@ -769,6 +747,8 @@ static int of_get_ddr_timings(struct device_node *np,
 				    &tim->phy_dll_dis_freq);
 	ret |= of_property_read_u32(np_tim, "ddr3_odt_dis_freq",
 				    &tim->ddr3_odt_dis_freq);
+	ret |= of_property_read_u32(np_tim, "phy_ddr3_odt_dis_freq",
+				    &tim->phy_ddr3_odt_dis_freq);
 	ret |= of_property_read_u32(np_tim, "ddr3_drv",
 				    &tim->ddr3_drv);
 	ret |= of_property_read_u32(np_tim, "ddr3_odt",
@@ -783,6 +763,8 @@ static int of_get_ddr_timings(struct device_node *np,
 				    &tim->phy_ddr3_odt);
 	ret |= of_property_read_u32(np_tim, "lpddr3_odt_dis_freq",
 				    &tim->lpddr3_odt_dis_freq);
+	ret |= of_property_read_u32(np_tim, "phy_lpddr3_odt_dis_freq",
+				    &tim->phy_lpddr3_odt_dis_freq);
 	ret |= of_property_read_u32(np_tim, "lpddr3_drv",
 				    &tim->lpddr3_drv);
 	ret |= of_property_read_u32(np_tim, "lpddr3_odt",
@@ -797,6 +779,8 @@ static int of_get_ddr_timings(struct device_node *np,
 				    &tim->phy_lpddr3_odt);
 	ret |= of_property_read_u32(np_tim, "lpddr4_odt_dis_freq",
 				    &tim->lpddr4_odt_dis_freq);
+	ret |= of_property_read_u32(np_tim, "phy_lpddr4_odt_dis_freq",
+				    &tim->phy_lpddr4_odt_dis_freq);
 	ret |= of_property_read_u32(np_tim, "lpddr4_drv",
 				    &tim->lpddr4_drv);
 	ret |= of_property_read_u32(np_tim, "lpddr4_dq_odt",
@@ -813,6 +797,8 @@ static int of_get_ddr_timings(struct device_node *np,
 				    &tim->phy_lpddr4_odt);
 	ret |= of_property_read_u32(np_tim, "ddr4_odt_dis_freq",
 				    &tim->ddr4_odt_dis_freq);
+	ret |= of_property_read_u32(np_tim, "phy_ddr4_odt_dis_freq",
+				    &tim->phy_ddr4_odt_dis_freq);
 	ret |= of_property_read_u32(np_tim, "ddr4_drv",
 				    &tim->ddr4_drv);
 	ret |= of_property_read_u32(np_tim, "ddr4_odt",
@@ -847,9 +833,7 @@ static int _ddr_recalc_rate(void)
 	if (!ddr_data->enable)
 		return 0;
 
-	pr_debug("In func %s\n", __func__);
-	res = rockchip_psci_smc_read(PSCI_SIP_DRAM_FREQ_CONFIG, 0, 0,
-				     DRAM_FREQ_CONFIG_DRAM_GET_RATE);
+	res = sip_smc_dram(0, 0, DRAM_FREQ_CONFIG_DRAM_GET_RATE);
 	if (res.a0)
 		return 0;
 	else
@@ -860,9 +844,8 @@ static int _ddr_change_freq(u32 hz)
 {
 	u32 ret;
 	struct arm_smccc_res res;
-	struct set_rate_params *p =
-		(struct set_rate_params *)ddr_data->share_memory;
-	unsigned int cpu = raw_smp_processor_id();
+	struct share_params *p =
+		(struct share_params *)ddr_data->share_memory;
 
 	if (!ddr_data->enable)
 		return 0;
@@ -870,38 +853,31 @@ static int _ddr_change_freq(u32 hz)
 	p->hz = hz;
 	p->wait_flag1 = 1;
 	p->wait_flag0 = 1;
-	pr_debug("In func %s,freq=%dMHz\n", __func__, hz / 1000000);
-	pr_err("current cpu %x\n", cpu);
-	pr_err("vbank = %dus\n", rk_fb_get_prmry_screen_vbt());
 	/* lock cpu to avoid cpu on/off */
 	cpu_maps_update_begin();
-	res = rockchip_psci_smc_read(PSCI_SIP_DRAM_FREQ_CONFIG,
-				     SHARE_PAGE_TYPE_DDR,
-				     0,
-				     DRAM_FREQ_CONFIG_DRAM_FREQ_CHANGE);
+	res = sip_smc_dram(SHARE_PAGE_TYPE_DDR,
+			   0,
+			   DRAM_FREQ_CONFIG_DRAM_FREQ_CHANGE);
 	cpu_maps_update_done();
 	if (!res.a1)
 		pr_info("set ddr freq timeout\n");
 	ret = _ddr_recalc_rate();
-	pr_debug("Func %s out,freq=%dMHz\n", __func__, ret / 1000000);
 	return ret;
 }
 
 static long _ddr_round_rate(u32 hz)
 {
 	struct arm_smccc_res res;
-	struct round_rate_params *p =
-		(struct round_rate_params *)ddr_data->share_memory;
+	struct share_params *p =
+		(struct share_params *)ddr_data->share_memory;
 
 	if (!ddr_data->enable)
 		return 0;
 
 	p->hz = hz;
-	pr_debug("In func %s,freq=%dMHz\n", __func__, hz / 1000000);
-	res = rockchip_psci_smc_read(PSCI_SIP_DRAM_FREQ_CONFIG,
-				     SHARE_PAGE_TYPE_DDR,
-				     0,
-				     DRAM_FREQ_CONFIG_DRAM_ROUND_RATE);
+	res = sip_smc_dram(SHARE_PAGE_TYPE_DDR,
+			   0,
+			   DRAM_FREQ_CONFIG_DRAM_ROUND_RATE);
 	if (res.a0)
 		return 0;
 	else
@@ -910,18 +886,16 @@ static long _ddr_round_rate(u32 hz)
 
 static void _ddr_set_auto_self_refresh(bool en)
 {
-	struct set_at_sr_params *p =
-		(struct set_at_sr_params *)ddr_data->share_memory;
+	struct share_params *p =
+		(struct share_params *)ddr_data->share_memory;
 
 	if (!ddr_data->enable)
 		return;
 
-	p->en = en;
-	pr_debug("In func %s\n", __func__);
-	rockchip_psci_smc_read(PSCI_SIP_DRAM_FREQ_CONFIG,
-			       SHARE_PAGE_TYPE_DDR,
-			       0,
-			       DRAM_FREQ_CONFIG_DRAM_SET_AT_SR);
+	p->sr_idle_en = en;
+	sip_smc_dram(SHARE_PAGE_TYPE_DDR,
+		     0,
+		     DRAM_FREQ_CONFIG_DRAM_SET_AT_SR);
 }
 
 static int ddr_monitor_init(struct platform_device *pdev,
@@ -1093,7 +1067,7 @@ static void _ddr_bandwidth_get(struct ddr_bw_info *ddr_bw_ch0,
 		ddr_bw_ch0->ddr_rd = tmp64;
 		ddr_bw_ch0->ddr_act = monitor_act;
 		tmp64 = ddr_freq_hz * (u64)2 * bw;
-		do_div(tmp64, 1024 * 1024);
+		do_div(tmp64, 1000 * 1000);
 		ddr_bw_ch0->ddr_total = tmp64;
 
 		for_each_probe(p)
@@ -1114,24 +1088,20 @@ static void ddr_init(u32 page_type)
 {
 	struct arm_smccc_res res;
 
-	pr_debug("In Func:%s\n", __func__);
-	res = rockchip_psci_smc_read(PSCI_SIP_DRAM_FREQ_CONFIG, page_type,
-				     0,
-				     DRAM_FREQ_CONFIG_DRAM_INIT);
+	res = sip_smc_dram(page_type,
+			   0,
+			   DRAM_FREQ_CONFIG_DRAM_INIT);
 	if (res.a0)
 		pr_info("ddr init error\n");
-	else
-		pr_debug("%s out\n", __func__);
 }
 
 static int __init rockchip_atf_ver_check(void)
 {
 	struct arm_smccc_res res;
 
-	res = rockchip_psci_smc_read(PSCI_SIP_DRAM_FREQ_CONFIG, 0, 0,
-				     DRAM_FREQ_CONFIG_DRAM_GET_VERSION);
+	res = sip_smc_dram(0, 0, DRAM_FREQ_CONFIG_DRAM_GET_VERSION);
 	pr_info("current ATF version 0x%lx!\n", res.a1);
-	if ((!res.a0) && (res.a1 >= 0x100))
+	if ((!res.a0) && (res.a1 >= 0x101))
 		return 0;
 
 	pr_err("read tf version 0x%lx!\n", res.a1);
@@ -1169,8 +1139,7 @@ static int __init rockchip_ddr_probe(struct platform_device *pdev)
 	 * first 4KB is used for interface parameters
 	 * after 4KB * N is dts parameters
 	 */
-	res = rockchip_request_share_memory(
-					    SHARE_PAGE_TYPE_DDR,
+	res = sip_smc_request_share_mem(SHARE_PAGE_TYPE_DDR,
 			DIV_ROUND_UP(sizeof(struct ddr_dts_config_timing),
 				     4096) + 1);
 	if (res.a0 != 0) {
@@ -1192,7 +1161,7 @@ static int __init rockchip_ddr_probe(struct platform_device *pdev)
 	if (!of_get_ddr_timings(np, ddr_data->dram_timing)) {
 		ddr_data->dram_timing->available = 1;
 	} else {
-		pr_info("of_get_ddr_timings: fail\n");
+		pr_err("of_get_ddr_timings: fail\n");
 		ddr_data->dram_timing->available = 0;
 	}
 

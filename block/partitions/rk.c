@@ -389,9 +389,6 @@ int rkpart_partition(struct parsed_partitions *state)
 	if (1 != state->bdev->bd_disk->emmc_disk)
 		return 0;
 
-	if (rk_new_part_dectet(n, state) == 1)
-		return 1;
-
 	/* Fixme: parameter should be coherence with part table */
 	cmdline = strstr(saved_command_line, "mtdparts=") + 9;
 	cmdline_parsed = 0;
@@ -409,8 +406,7 @@ int rkpart_partition(struct parsed_partitions *state)
 			      i + 1,
 			      parts[i].from + FROM_OFFSET,
 			      parts[i].size);
-		label_max = min(sizeof(info->volname) - 1,
-				sizeof(parts[i].name));
+		label_max = sizeof(info->volname) - 1;
 		strncpy(info->volname, parts[i].name, label_max);
 		pr_info("%10s: 0x%09llx -- 0x%09llx (%llu MB)\n",
 			parts[i].name,
@@ -424,4 +420,18 @@ int rkpart_partition(struct parsed_partitions *state)
 	return 1;
 }
 
+int rkpart_new_partition(struct parsed_partitions *state)
+{
+	sector_t n = get_capacity(state->bdev->bd_disk);
 
+	if (n < SECTOR_1G)
+		return 0;
+
+	/* ONLY be used by eMMC-disk */
+	if (state->bdev->bd_disk->emmc_disk != 1)
+		return 0;
+
+	if (rk_new_part_dectet(n, state) == 1)
+		return 1;
+	return 0;
+}

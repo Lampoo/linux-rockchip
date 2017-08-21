@@ -23,6 +23,11 @@
  *1. Support config sensor gain and shutter time in ov_camera_module_custom_config.exposure_valid_frame;
  *v0.1.2:
  *1. Support v4l2 subdev api for s_frame_interval;
+ *v0.1.3:
+ *1. remove stream state judge before hold reg setting,
+ *during stream on->aec->stream off->aec->stream on, stream state may be changed,
+ *reg is hold but not release.
+ *
  */
 
 #include <linux/i2c.h>
@@ -376,19 +381,23 @@ static int ov2710_write_aec(struct ov_camera_module *cam_mod)
 		u32 exp_time = cam_mod->exp_config.exp_time;
 		a_gain = a_gain * cam_mod->exp_config.gain_percent / 100;
 
-		if (cam_mod->state == OV_CAMERA_MODULE_STREAMING)
-			ret = ov_camera_module_write_reg(cam_mod,
-				OV2710_AEC_GROUP_UPDATE_ADDRESS,
-				OV2710_AEC_GROUP_UPDATE_START_DATA);
+		mutex_lock(&cam_mod->lock);
+		/* hold reg en */
+		ret = ov_camera_module_write_reg(cam_mod,
+			OV2710_AEC_GROUP_UPDATE_ADDRESS,
+			OV2710_AEC_GROUP_UPDATE_START_DATA);
+
 		if (!IS_ERR_VALUE(ret) && cam_mod->auto_adjust_fps)
-			ret = OV2710_auto_adjust_fps(cam_mod, cam_mod->exp_config.exp_time);
+			ret |= OV2710_auto_adjust_fps(cam_mod,
+				cam_mod->exp_config.exp_time);
+
 		ret |= ov_camera_module_write_reg(cam_mod,
 			OV2710_AEC_PK_LONG_GAIN_HIGH_REG,
 			OV2710_FETCH_MSB_GAIN(a_gain));
 		ret |= ov_camera_module_write_reg(cam_mod,
 			OV2710_AEC_PK_LONG_GAIN_LOW_REG,
 			OV2710_FETCH_LSB_GAIN(a_gain));
-		ret = ov_camera_module_write_reg(cam_mod,
+		ret |= ov_camera_module_write_reg(cam_mod,
 			OV2710_AEC_PK_LONG_EXPO_3RD_REG,
 			OV2710_FETCH_3RD_BYTE_EXP(exp_time));
 		ret |= ov_camera_module_write_reg(cam_mod,
@@ -397,14 +406,15 @@ static int ov2710_write_aec(struct ov_camera_module *cam_mod)
 		ret |= ov_camera_module_write_reg(cam_mod,
 			OV2710_AEC_PK_LONG_EXPO_1ST_REG,
 			OV2710_FETCH_1ST_BYTE_EXP(exp_time));
-		if (cam_mod->state == OV_CAMERA_MODULE_STREAMING) {
-			ret = ov_camera_module_write_reg(cam_mod,
-				OV2710_AEC_GROUP_UPDATE_ADDRESS,
-				OV2710_AEC_GROUP_UPDATE_END_DATA);
-			ret = ov_camera_module_write_reg(cam_mod,
-				OV2710_AEC_GROUP_UPDATE_ADDRESS,
-				OV2710_AEC_GROUP_UPDATE_END_LAUNCH);
-		}
+
+		/* hold reg end */
+		ret |= ov_camera_module_write_reg(cam_mod,
+			OV2710_AEC_GROUP_UPDATE_ADDRESS,
+			OV2710_AEC_GROUP_UPDATE_END_DATA);
+		ret |= ov_camera_module_write_reg(cam_mod,
+			OV2710_AEC_GROUP_UPDATE_ADDRESS,
+			OV2710_AEC_GROUP_UPDATE_END_LAUNCH);
+		mutex_unlock(&cam_mod->lock);
 	}
 
 	if (IS_ERR_VALUE(ret))
@@ -676,16 +686,17 @@ static int ov2710_start_streaming(struct ov_camera_module *cam_mod)
 {
 	int ret = 0;
 
-	ov_camera_module_pr_debug(cam_mod, "active config=%s\n", cam_mod->active_config->name);
+	ov_camera_module_pr_info(cam_mod, "active config=%s\n", cam_mod->active_config->name);
 
 	ret = OV2710_g_VTS(cam_mod, &cam_mod->vts_min);
 	if (IS_ERR_VALUE(ret))
 		goto err;
-	ov_camera_module_pr_debug(cam_mod, "=====streaming on ===\n");
+
+	mutex_lock(&cam_mod->lock);
 	ret = ov_camera_module_write_reg(cam_mod, 0x3008, 0x02);
 	ret |= ov_camera_module_write_reg(cam_mod, 0x4201, 0x00);
 	ret |= ov_camera_module_write_reg(cam_mod, 0x4202, 0x00);
-
+	mutex_unlock(&cam_mod->lock);
 	if (IS_ERR_VALUE(ret))
 		goto err;
 
@@ -702,11 +713,12 @@ static int ov2710_stop_streaming(struct ov_camera_module *cam_mod)
 {
 	int ret = 0;
 
-	ov_camera_module_pr_debug(cam_mod, "\n");
+	ov_camera_module_pr_info(cam_mod, "\n");
+	mutex_lock(&cam_mod->lock);
 	ret = ov_camera_module_write_reg(cam_mod, 0x3008, 0x42);
 	ret |= ov_camera_module_write_reg(cam_mod, 0x4201, 0x00);
 	ret |= ov_camera_module_write_reg(cam_mod, 0x4202, 0x0f);
-
+	mutex_unlock(&cam_mod->lock);
 	if (IS_ERR_VALUE(ret))
 		goto err;
 
@@ -844,6 +856,7 @@ static int ov2710_probe(
 
 	ov2710.custom = ov2710_custom_config;
 
+	mutex_init(&ov2710.lock);
 	dev_info(&client->dev, "probing successful\n");
 	return 0;
 }
@@ -860,6 +873,7 @@ static int ov2710_remove(
 	if (!client->adapter)
 		return -ENODEV;	/* our client isn't attached */
 
+	mutex_destroy(&cam_mod->lock);
 	ov_camera_module_release(cam_mod);
 
 	dev_info(&client->dev, "removed\n");

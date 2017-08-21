@@ -53,6 +53,234 @@ static struct rk_display_device *disp_hdmi_devices;
 static struct rk_lcdc_driver *prm_dev_drv;
 static struct rk_lcdc_driver *ext_dev_drv;
 
+static ssize_t show_disp_info(struct device *dev,
+			      struct device_attribute *attr, char *buf)
+{
+	struct rk_drm_private *rk_drm_priv = platform_get_drvdata(drm_fb_pdev);
+	struct rk_lcdc_driver *dev_drv =
+			rk_drm_priv->screen_priv[0].lcdc_dev_drv;
+
+	if (dev_drv->ops->get_disp_info)
+		return dev_drv->ops->get_disp_info(dev_drv, buf, 0);
+
+	return 0;
+}
+
+static ssize_t show_dsp_bcsh(struct device *dev,
+			     struct device_attribute *attr, char *buf)
+{
+	struct rk_drm_private *rk_drm_priv = platform_get_drvdata(drm_fb_pdev);
+	struct rk_lcdc_driver *dev_drv =
+			rk_drm_priv->screen_priv[0].lcdc_dev_drv;
+	int brightness = 0, contrast = 0, sat_con = 0, sin_hue = 0, cos_hue = 0;
+
+	if (dev_drv->ops->get_dsp_bcsh_bcs) {
+		brightness = dev_drv->ops->get_dsp_bcsh_bcs(dev_drv,
+							    BRIGHTNESS);
+		contrast = dev_drv->ops->get_dsp_bcsh_bcs(dev_drv, CONTRAST);
+		sat_con = dev_drv->ops->get_dsp_bcsh_bcs(dev_drv, SAT_CON);
+	}
+	if (dev_drv->ops->get_dsp_bcsh_hue) {
+		sin_hue = dev_drv->ops->get_dsp_bcsh_hue(dev_drv, H_SIN);
+		cos_hue = dev_drv->ops->get_dsp_bcsh_hue(dev_drv, H_COS);
+	}
+	return snprintf(buf, PAGE_SIZE,
+			"brightness:%4d,contrast:%4d,sat_con:%4d,"
+			"sin_hue:%4d,cos_hue:%4d\n",
+			brightness, contrast, sat_con, sin_hue, cos_hue);
+}
+
+static ssize_t set_dsp_bcsh(struct device *dev, struct device_attribute *attr,
+			    const char *buf, size_t count)
+{
+	struct rk_drm_private *rk_drm_priv = platform_get_drvdata(drm_fb_pdev);
+	struct rk_lcdc_driver *dev_drv =
+			rk_drm_priv->screen_priv[0].lcdc_dev_drv;
+	int brightness, contrast, sat_con, ret = 0, sin_hue, cos_hue;
+
+	if (!strncmp(buf, "open", 4)) {
+		if (dev_drv->ops->open_bcsh)
+			ret = dev_drv->ops->open_bcsh(dev_drv, 1);
+		else
+			ret = -1;
+	} else if (!strncmp(buf, "close", 5)) {
+		if (dev_drv->ops->open_bcsh)
+			ret = dev_drv->ops->open_bcsh(dev_drv, 0);
+		else
+			ret = -1;
+	} else if (!strncmp(buf, "brightness", 10)) {
+		if (!sscanf(buf, "brightness %d", &brightness))
+			return -EINVAL;
+		if (unlikely(brightness > 255)) {
+			dev_err(dev_drv->dev,
+				"brightness should be [0:255],now=%d\n\n",
+				brightness);
+			brightness = 255;
+		}
+		if (dev_drv->ops->set_dsp_bcsh_bcs)
+			ret = dev_drv->ops->set_dsp_bcsh_bcs(dev_drv,
+							     BRIGHTNESS,
+							     brightness);
+		else
+			ret = -1;
+	} else if (!strncmp(buf, "contrast", 8)) {
+		if (!sscanf(buf, "contrast %d", &contrast))
+			return -EINVAL;
+		if (unlikely(contrast > 510)) {
+			dev_err(dev_drv->dev,
+				"contrast should be [0:510],now=%d\n",
+				contrast);
+			contrast = 510;
+		}
+		if (dev_drv->ops->set_dsp_bcsh_bcs)
+			ret = dev_drv->ops->set_dsp_bcsh_bcs(dev_drv,
+							     CONTRAST,
+							     contrast);
+		else
+			ret = -1;
+	} else if (!strncmp(buf, "sat_con", 7)) {
+		if (!sscanf(buf, "sat_con %d", &sat_con))
+			return -EINVAL;
+		if (unlikely(sat_con > 1015)) {
+			dev_err(dev_drv->dev,
+				"sat_con should be [0:1015],now=%d\n",
+				sat_con);
+			sat_con = 1015;
+		}
+		if (dev_drv->ops->set_dsp_bcsh_bcs)
+			ret = dev_drv->ops->set_dsp_bcsh_bcs(dev_drv,
+							     SAT_CON,
+							     sat_con);
+		else
+			ret = -1;
+	} else if (!strncmp(buf, "hue", 3)) {
+		if (!sscanf(buf, "hue %d %d", &sin_hue, &cos_hue))
+			return -EINVAL;
+		if (unlikely(sin_hue > 511 || cos_hue > 511)) {
+			dev_err(dev_drv->dev, "sin_hue=%d,cos_hue=%d\n",
+				sin_hue, cos_hue);
+		}
+		if (dev_drv->ops->set_dsp_bcsh_hue)
+			ret = dev_drv->ops->set_dsp_bcsh_hue(dev_drv,
+							     sin_hue,
+							     cos_hue);
+		else
+			ret = -1;
+	} else {
+		dev_info(dev, "format error\n");
+	}
+
+	if (ret < 0)
+		return ret;
+
+	return count;
+}
+
+static ssize_t set_dsp_lut(struct device *dev, struct device_attribute *attr,
+			   const char *buf, size_t count)
+{
+	struct rk_drm_private *rk_drm_priv = platform_get_drvdata(drm_fb_pdev);
+	struct rk_lcdc_driver *dev_drv =
+			rk_drm_priv->screen_priv[0].lcdc_dev_drv;
+	int *dsp_lut = NULL;
+	const char *start = buf;
+	int i = 256, temp;
+	int space_max = 10;
+
+	dsp_lut = kzalloc(256 * 4, GFP_KERNEL);
+	if (!dsp_lut)
+		return -ENOMEM;
+	for (i = 0; i < 256; i++) {
+		temp = i;
+		/*init by default value*/
+		dsp_lut[i] = temp + (temp << 8) + (temp << 16);
+	}
+	/*printk("count:%d\n>>%s\n\n",count,start);*/
+	for (i = 0; i < 256; i++) {
+		space_max = 10;	/*max space number 10*/
+		temp = simple_strtoul(start, NULL, 10);
+		dsp_lut[i] = temp;
+		do {
+			start++;
+			space_max--;
+		} while ((*start != ' ') && space_max);
+
+		if (!space_max)
+			break;
+		else
+			start++;
+	}
+	if (dev_drv->ops->set_dsp_lut)
+		dev_drv->ops->set_dsp_lut(dev_drv, dsp_lut);
+
+	kfree(dsp_lut);
+	return count;
+}
+
+static ssize_t show_fps(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	struct rk_drm_private *rk_drm_priv = platform_get_drvdata(drm_fb_pdev);
+	struct rk_lcdc_driver *dev_drv =
+			rk_drm_priv->screen_priv[0].lcdc_dev_drv;
+	int fps = 0;
+
+	if (dev_drv->ops->fps_mgr)
+		fps = dev_drv->ops->fps_mgr(dev_drv, 0, 0);
+	if (fps < 0)
+		return fps;
+
+	return snprintf(buf, PAGE_SIZE, "fps:%d\n", fps);
+}
+
+static ssize_t set_fps(struct device *dev, struct device_attribute *attr,
+		       const char *buf, size_t count)
+{
+	struct rk_drm_private *rk_drm_priv = platform_get_drvdata(drm_fb_pdev);
+	struct rk_lcdc_driver *dev_drv =
+			rk_drm_priv->screen_priv[0].lcdc_dev_drv;
+	u32 fps;
+	int ret;
+
+	ret = kstrtou32(buf, 0, &fps);
+	if (ret)
+		return ret;
+
+	if (fps == 0 || fps > 60) {
+		dev_info(dev, "unsupport fps value,pelase set 1~60\n");
+		return count;
+	}
+
+	if (dev_drv->ops->fps_mgr)
+		ret = dev_drv->ops->fps_mgr(dev_drv, fps, 1);
+	if (ret < 0)
+		return ret;
+
+	return count;
+}
+
+static struct device_attribute rk_drm_fb_attrs[] = {
+	__ATTR(disp_info, S_IRUGO, show_disp_info, NULL),
+	__ATTR(bcsh, S_IRUGO | S_IWUSR, show_dsp_bcsh, set_dsp_bcsh),
+	__ATTR(dsp_lut, S_IWUSR, NULL, set_dsp_lut),
+	__ATTR(fps, S_IRUGO | S_IWUSR, show_fps, set_fps),
+};
+
+static int rk_drm_fb_create_sysfs(struct rk_lcdc_driver *dev_drv)
+{
+	int r, t;
+
+	for (t = 0; t < ARRAY_SIZE(rk_drm_fb_attrs); t++) {
+		r = device_create_file(dev_drv->dev, &rk_drm_fb_attrs[t]);
+		if (r) {
+			dev_err(dev_drv->dev, "failed to create sysfs file\n");
+			return r;
+		}
+	}
+
+	return 0;
+}
+
 void rk_drm_display_register(struct rk_display_ops *extend_ops,
 			     void *displaydata, int type)
 {
@@ -883,6 +1111,7 @@ int rk_fb_register(struct rk_lcdc_driver *dev_drv,
 					    struct fb_modelist, list);
 		mode = &modelist->mode;
 
+		rk_drm_fb_create_sysfs(dev_drv);
 		if (dev_drv->ops->open)
 			dev_drv->ops->open(dev_drv, 0, 1);
 		if (dev_drv->ops->mmu_en)
@@ -1093,6 +1322,7 @@ static int rk_drm_win_commit(struct rk_drm_display *drm_disp,
 			lcdc_win->area[0].yact = drm_win->yact;
 			lcdc_win->area[0].xvir = drm_win->xvir;
 			lcdc_win->area[0].y_vir_stride = drm_win->xvir;
+			lcdc_win->area[0].uv_vir_stride = drm_win->uv_vir;
 			lcdc_win->area[0].smem_start = drm_win->yrgb_addr;
 			lcdc_win->area[0].cbr_start = drm_win->uv_addr;
 			lcdc_win->alpha_en = 1;

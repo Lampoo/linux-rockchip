@@ -50,45 +50,6 @@
 / {
 	compatible = "rockchip,px3se-sdk","rockchip,rk3128";
 
-	memory {
-		device_type = "memory";
-		reg = <0x60000000 0x20000000>;
-	};
-	fiq-debugger {
-		status = "okay";
-		rockchip,serial-id = <1>;
-		pinctrl-0 = <&uart1_xfer &uart1_cts &uart1_rts>;
-	};
-	rockchip_suspend: rockchip_suspend {
-		rockchip,ctrbits = <
-			(0
-			|RKPM_CTR_GTCLKS
-			|RKPM_CTR_PLLS
-			/*|RKPM_CTR_ARMOFF_LPMD*/
-			|RKPM_CTR_ARMLOGDP_LPMD
-			/*|RKPM_CTR_IDLESRAM_MD*/
-			|RKPM_CTR_DDR
-			|RKPM_CTR_PMIC
-			/*|RKPM_CTR_BUS_IDLE*/
-			|RKPM_CTR_SYSCLK_32K
-			)
-			>;
-		rockchip,pmic-suspend_gpios = <0>;
-	};
-
-	chosen {
-		bootargs = "clk_ignore_unused rockchip_jtag noinitrd root=/dev/mtdblock3 rootfstype=squashfs";
-	};
-
-	sfc: sfc@1020c000 {
-		compatible = "rockchip,sfc";
-		reg = <0x1020c000 0x200>;
-		interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-		clocks = <&clk_sfc>, <&clk_gates7 1>;
-		clock-names = "clk_sfc", "hclk_sfc";
-		status = "okay";
-	};
-
 	backlight: backlight {
 		compatible = "pwm-backlight";
 		pwms = <&pwm0 0 25000>;
@@ -108,13 +69,18 @@
 		229 230 231 232 233 234 235 236 237 238 239 240 241 242 243 244
 		245 246 247 248 249 250 251 252 253 254 255>;
 		default-brightness-level = <128>;
-		enable-gpios = <&gpio2 GPIO_B3 GPIO_ACTIVE_HIGH>;
+	};
+
+	chip_state {
+		compatible = "chip_state";
+		clocks = <&clk_gates5 2>;
+		clock-names = "chip_state";
 	};
 
 	usb_control {
 		compatible = "rockchip,rk3126-usb-control";
 
-		host_drv_gpio = <&gpio3 GPIO_C4 GPIO_ACTIVE_LOW>;
+		//host_drv_gpio = <&gpio2 GPIO_B3 GPIO_ACTIVE_LOW>;
 		otg_drv_gpio = <&gpio2 GPIO_B4 GPIO_ACTIVE_LOW>;
 
 		rockchip,remote_wakeup;
@@ -124,20 +90,40 @@
 	wireless-wlan {
 		compatible = "wlan-platdata";
 
-		wifi_chip_type = "rtl8723cs";
+		wifi_chip_type = "rtl8723ds";
 		sdio_vref = <1800>; /*1800mv or 3300mv*/
 		/* WIFI_HOST_WAKE = GPIO3_C7 */
 		WIFI,host_wake_irq = <&gpio3 GPIO_C7 GPIO_ACTIVE_HIGH>;
 		/* WIFI_REG_ON  = GPIO3_D3 */
 		WIFI,poweren_gpio  = <&gpio3 GPIO_D3 GPIO_ACTIVE_HIGH>;
+		WIFI,vbat_gpio  = <&gpio1 GPIO_A3 GPIO_ACTIVE_HIGH>;
 
+		status = "okay";
+	};
+
+	wireless-bluetooth {
+		compatible = "bluetooth-platdata";
+		//wifi-bt-power-toggle;
+		keep_bt_power_on;
+		//uart_rts_gpios = <&gpio2 GPIO_D3 GPIO_ACTIVE_LOW>;
+		//pinctrl-names = "default","rts_gpio";
+		//pinctrl-0 = <&uart0_rts>;
+		//pinctrl-1 = <&uart0_rts_gpio>;
+		BT,power_gpio = <&gpio3 GPIO_C5 GPIO_ACTIVE_HIGH>;
+		//BT,reset_gpio = <&gpio3 GPIO_A2 GPIO_ACTIVE_HIGH>;
+		BT,wake_gpio = <&gpio3 GPIO_D2 GPIO_ACTIVE_HIGH>;
+		BT,wake_host_irq = <&gpio3 GPIO_C6 GPIO_ACTIVE_HIGH>;
 		status = "okay";
 	};
 };
 
 &fb {
-	rockchip,disp-mode = <ONE_DUAL>;
+	rockchip,disp-mode = <NO_DUAL>;
 	rockchip,uboot-logo-on = <0>;
+};
+
+&gmac {
+	status = "disabled";
 };
 
 &rk_screen {
@@ -155,9 +141,9 @@
 	status = "okay";
 
 	backlight = <&backlight>;
-	pinctrl-names = "default", "gpio";
-	pinctrl-0 = <&lcdc0_lcdc>;
-	pinctrl-1 = <&lcdc0_gpio>;
+	//pinctrl-names = "den", "sync";
+	//pinctrl-0 = <&lcdc0_den>;
+	//pinctrl-1 = <&lcdc0_sync>;
 
 	rockchip,fb-win-map = <FB_DEFAULT_ORDER>;
 	power_ctr: power_ctr {
@@ -186,6 +172,10 @@
 		label = "power";
 		gpio-key,wakeup;
 	};
+};
+
+&uart0 {
+	status = "okay";
 };
 
 &uart1 {

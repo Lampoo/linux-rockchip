@@ -2171,6 +2171,8 @@ static int hdmi_dev_config_video(struct hdmi *hdmi, struct hdmi_video *vpara)
 static void hdmi_dev_config_aai(struct hdmi_dev *hdmi_dev,
 				struct hdmi_audio *audio)
 {
+	int ca;
+
 	/* Refer to CEA861-E Audio infoFrame
 	 * Set both Audio Channel Count and Audio Coding
 	 * Type Refer to Stream Head for HDMI
@@ -2187,7 +2189,21 @@ static void hdmi_dev_config_aai(struct hdmi_dev *hdmi_dev,
 		     v_FC_SAMPLE_SIZE(0) | v_FC_SAMPLE_FREQ(0));
 
 	/* Set Channel Allocation */
-	hdmi_writel(hdmi_dev, FC_AUDICONF2, 0x00);
+	switch (audio->channel) {
+	case 4:
+		ca = 0x3;
+		break;
+	case 6:
+		ca = 0xb;
+		break;
+	case 8:
+		ca = 0x13;
+		break;
+	default:
+		ca = 0x0;
+	}
+
+	hdmi_writel(hdmi_dev, FC_AUDICONF2, ca);
 
 	/* Set LFEPBLDOWN-MIX INH and LSV */
 	hdmi_writel(hdmi_dev, FC_AUDICONF3, 0x00);
@@ -2538,8 +2554,11 @@ static int hdmi_dev_disable(struct hdmi *hdmi)
 	HDMIDBG(2, "%s\n", __func__);
 	if (hdmi_dev->enable) {
 		hdmi_dev->enable = 0;
-		if (hdmi->property->feature & SUPPORT_CEC_WAKEUP)
+		if (hdmi->property->feature & SUPPORT_CEC_WAKEUP) {
 			hdmi_writel(hdmi_dev, CEC_WKUPCTRL, 0xff);
+			hdmi_msk_reg(hdmi_dev, CEC_CTRL,
+				     m_CEC_STANBY, v_CEC_STANBY(1));
+		}
 		hdmi_writel(hdmi_dev, IH_MUTE, 0x1);
 	}
 	return 0;
@@ -2718,9 +2737,12 @@ irqreturn_t rockchip_hdmiv2_dev_cec_irq(int irq, void *priv)
 	struct hdmi_dev *hdmi_dev = priv;
 	char wakeup, cec_int;
 
+	pr_info("%s\n", __func__);
 	cec_int = hdmi_readl(hdmi_dev, IH_CEC_STAT0);
 	if (cec_int)
 		hdmi_writel(hdmi_dev, IH_CEC_STAT0, cec_int);
+	hdmi_msk_reg(hdmi_dev, CEC_CTRL,
+		     m_CEC_STANBY, v_CEC_STANBY(0));
 	wakeup = hdmi_readl(hdmi_dev, CEC_WKUPCTRL);
 	hdmi_writel(hdmi_dev, CEC_WKUPCTRL, 0x00);
 	rockchip_hdmi_cec_submit_work(EVENT_RX_WAKEUP, 100, NULL);

@@ -792,13 +792,8 @@ static inline void ep0_out_start(dwc_otg_core_if_t *core_if,
 	/** DOEPCTL0 Register write cnak will be set after setup interrupt */
 	doepctl.d32 = 0;
 	doepctl.b.epena = 1;
-	if (core_if->snpsid <= OTG_CORE_REV_2_94a) {
-		doepctl.b.cnak = 1;
-		DWC_WRITE_REG32(&dev_if->out_ep_regs[0]->doepctl, doepctl.d32);
-	} else {
-		DWC_MODIFY_REG32(&dev_if->out_ep_regs[0]->doepctl, 0,
-				 doepctl.d32);
-	}
+	DWC_MODIFY_REG32(&dev_if->out_ep_regs[0]->doepctl, 0,
+			 doepctl.d32);
 
 #ifdef VERBOSE
 	DWC_DEBUGPL(DBG_PCDV, "doepctl0=%0x\n",
@@ -1896,6 +1891,16 @@ static inline void pcd_setup(dwc_otg_pcd_t *pcd)
 
 		/* handle non-standard (class/vendor) requests in the gadget driver */
 		do_gadget_setup(pcd, &ctrl);
+
+		/*
+		 * Rockchip platform Vendor Request for sending uevent to
+		 * user space and notify the user space to set the expected
+		 * usb functions according to the request.
+		 */
+		if (UT_GET_TYPE(ctrl.bmRequestType) == UT_VENDOR &&
+		    ctrl.bRequest == UR_SET_FUNCTION)
+			do_setup_in_status_phase(pcd);
+
 		return;
 	}
 

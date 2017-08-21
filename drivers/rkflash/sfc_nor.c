@@ -64,14 +64,20 @@ static struct flash_info spi_flash_tbl[] = {
 	{0xc84016, 128, 8, 0x03, 0x02, 0x6B, 0x32, 0x20, 0xD8, 0x0D, 13, 9, 0},
 	/* GD25Q64B */
 	{0xc84017, 128, 8, 0x03, 0x02, 0x6B, 0x32, 0x20, 0xD8, 0x0D, 14, 9, 0},
-	/* GD25Q128B */
-	{0xc84018, 128, 8, 0x03, 0x02, 0x6B, 0x32, 0x20, 0xD8, 0x0D, 15, 9, 0},
+	/* GD25Q127C and GD25Q128C*/
+	{0xc84018, 128, 8, 0x03, 0x02, 0x6B, 0x32, 0x20, 0xD8, 0x0C, 15, 9, 0},
 	/* GD25Q256B */
 	{0xc84019, 128, 8, 0x13, 0x12, 0x6C, 0x3E, 0x21, 0xDC, 0x1C, 16, 6, 0},
+	/* GD25Q512MC */
+	{0xc84020, 128, 8, 0x13, 0x12, 0x6C, 0x3E, 0x21, 0xDC, 0x1C, 17, 6, 0},
 	/* 25Q128FV */
 	{0xef4018, 128, 8, 0x03, 0x02, 0x6B, 0x32, 0x20, 0xD8, 0x0C, 15, 9, 0},
 	/* 25Q256FV */
 	{0xef4019, 128, 8, 0x13, 0x02, 0x6C, 0x32, 0x20, 0xD8, 0x3C, 16, 9, 0},
+	/* XT25F128A */
+	{0x207018, 128, 8, 0x03, 0x02, 0x6B, 0x32, 0x20, 0xD8, 0x00, 15, 0, 0},
+	/* MX25L25635E/F */
+	{0xc22019, 128, 8, 0x03, 0x02, 0x6B, 0x38, 0x20, 0xD8, 0x30, 16, 6, 0},
 };
 
 static struct flash_info *g_spi_flash_info;
@@ -318,7 +324,7 @@ static int snor_prog_page(u32 addr, void *p_data, u32 size)
 
 	sfctrl.d32 = 0;
 	sfctrl.b.datalines = p_dev->prog_lines;
-	sfctrl.b.enbledma = 1;
+	sfctrl.b.enbledma = 0;
 	if (p_dev->prog_cmd == CMD_PAGE_PROG_A4)
 		sfctrl.b.addrlines = SFC_4BITS_LINE;
 
@@ -460,7 +466,7 @@ static int snor_read_data(u32 addr, void *p_data, u32 size)
 	sfctrl.d32 = 0;
 	sfctrl.b.datalines = p_dev->read_lines;
 	if (!(size & 0x3) && size >= 4)
-		sfctrl.b.enbledma = 1;
+		sfctrl.b.enbledma = 0;
 
 	if (p_dev->read_cmd == CMD_FAST_READ_X1 ||
 	    p_dev->read_cmd == CMD_FAST_READ_X4 ||

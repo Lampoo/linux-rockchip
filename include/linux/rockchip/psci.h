@@ -99,9 +99,10 @@ int rockchip_psci_smc_set_suspend_mode(u32 mode);
 u32 rockchip_secure_reg_read(u32 addr_phy);
 int rockchip_secure_reg_write(u32 addr_phy, u32 val);
 struct arm_smccc_res
-rockchip_request_share_memory(enum share_page_type_t page_type,
-			      u32 page_nums);
+sip_smc_request_share_mem(enum share_page_type_t page_type, u32 page_nums);
 int rockchip_psci_remotectl_config(u32 func, u32 data);
+struct arm_smccc_res sip_smc_dram(u32 arg0, u32 arg1, u32 arg2);
+void arm_psci_sys_reset(void);
 
 #ifdef CONFIG_ARM64
 int rockchip_psci_smc_write64(u64 function_id, u64 arg0, u64 arg1, u64 arg2);
@@ -123,6 +124,15 @@ void psci_fiq_debugger_enable_debug(bool val);
 int psci_fiq_debugger_set_print_port(u32 port, u32 baudrate);
 int psci_set_memory_secure(bool val);
 #else
+static inline struct arm_smccc_res sip_smc_dram(u32 arg0, u32 arg1,
+						     u32 arg2)
+{
+	struct arm_smccc_res res;
+
+	memset(&res, 0, sizeof(struct arm_smccc_res));
+	return res;
+}
+
 static inline struct arm_smccc_res
 	rockchip_psci_smc_read(u32 function_id, u32 arg0, u32 arg1, u32 arg2)
 {

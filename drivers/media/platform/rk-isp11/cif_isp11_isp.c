@@ -1102,19 +1102,6 @@ static int cifisp_aec_param(struct cif_isp11_isp_dev *isp_dev,
 		goto end;
 	}
 
-	if (arg->meas_window.h_offs > CIFISP_EXP_MAX_HOFFS ||
-		arg->meas_window.h_size > CIFISP_EXP_MAX_HSIZE ||
-		arg->meas_window.h_size < CIFISP_EXP_MIN_HSIZE ||
-		arg->meas_window.v_offs > CIFISP_EXP_MAX_VOFFS ||
-		arg->meas_window.v_size > CIFISP_EXP_MAX_VSIZE ||
-		arg->meas_window.v_size < CIFISP_EXP_MIN_VSIZE ||
-		arg->mode > CIFISP_EXP_MEASURING_MODE_1) {
-		CIFISP_DPRINT(CIFISP_ERROR,
-			      "incompatible param in function: %s\n", __func__);
-		retval = -EINVAL;
-		goto end;
-	}
-
 	memcpy(new_cfg,
 		arg,
 		sizeof(struct cifisp_aec_config));
@@ -2695,7 +2682,8 @@ static void cifisp_dpf_config(const struct cif_isp11_isp_dev *isp_dev)
 	unsigned int i;
 	unsigned int spatial_coeff;
 
-	isp_dpf_mode = 0x00;
+	isp_dpf_mode =
+		cifisp_ioread32(CIF_ISP_DPF_MODE) & CIFISP_DPF_MODE_EN;
 
 	switch (pconfig->gain.mode) {
 	case CIFISP_DPF_GAIN_USAGE_DISABLED:
@@ -2902,18 +2890,11 @@ static int cifisp_dqbuf(struct file *file, void *priv, struct v4l2_buffer *p)
 static int cifisp_streamon(struct file *file, void *priv, enum v4l2_buf_type i)
 {
 	struct cif_isp11_isp_dev *isp_dev = video_get_drvdata(video_devdata(file));
-	struct cif_isp11_device *cif_dev =
-		container_of(isp_dev, struct cif_isp11_device, isp_dev);
 	int ret;
 
-	if (CIF_ISP11_PIX_FMT_IS_RAW_BAYER(
-	cif_dev->config.isp_config.output.pix_fmt)) {
-		ret = -EPERM;
-	} else {
-		ret = videobuf_streamon(&isp_dev->vbq_stat);
-		if (ret == 0)
-			isp_dev->streamon = true;
-	}
+	ret = videobuf_streamon(&isp_dev->vbq_stat);
+	if (ret == 0)
+		isp_dev->streamon = true;
 
 	CIFISP_DPRINT(CIFISP_DEBUG,
 		      " %s: %s: ret %d\n", ISP_VDEV_NAME, __func__, ret);
@@ -2921,9 +2902,8 @@ static int cifisp_streamon(struct file *file, void *priv, enum v4l2_buf_type i)
 }
 
 /* ========================================================== */
-static int cifisp_streamoff(struct file *file, void *priv, enum v4l2_buf_type i)
+static int __cifisp_streamoff(struct cif_isp11_isp_dev *isp_dev)
 {
-	struct cif_isp11_isp_dev *isp_dev = video_get_drvdata(video_devdata(file));
 	int ret;
 
 	drain_workqueue(isp_dev->readout_wq);
@@ -2932,6 +2912,16 @@ static int cifisp_streamoff(struct file *file, void *priv, enum v4l2_buf_type i)
 
 	if (ret == 0)
 		isp_dev->streamon = false;
+
+	return ret;
+}
+
+static int cifisp_streamoff(struct file *file, void *priv, enum v4l2_buf_type i)
+{
+	struct cif_isp11_isp_dev *isp_dev = video_get_drvdata(video_devdata(file));
+	int ret;
+
+	ret = __cifisp_streamoff(isp_dev);
 
 	CIFISP_DPRINT(CIFISP_DEBUG,
 		" %s: %s: ret %d\n", ISP_VDEV_NAME, __func__, ret);
@@ -3521,6 +3511,9 @@ void cifisp_configure_isp(
 		} else {
 			cifisp_ie_end(isp_dev);
 		}
+
+		__cifisp_streamoff(isp_dev);
+
 	}
 
 	cifisp_dump_reg(isp_dev, CIFISP_DEBUG);
@@ -3587,6 +3580,7 @@ void cifisp_disable_isp(struct cif_isp11_isp_dev *isp_dev)
 	cifisp_ie_end(isp_dev);
 	cifisp_dpf_end(isp_dev);
 
+	__cifisp_streamoff(isp_dev);
 	/*
 	Isp isn't active, isp interrupt isn't enabled, spin_lock is enough;
 	*/
@@ -4086,12 +4080,8 @@ static inline bool cifisp_isp_isr_other_config(
 				*time_left -= CIFISP_MODULE_DPF_TIME;
 				break;
 			case CIFISP_DPF_STRENGTH_ID:
-				if (CIFISP_MODULE_IS_EN(*ens, CIFISP_MODULE_DPF)) {
 					/*update dpf strength config */
 					cifisp_dpf_strength_config(isp_dev);
-					cifisp_dpf_en(isp_dev);
-				} else
-					cifisp_dpf_end(isp_dev);
 				*time_left -= CIFISP_MODULE_DPF_STRENGTH_TIME;
 				break;
 			case CIFISP_WDR_ID:

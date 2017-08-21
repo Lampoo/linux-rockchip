@@ -69,13 +69,12 @@
 		229 230 231 232 233 234 235 236 237 238 239 240 241 242 243 244
 		245 246 247 248 249 250 251 252 253 254 255>;
 		default-brightness-level = <128>;
-		enable-gpios = <&gpio2 GPIO_B3 GPIO_ACTIVE_HIGH>;
 	};
 
 	usb_control {
 		compatible = "rockchip,rk3126-usb-control";
 
-		host_drv_gpio = <&gpio3 GPIO_C4 GPIO_ACTIVE_LOW>;
+		//host_drv_gpio = <&gpio2 GPIO_B3 GPIO_ACTIVE_LOW>;
 		otg_drv_gpio = <&gpio2 GPIO_B4 GPIO_ACTIVE_LOW>;
 
 		rockchip,remote_wakeup;
@@ -85,12 +84,13 @@
 	wireless-wlan {
 		compatible = "wlan-platdata";
 
-		wifi_chip_type = "rtl8723cs";
+		wifi_chip_type = "rtl8723ds";
 		sdio_vref = <1800>; /*1800mv or 3300mv*/
 		/* WIFI_HOST_WAKE = GPIO3_C7 */
 		WIFI,host_wake_irq = <&gpio3 GPIO_C7 GPIO_ACTIVE_HIGH>;
 		/* WIFI_REG_ON  = GPIO3_D3 */
 		WIFI,poweren_gpio  = <&gpio3 GPIO_D3 GPIO_ACTIVE_HIGH>;
+		WIFI,vbat_gpio  = <&gpio1 GPIO_A3 GPIO_ACTIVE_HIGH>;
 
 		status = "okay";
 	};
@@ -116,6 +116,10 @@
 	rockchip,uboot-logo-on = <0>;
 };
 
+&gmac {
+	status = "disabled";
+};
+
 &rk_screen {
 	display-timings = <&disp_timings>;
 };
@@ -131,9 +135,9 @@
 	status = "okay";
 
 	backlight = <&backlight>;
-	pinctrl-names = "default", "gpio";
-	pinctrl-0 = <&lcdc0_lcdc>;
-	pinctrl-1 = <&lcdc0_gpio>;
+	//pinctrl-names = "den", "sync";
+	//pinctrl-0 = <&lcdc0_den>;
+	//pinctrl-1 = <&lcdc0_sync>;
 
 	rockchip,fb-win-map = <FB_DEFAULT_ORDER>;
 	power_ctr: power_ctr {

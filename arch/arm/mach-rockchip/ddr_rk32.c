@@ -1768,10 +1768,9 @@ static void ddr_get_datatraing_addr(uint32 *pdtar)
 	        {
 	            cap1 += cap1 >> (READ_ROW_INFO(1,0)-READ_ROW_INFO(1,1));
 	        }
-	        if(READ_CH_ROW_INFO(1))
-	        {
-	            cap1 = cap1*3/4;
-	        }
+		if (READ_CH_ROW_INFO(1))
+			cap1 = (u64)cap1 * 3 / 4;
+
 		 chAddr[0] = addr;
 		 chAddr[1] = cap1 - PAGE_SIZE;
 		 if(READ_CS_INFO(1) > 1)
@@ -3888,30 +3887,112 @@ static uint32 ddr_change_freq_gpll_dpll(uint32 nMHz)
 }
 #endif
 
+/*
+ * major_cpu is the cpu responsible for ddr change frequency.
+ * it need more stack than other cpu. so need to allocate
+ * a big stack for.
+ * because major_cpu maybe one of cpu0-3,
+ * so use this array to allocate stack according to different
+ * major_cpu.
+ * the allocate result as:
+ * ------------------- MSB address
+ * | other cpu stack | (index 0)
+ * -------------------
+ * | other cpu stack | (index 1)
+ * -------------------
+ * | other cpu stack | (index 2)
+ * -------------------
+ * | major cpu stack | (index 3)
+ * |                 |
+ * :                 :
+ * :                 :
+ * |                 |
+ * ------------------- LSB address
+ *
+ * ie: major_cpu=1, cpu1, the allocate result is
+ * ------------------- MSB address
+ * | cpu 2 stack     |
+ * -------------------
+ * | cpu 3 stack     |
+ * -------------------
+ * | cpu 0 stack     |
+ * -------------------
+ * | cpu 1 stack     |
+ * |                 |
+ * :                 :
+ * :                 :
+ * |                 |
+ * ------------------- LSB address
+ */
+static const u32 cpu_stack_idx[4][4] = {
+	{3, 0, 1, 2},
+	{2, 3, 0, 1},
+	{1, 2, 3, 0},
+	{0, 1, 2, 3},
+};
+
 bool DEFINE_PIE_DATA(cpu_pause[NR_CPUS]);
+u32 DEFINE_PIE_DATA(major_cpu);
 volatile bool *DATA(p_cpu_pause);
-static inline bool is_cpu0_paused(unsigned int cpu) { smp_rmb(); return DATA(cpu_pause)[0]; }
-static inline void set_cpuX_paused(unsigned int cpu, bool pause) { DATA(cpu_pause)[cpu] = pause; smp_wmb(); }
-static inline bool is_cpuX_paused(unsigned int cpu) { smp_rmb(); return DATA(p_cpu_pause)[cpu]; }
-static inline void set_cpu0_paused(bool pause) { DATA(p_cpu_pause)[0] = pause; smp_wmb();}
+static inline bool is_major_cpu_paused(unsigned int cpu)
+{
+	/* memory barrier first */
+	smp_rmb();
+	return DATA(cpu_pause)[cpu];
+}
+
+static inline void set_cpuX_paused(unsigned int cpu, bool pause)
+{
+	DATA(cpu_pause)[cpu] = pause;
+	/* make sure other cpu get the right value */
+	smp_wmb();
+}
+
+static inline bool is_cpuX_paused(unsigned int cpu)
+{
+	/* memory barrier first */
+	smp_rmb();
+	return DATA(p_cpu_pause)[cpu];
+}
+
+static inline u32 get_major_cpu(void)
+{
+	return *kern_to_pie(rockchip_pie_chunk, &DATA(major_cpu));
+}
+
+static inline void set_major_cpu_paused(u32 cpu, bool pause)
+{
+	DATA(p_cpu_pause)[cpu] = pause;
+	/* make sure other cpu get the right value */
+	smp_wmb();
+}
 
 /* Do not use stack, safe on SMP */
 void PIE_FUNC(_pause_cpu)(void *arg)
-{       
-    unsigned int cpu = (unsigned int)arg;
-    
-    set_cpuX_paused(cpu, true);
-    while (is_cpu0_paused(cpu));
-    set_cpuX_paused(cpu, false);
+{
+	unsigned int cpu = (unsigned int)arg;
+
+	set_cpuX_paused(cpu, true);
+	while (is_major_cpu_paused(DATA(major_cpu)))
+		continue;
+	set_cpuX_paused(cpu, false);
 }
 
 static void pause_cpu(void *info)
 {
-    unsigned int cpu = raw_smp_processor_id();
+	unsigned int cpu = raw_smp_processor_id();
+	u32 stack_off = cpu_stack_idx[get_major_cpu()][cpu];
+	unsigned long flags;
 
-    call_with_stack(fn_to_pie(rockchip_pie_chunk, &FUNC(_pause_cpu)),
-            (void *)cpu,
-            rockchip_sram_stack-(cpu-1)*PAUSE_CPU_STACK_SIZE);
+	stack_off *= PAUSE_CPU_STACK_SIZE;
+	local_irq_save(flags);
+	local_fiq_disable();
+	call_with_stack(fn_to_pie(rockchip_pie_chunk,
+			&FUNC(_pause_cpu)),
+			(void *)cpu,
+			rockchip_sram_stack - stack_off);
+	local_fiq_enable();
+	local_irq_restore(flags);
 }
 
 static void wait_cpu(void *info)
@@ -3922,17 +4003,19 @@ static int call_with_single_cpu(u32 (*fn)(void *arg), void *arg)
 {
 	s64 now_ns, timeout_ns;
 	unsigned int cpu;
-	unsigned int this_cpu = smp_processor_id();
+	unsigned int this_cpu;
 	int ret = 0;
 
 	cpu_maps_update_begin();
 	local_bh_disable();
+	this_cpu = smp_processor_id();
 
 	/* It should take much less than 1s to pause the cpus. It typically
 	* takes around 20us. */
 	timeout_ns = ktime_to_ns(ktime_add_ns(ktime_get(), NSEC_PER_SEC));
 	now_ns = ktime_to_ns(ktime_get());
-	set_cpu0_paused(true);
+	*kern_to_pie(rockchip_pie_chunk, &DATA(major_cpu)) = this_cpu;
+	set_major_cpu_paused(this_cpu, true);
 	smp_call_function((smp_call_func_t)pause_cpu, NULL, 0);
 	for_each_online_cpu(cpu) {
 		if (cpu == this_cpu)
@@ -3947,7 +4030,7 @@ static int call_with_single_cpu(u32 (*fn)(void *arg), void *arg)
 	}
 	ret = fn(arg);
 out:
-	set_cpu0_paused(false);
+	set_major_cpu_paused(this_cpu, false);
 	local_bh_enable();
 	smp_call_function(wait_cpu, NULL, true);
 	cpu_maps_update_done();
@@ -4248,24 +4331,22 @@ void ddr_reg_save(uint32 *pArg)
     pMSCH_REG     pMSCH_Reg;
     
     p_ddr_reg->tag = 0x56313031;
+	p_ddr_reg->pctlAddr[0] = RK3288_DDR_PCTL0_PHYS;
+	p_ddr_reg->publAddr[0] = RK3288_DDR_PUBL0_PHYS;
     if(p_ddr_ch[0]->mem_type != DRAM_MAX)
     {
-        p_ddr_reg->pctlAddr[0] = RK3288_DDR_PCTL0_PHYS;
-        p_ddr_reg->publAddr[0] = RK3288_DDR_PUBL0_PHYS;
         p_ddr_reg->nocAddr[0] = RK3288_SERVICE_BUS_PHYS;
         pDDR_Reg = p_ddr_ch[0]->pDDR_Reg;
         pPHY_Reg = p_ddr_ch[0]->pPHY_Reg;
     }
     else
     {
-        p_ddr_reg->pctlAddr[0] = 0xFFFFFFFF;
-        p_ddr_reg->publAddr[0] = 0xFFFFFFFF;
         p_ddr_reg->nocAddr[0] = 0xFFFFFFFF;
     }
+	p_ddr_reg->pctlAddr[1] = RK3288_DDR_PCTL1_PHYS;
+	p_ddr_reg->publAddr[1] = RK3288_DDR_PUBL1_PHYS;
     if(p_ddr_ch[1]->mem_type != DRAM_MAX)
     {
-        p_ddr_reg->pctlAddr[1] = RK3288_DDR_PCTL1_PHYS;
-        p_ddr_reg->publAddr[1] = RK3288_DDR_PUBL1_PHYS;
         p_ddr_reg->nocAddr[1] = RK3288_SERVICE_BUS_PHYS+0x80;
         if((pDDR_Reg == NULL) || (pPHY_Reg == NULL))
         {
@@ -4275,8 +4356,6 @@ void ddr_reg_save(uint32 *pArg)
     }
     else
     {
-        p_ddr_reg->pctlAddr[1] = 0xFFFFFFFF;
-        p_ddr_reg->publAddr[1] = 0xFFFFFFFF;
         p_ddr_reg->nocAddr[1] = 0xFFFFFFFF;
     }
     
@@ -4481,7 +4560,7 @@ static void ddr_monitor_stop(void)
 }
 
 static void _ddr_bandwidth_get(struct ddr_bw_info *ddr_bw_ch0,
-			struct ddr_bw_info *ddr_bw_ch1)
+			       struct ddr_bw_info *ddr_bw_ch1)
 {
 	u32 ddr_bw_val[2][ddrbw_id_end], ddr_freq;
 	u64 temp64;
@@ -4491,62 +4570,76 @@ static void _ddr_bandwidth_get(struct ddr_bw_info *ddr_bw_ch0,
 	for (j = 0; j < 2; j++) {
 		for (i = 0; i < ddrbw_eff; i++)
 			ddr_bw_val[j][i] =
-				grf_readl(RK3288_GRF_SOC_STATUS11+i*4+j*16);
+				grf_readl(RK3288_GRF_SOC_STATUS11 +
+					  i * 4 + j * 16);
 	}
 	if (!ddr_bw_val[0][ddrbw_time_num])
 		goto end;
 
 	if (ddr_bw_ch0) {
+		/*
+		 * read noc register first, to avoid
+		 * noc's statistics not match with
+		 * ddr monitor's result
+		 */
+		ddr_bw_ch0->cpum = (noc_readl(0x400 + 0x178) << 16)
+			+ (noc_readl(0x400 + 0x164));
+		ddr_bw_ch0->gpu = (noc_readl(0x800 + 0x178) << 16)
+			+ (noc_readl(0x800 + 0x164));
+		ddr_bw_ch0->peri = (noc_readl(0xc00 + 0x178) << 16)
+			+ (noc_readl(0xc00 + 0x164));
+		ddr_bw_ch0->video = (noc_readl(0x1000 + 0x178) << 16)
+			+ (noc_readl(0x1000 + 0x164));
+		ddr_bw_ch0->vio0 = (noc_readl(0x1400 + 0x178) << 16)
+			+ (noc_readl(0x1400 + 0x164));
+		ddr_bw_ch0->vio1 = (noc_readl(0x1800 + 0x178) << 16)
+			+ (noc_readl(0x1800 + 0x164));
+		ddr_bw_ch0->vio2 = (noc_readl(0x1c00 + 0x178) << 16)
+			+ (noc_readl(0x1c00 + 0x164));
+
 		ddr_freq = readl_relaxed(RK_DDR_VIRT + 0xc0);
 
-		temp64 = ((u64)ddr_bw_val[0][0]+ddr_bw_val[0][1])*4*100;
+		temp64 = ((u64)ddr_bw_val[0][0] + ddr_bw_val[0][1]) *
+				4 * 100;
 		do_div(temp64, ddr_bw_val[0][ddrbw_time_num]);
 		ddr_bw_val[0][ddrbw_eff] = temp64;
 
 		ddr_bw_ch0->ddr_percent = temp64;
 		ddr_bw_ch0->ddr_time =
-			ddr_bw_val[0][ddrbw_time_num]/(ddr_freq*1000);
-		ddr_bw_ch0->ddr_wr =
-			(ddr_bw_val[0][ddrbw_wr_num]*8*4)*
-				ddr_freq/ddr_bw_val[0][ddrbw_time_num];
-		ddr_bw_ch0->ddr_rd =
-			(ddr_bw_val[0][ddrbw_rd_num]*8*4)*
-				ddr_freq/ddr_bw_val[0][ddrbw_time_num];
+			ddr_bw_val[0][ddrbw_time_num] / (ddr_freq * 1000);
+		temp64 = ((u64)(ddr_bw_val[0][ddrbw_wr_num] * 8 * 4) *
+				(u64)ddr_freq);
+		do_div(temp64, ddr_bw_val[0][ddrbw_time_num]);
+		ddr_bw_ch0->ddr_wr = (u32)temp64;
+		temp64 = ((u64)(ddr_bw_val[0][ddrbw_rd_num] * 8 * 4) *
+				(u64)ddr_freq);
+		do_div(temp64, ddr_bw_val[0][ddrbw_time_num]);
+		ddr_bw_ch0->ddr_rd = (u32)temp64;
 		ddr_bw_ch0->ddr_act =
 			ddr_bw_val[0][ddrbw_act_num];
-		ddr_bw_ch0->ddr_total =
-			ddr_freq*2*4;
+		ddr_bw_ch0->ddr_total = ddr_freq * 2 * 4;
 
-		ddr_bw_ch0->cpum = (noc_readl(0x400+0x178)<<16)
-			+ (noc_readl(0x400+0x164));
-		ddr_bw_ch0->gpu = (noc_readl(0x800+0x178)<<16)
-			+ (noc_readl(0x800+0x164));
-		ddr_bw_ch0->peri = (noc_readl(0xc00+0x178)<<16)
-			+ (noc_readl(0xc00+0x164));
-		ddr_bw_ch0->video = (noc_readl(0x1000+0x178)<<16)
-			+ (noc_readl(0x1000+0x164));
-		ddr_bw_ch0->vio0 = (noc_readl(0x1400+0x178)<<16)
-			+ (noc_readl(0x1400+0x164));
-		ddr_bw_ch0->vio1 = (noc_readl(0x1800+0x178)<<16)
-			+ (noc_readl(0x1800+0x164));
-		ddr_bw_ch0->vio2 = (noc_readl(0x1c00+0x178)<<16)
-			+ (noc_readl(0x1c00+0x164));
-
-		ddr_bw_ch0->cpum =
-			ddr_bw_ch0->cpum*ddr_freq/ddr_bw_val[0][ddrbw_time_num];
-		ddr_bw_ch0->gpu =
-			ddr_bw_ch0->gpu*ddr_freq/ddr_bw_val[0][ddrbw_time_num];
-		ddr_bw_ch0->peri =
-			ddr_bw_ch0->peri*ddr_freq/ddr_bw_val[0][ddrbw_time_num];
-		ddr_bw_ch0->video =
-			ddr_bw_ch0->video*
-				ddr_freq/ddr_bw_val[0][ddrbw_time_num];
-		ddr_bw_ch0->vio0 =
-			ddr_bw_ch0->vio0*ddr_freq/ddr_bw_val[0][ddrbw_time_num];
-		ddr_bw_ch0->vio1 =
-			ddr_bw_ch0->vio1*ddr_freq/ddr_bw_val[0][ddrbw_time_num];
-		ddr_bw_ch0->vio2 =
-			ddr_bw_ch0->vio2*ddr_freq/ddr_bw_val[0][ddrbw_time_num];
+		temp64 = ((u64)ddr_bw_ch0->cpum * (u64)ddr_freq);
+		do_div(temp64, ddr_bw_val[0][ddrbw_time_num]);
+		ddr_bw_ch0->cpum = (u32)temp64;
+		temp64 = ((u64)ddr_bw_ch0->gpu * (u64)ddr_freq);
+		do_div(temp64, ddr_bw_val[0][ddrbw_time_num]);
+		ddr_bw_ch0->gpu = (u32)temp64;
+		temp64 = ((u64)ddr_bw_ch0->peri * (u64)ddr_freq);
+		do_div(temp64, ddr_bw_val[0][ddrbw_time_num]);
+		ddr_bw_ch0->peri = (u32)temp64;
+		temp64 = ((u64)ddr_bw_ch0->video * (u64)ddr_freq);
+		do_div(temp64, ddr_bw_val[0][ddrbw_time_num]);
+		ddr_bw_ch0->video = (u32)temp64;
+		temp64 = ((u64)ddr_bw_ch0->vio0 * (u64)ddr_freq);
+		do_div(temp64, ddr_bw_val[0][ddrbw_time_num]);
+		ddr_bw_ch0->vio0 = (u32)temp64;
+		temp64 = ((u64)ddr_bw_ch0->vio1 * (u64)ddr_freq);
+		do_div(temp64, ddr_bw_val[0][ddrbw_time_num]);
+		ddr_bw_ch0->vio1 = (u32)temp64;
+		temp64 = ((u64)ddr_bw_ch0->vio1 * (u64)ddr_freq);
+		do_div(temp64, ddr_bw_val[0][ddrbw_time_num]);
+		ddr_bw_ch0->vio2 = (u32)temp64;
 	}
 end:
 	ddr_monitor_start();
@@ -4556,23 +4649,25 @@ end:
 
 static int ddr_init(uint32 dram_speed_bin, uint32 freq)
 {
-    uint32 tmp;
-    uint32 die=1;
-    uint32 gsr,dqstr;
-    struct clk *clk;
-    uint32 ch,cap=0,cs_cap;
+	uint32 tmp;
+	uint32 die = 1;
+	uint32 gsr, dqstr;
+	struct clk *clk;
+	uint32 ch, cs_cap;
+	u64 cap = 0;
 	struct device_node *clk_ddr_dev_node;
 	const struct property *prop;
 
-    ddr_print("version 1.00 20150126 \n");
+	ddr_print("version 1.00 20150126\n");
 
-    p_ddr_reg = kern_to_pie(rockchip_pie_chunk, &DATA(ddr_reg));
-    p_ddr_set_pll = fn_to_pie(rockchip_pie_chunk, &FUNC(ddr_set_pll));
-    DATA(p_cpu_pause) = kern_to_pie(rockchip_pie_chunk, &DATA(cpu_pause[0]));
+	p_ddr_reg = kern_to_pie(rockchip_pie_chunk, &DATA(ddr_reg));
+	p_ddr_set_pll = fn_to_pie(rockchip_pie_chunk, &FUNC(ddr_set_pll));
+	DATA(p_cpu_pause) = kern_to_pie(rockchip_pie_chunk,
+					&DATA(cpu_pause[0]));
 
-    tmp = clk_get_rate(clk_get(NULL, "clk_ddr"))/1000000;
-    *kern_to_pie(rockchip_pie_chunk, &DATA(ddr_freq)) = tmp;
-    *kern_to_pie(rockchip_pie_chunk, &DATA(ddr_sr_idle)) = 0;
+	tmp = clk_get_rate(clk_get(NULL, "clk_ddr")) / 1000000;
+	*kern_to_pie(rockchip_pie_chunk, &DATA(ddr_freq)) = tmp;
+	*kern_to_pie(rockchip_pie_chunk, &DATA(ddr_sr_idle)) = 0;
 
 	*kern_to_pie(rockchip_pie_chunk, &DATA(vop_dclk_mode)) = 0;
 	clk_ddr_dev_node = of_find_node_by_name(NULL, "clk_ddr");
@@ -4586,134 +4681,136 @@ static int ddr_init(uint32 dram_speed_bin, uint32 freq)
 			tmp = be32_to_cpup(prop->value);
 			if (tmp < 3)
 				*kern_to_pie(rockchip_pie_chunk,
-					&DATA(vop_dclk_mode)) = tmp;
+					     &DATA(vop_dclk_mode)) = tmp;
 		}
 		of_node_put(clk_ddr_dev_node);
 	}
 
-    for(ch=0;ch<CH_MAX;ch++)
-    {
-        p_ddr_ch[ch] = kern_to_pie(rockchip_pie_chunk, &DATA(ddr_ch[ch]));
-        
-        p_ddr_ch[ch]->chNum = ch;
-        p_ddr_ch[ch]->pDDR_Reg = pDDR_REG(ch);
-        p_ddr_ch[ch]->pPHY_Reg = pPHY_REG(ch);
-        p_ddr_ch[ch]->pMSCH_Reg = pMSCH_REG(ch);
+	for (ch = 0; ch < CH_MAX; ch++) {
+		p_ddr_ch[ch] = kern_to_pie(rockchip_pie_chunk,
+					   &DATA(ddr_ch[ch]));
 
-        if(!(READ_CH_INFO()&(1<<ch)))
-        {
-            p_ddr_ch[ch]->mem_type = DRAM_MAX;
-            continue;
-        }
-        else
-        {
-            if(ch)
-            {
-                ddr_print("Channel b: \n");
-            }
-            else
-            {
-                ddr_print("Channel a: \n");
-            }
-            tmp = p_ddr_ch[ch]->pPHY_Reg->DCR.b.DDRMD;
-            if((tmp ==  LPDDR2) && (READ_DRAMTYPE_INFO() == 6))
-            {
-                tmp = LPDDR3;
-            }
-            switch(tmp)
-            {
-                case DDR3:
-                    ddr_print("DDR3 Device\n");
-                    break;
-                case LPDDR3:
-                    ddr_print("LPDDR3 Device\n");
-                    break;
-                case LPDDR2:
-                    ddr_print("LPDDR2 Device\n");
-                    break;
-                default:
-                    ddr_print("Unkown Device\n");
-                    tmp = DRAM_MAX;
-                    break;
-            }
-            p_ddr_ch[ch]->mem_type = tmp;
-            if(tmp == DRAM_MAX)
-            {
-                p_ddr_ch[ch]->mem_type = DRAM_MAX;
-                continue;
-            }
-        }
-        
-        p_ddr_ch[ch]->ddr_speed_bin = dram_speed_bin;
-        //get capability per chip, not total size, used for calculate tRFC
-        die = (8<<READ_BW_INFO(ch))/(8<<READ_DIE_BW_INFO(ch));
-        cap = (1 << (READ_ROW_INFO(ch,0)+READ_COL_INFO(ch)+READ_BK_INFO(ch)+READ_BW_INFO(ch)));
-        cs_cap = cap;
-        if(READ_CS_INFO(ch) > 1)
-        {
-            cap += cap >> (READ_ROW_INFO(ch,0)-READ_ROW_INFO(ch,1));
-        }
-        if(READ_CH_ROW_INFO(ch))
-        {
-            cap = cap*3/4;
-        }
-        p_ddr_ch[ch]->ddr_capability_per_die = cs_cap/die;
-        ddr_print("Bus Width=%d Col=%d Bank=%d Row=%d CS=%d Total Capability=%dMB\n",
-                                                                        READ_BW_INFO(ch)*16,\
-                                                                        READ_COL_INFO(ch), \
-                                                                        (0x1<<(READ_BK_INFO(ch))), \
-                                                                        READ_ROW_INFO(ch,0), \
-                                                                        READ_CS_INFO(ch), \
-                                                                        (cap>>20));
-    }
-    
-    ddr_adjust_config();
+		p_ddr_ch[ch]->chNum = ch;
+		p_ddr_ch[ch]->pDDR_Reg = pDDR_REG(ch);
+		p_ddr_ch[ch]->pPHY_Reg = pPHY_REG(ch);
+		p_ddr_ch[ch]->pMSCH_Reg = pMSCH_REG(ch);
 
-    clk = clk_get(NULL, "clk_ddr");
-    if (IS_ERR(clk)) {
-        ddr_print("failed to get ddr clk\n");
-        clk = NULL;
-    }
-    if(freq != 0)
-        tmp = clk_set_rate(clk, 1000*1000*freq);
-    else
-        tmp = clk_set_rate(clk, clk_get_rate(clk));
-    ddr_print("init success!!! freq=%luMHz\n", clk ? clk_get_rate(clk)/1000000 : freq);
+		if (!(READ_CH_INFO() & (1 << ch))) {
+			p_ddr_ch[ch]->mem_type = DRAM_MAX;
+			continue;
+		}
 
-    for(ch=0;ch<CH_MAX;ch++)
-    {
-        if(p_ddr_ch[ch]->mem_type != DRAM_MAX)
-        {            
-            if(ch)
-            {
-                ddr_print("Channel b: \n");
-            }
-            else
-            {
-                ddr_print("Channel a: \n");
-            }
-            for(tmp=0;tmp<4;tmp++)
-            {
-                gsr = p_ddr_ch[ch]->pPHY_Reg->DATX8[tmp].DXGSR[0];
-                dqstr = p_ddr_ch[ch]->pPHY_Reg->DATX8[tmp].DXDQSTR;
-                ddr_print("DTONE=0x%x, DTERR=0x%x, DTIERR=0x%x, DTPASS=%d,%d, DGSL=%d,%d extra clock, DGPS=%d,%d\n", \
-                                                                    (gsr&0xF), ((gsr>>4)&0xF), ((gsr>>8)&0xF), \
-                                                                    ((gsr>>13)&0x7), ((gsr>>16)&0x7),\
-                                                                    (dqstr&0x7), ((dqstr>>3)&0x7),\
-                                                                    ((((dqstr>>12)&0x3)+1)*90), ((((dqstr>>14)&0x3)+1)*90));
-            }
-            ddr_print("ZERR=%x, ZDONE=%x, ZPD=0x%x, ZPU=0x%x, OPD=0x%x, OPU=0x%x\n", \
-                                                        (p_ddr_ch[ch]->pPHY_Reg->ZQ0SR[0]>>30)&0x1, \
-                                                        (p_ddr_ch[ch]->pPHY_Reg->ZQ0SR[0]>>31)&0x1, \
-                                                        p_ddr_ch[ch]->pPHY_Reg->ZQ0SR[1]&0x3,\
-                                                        (p_ddr_ch[ch]->pPHY_Reg->ZQ0SR[1]>>2)&0x3,\
-                                                        (p_ddr_ch[ch]->pPHY_Reg->ZQ0SR[1]>>4)&0x3,\
-                                                        (p_ddr_ch[ch]->pPHY_Reg->ZQ0SR[1]>>6)&0x3);
-            ddr_print("DRV Pull-Up=0x%x, DRV Pull-Dwn=0x%x\n", p_ddr_ch[ch]->pPHY_Reg->ZQ0SR[0]&0x1F, (p_ddr_ch[ch]->pPHY_Reg->ZQ0SR[0]>>5)&0x1F);
-            ddr_print("ODT Pull-Up=0x%x, ODT Pull-Dwn=0x%x\n", (p_ddr_ch[ch]->pPHY_Reg->ZQ0SR[0]>>10)&0x1F, (p_ddr_ch[ch]->pPHY_Reg->ZQ0SR[0]>>15)&0x1F);
-        }
-    }
+		if (ch)
+			ddr_print("Channel b:\n");
+		else
+			ddr_print("Channel a:\n");
+		tmp = p_ddr_ch[ch]->pPHY_Reg->DCR.b.DDRMD;
+		if ((tmp ==  LPDDR2) && (READ_DRAMTYPE_INFO() == 6))
+			tmp = LPDDR3;
 
-    return 0;
+		switch (tmp) {
+		case DDR3:
+			ddr_print("DDR3 Device\n");
+			break;
+		case LPDDR3:
+			ddr_print("LPDDR3 Device\n");
+			break;
+		case LPDDR2:
+			ddr_print("LPDDR2 Device\n");
+			break;
+		default:
+			ddr_print("Unknown Device\n");
+			tmp = DRAM_MAX;
+			break;
+		}
+		p_ddr_ch[ch]->mem_type = tmp;
+
+		if (tmp == DRAM_MAX) {
+			p_ddr_ch[ch]->mem_type = DRAM_MAX;
+			continue;
+		}
+
+		p_ddr_ch[ch]->ddr_speed_bin = dram_speed_bin;
+		/*
+		 * get capability per chip, not total size,
+		 * used for calculate tRFC
+		 */
+		die = (8 << READ_BW_INFO(ch)) / (8 << READ_DIE_BW_INFO(ch));
+		cap = (1ull << (READ_ROW_INFO(ch, 0) +
+				READ_COL_INFO(ch) +
+				READ_BK_INFO(ch) +
+				READ_BW_INFO(ch)));
+		cs_cap = cap;
+		if (READ_CS_INFO(ch) > 1)
+			cap += cap >> (READ_ROW_INFO(ch, 0) -
+				       READ_ROW_INFO(ch, 1));
+		if (READ_CH_ROW_INFO(ch))
+			cap = cap * 3 / 4;
+		p_ddr_ch[ch]->ddr_capability_per_die = cs_cap / die;
+		ddr_print("Bus Width=%d Col=%d Bank=%d Row=%d ",
+			  READ_BW_INFO(ch) * 16,
+			  READ_COL_INFO(ch),
+			  (0x1 << (READ_BK_INFO(ch))),
+			  READ_ROW_INFO(ch, 0));
+		ddr_print("CS=%d Total Capability=%lluMB\n",
+			  READ_CS_INFO(ch),
+			  (unsigned long long)(cap >> 20));
+	}
+
+	ddr_adjust_config();
+
+	clk = clk_get(NULL, "clk_ddr");
+	if (IS_ERR(clk)) {
+		ddr_print("failed to get ddr clk\n");
+		clk = NULL;
+	}
+	if (freq != 0)
+		tmp = clk_set_rate(clk, 1000 * 1000 * freq);
+	else
+		tmp = clk_set_rate(clk, clk_get_rate(clk));
+	ddr_print("init success!!! freq=%luMHz\n",
+		  clk ? clk_get_rate(clk) / 1000000 : freq);
+
+	for (ch = 0; ch < CH_MAX; ch++) {
+		if (p_ddr_ch[ch]->mem_type == DRAM_MAX)
+			continue;
+		if (ch)
+			ddr_print("Channel b:\n");
+		else
+			ddr_print("Channel a:\n");
+
+		for (tmp = 0; tmp < 4; tmp++) {
+			gsr = p_ddr_ch[ch]->pPHY_Reg->DATX8[tmp].DXGSR[0];
+			dqstr = p_ddr_ch[ch]->pPHY_Reg->DATX8[tmp].DXDQSTR;
+			ddr_print("DTONE=0x%x, DTERR=0x%x, DTIERR=0x%x, ",
+				  (gsr & 0xF),
+				  ((gsr >> 4) & 0xF),
+				  ((gsr >> 8) & 0xF));
+			ddr_print("DTPASS=%d,%d, DGSL=%d,%d extra clock, ",
+				  ((gsr >> 13) & 0x7),
+				  ((gsr >> 16) & 0x7),
+				  (dqstr & 0x7),
+				  ((dqstr >> 3) & 0x7));
+			ddr_print("DGPS=%d,%d\n",
+				  ((((dqstr >> 12) & 0x3) + 1) * 90),
+				  ((((dqstr >> 14) & 0x3) + 1) * 90));
+		}
+		ddr_print("ZERR=%x, ZDONE=%x, ZPD=0x%x, ",
+			  (p_ddr_ch[ch]->pPHY_Reg->ZQ0SR[0] >> 30) & 0x1,
+			  (p_ddr_ch[ch]->pPHY_Reg->ZQ0SR[0] >> 31) & 0x1,
+			  p_ddr_ch[ch]->pPHY_Reg->ZQ0SR[1] & 0x3);
+		ddr_print("ZPU=0x%x, OPD=0x%x, OPU=0x%x\n",
+			  (p_ddr_ch[ch]->pPHY_Reg->ZQ0SR[1] >> 2) & 0x3,
+			  (p_ddr_ch[ch]->pPHY_Reg->ZQ0SR[1] >> 4) & 0x3,
+			  (p_ddr_ch[ch]->pPHY_Reg->ZQ0SR[1] >> 6) & 0x3);
+		ddr_print("DRV Pull-Up=0x%x, DRV Pull-Dwn=0x%x\n",
+			  p_ddr_ch[ch]->pPHY_Reg->ZQ0SR[0] & 0x1F,
+			  (p_ddr_ch[ch]->pPHY_Reg->ZQ0SR[0] >> 5) & 0x1F);
+		ddr_print("ODT Pull-Up=0x%x, ODT Pull-Dwn=0x%x\n",
+			  (p_ddr_ch[ch]->pPHY_Reg->ZQ0SR[0] >> 10) & 0x1F,
+			  (p_ddr_ch[ch]->pPHY_Reg->ZQ0SR[0] >> 15) & 0x1F);
+	}
+
+	return 0;
 }
 

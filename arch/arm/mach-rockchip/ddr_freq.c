@@ -176,7 +176,8 @@ static void ddrfreq_mode(bool auto_self_refresh, unsigned long target_rate, char
 
 	ddr.mode = name;
 	if (auto_self_refresh != ddr.auto_self_refresh) {
-		ddr_set_auto_self_refresh(auto_self_refresh);
+		if (ddr_set_auto_self_refresh)
+			ddr_set_auto_self_refresh(auto_self_refresh);
 		ddr.auto_self_refresh = auto_self_refresh;
 		dprintk(DEBUG_DDR, "change auto self refresh to %d when %s\n", auto_self_refresh, name);
 	}
@@ -551,6 +552,23 @@ static long get_video_param(char **str)
 	return 0;
 }
 
+static ssize_t video_state_read(struct file *file, char __user *buffer,
+				size_t count, loff_t *ppos)
+{
+	int n, ret;
+	char buf[32];
+
+	if (*ppos > 0)
+		return 0;
+
+	n = sprintf(buf, "0x%lx\n", rockchip_get_system_status());
+	ret = copy_to_user(buffer, buf, n);
+
+	*ppos += n;
+
+	return n;
+}
+
 static ssize_t video_state_write(struct file *file, const char __user *buffer,
 				 size_t count, loff_t *ppos)
 {
@@ -636,7 +654,6 @@ static ssize_t video_state_write(struct file *file, const char __user *buffer,
 static int video_state_release(struct inode *inode, struct file *file)
 {
 	dprintk(DEBUG_VIDEO_STATE, "video_state release\n");
-	clear_video_info();
 	update_video_info();
 	return 0;
 }
@@ -646,6 +663,7 @@ static const struct file_operations video_state_fops = {
 	.owner	= THIS_MODULE,
 	.release= video_state_release,
 	.write	= video_state_write,
+	.read	= video_state_read,
 };
 
 static struct miscdevice video_state_dev = {

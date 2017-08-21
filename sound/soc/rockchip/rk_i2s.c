@@ -46,7 +46,7 @@
 
 #define CLK_SET_LATER
 #define I2S_DEFAULT_FREQ	(11289600)
-#define I2S_DMA_BURST_SIZE	(16) /* size * width: 16*4 = 64 bytes */
+#define I2S_DMA_BURST_SIZE	(8) /* size * width: 16*4 = 64 bytes */
 static DEFINE_SPINLOCK(lock);
 
 #if defined(CONFIG_RK_HDMI) && defined(CONFIG_SND_RK_SOC_HDMI_I2S)
@@ -577,12 +577,12 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
 		goto err;
 	}
 
-	if (soc_is_rk3126b()) {
+	if (soc_is_rk3126b() || soc_is_rk3126c()) {
 		int sdi_src = 0;
 
-		/* rk3126b has no i2s1 controller(i2s_8ch) */
+		/* rk3126b/c has no i2s1 controller(i2s_8ch) */
 		if (1 == pdev->id) {
-			pr_info("rk3126b has no i2s1 controller\n");
+			pr_info("rk3126b/c has no i2s1 controller\n");
 			ret = -ENODEV;
 			goto err;
 		}
@@ -624,24 +624,25 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
 		ret = PTR_ERR(i2s->clk);
 		goto err;
 	}
-#ifdef CLK_SET_LATER
-	INIT_DELAYED_WORK(&i2s->clk_delayed_work, set_clk_later_work);
-	schedule_delayed_work(&i2s->clk_delayed_work, msecs_to_jiffies(10));
-#else
+
+	clk_prepare_enable(i2s->clk);
+#ifndef CLK_SET_LATER
 	clk_set_rate(i2s->clk, I2S_DEFAULT_FREQ);
 #endif
-	clk_prepare_enable(i2s->clk);
 
 	i2s->mclk = devm_clk_get(&pdev->dev, "i2s_mclk");
 	if (IS_ERR(i2s->mclk)) {
 		dev_info(&pdev->dev, "i2s%d has no mclk\n", pdev->id);
 	} else {
+		clk_prepare_enable(i2s->mclk);
 	#ifndef CLK_SET_LATER
 		clk_set_rate(i2s->mclk, I2S_DEFAULT_FREQ);
 	#endif
-		clk_prepare_enable(i2s->mclk);
 	}
-
+#ifdef CLK_SET_LATER
+	INIT_DELAYED_WORK(&i2s->clk_delayed_work, set_clk_later_work);
+	schedule_delayed_work(&i2s->clk_delayed_work, msecs_to_jiffies(10));
+#endif
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	regs = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(regs)) {

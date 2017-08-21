@@ -867,8 +867,22 @@ static int cif_isp11_v4l2_s_fmt(
 			f->fmt.pix.pixelformat, queue);
 	strm_fmt.frm_fmt.width = f->fmt.pix.width;
 	strm_fmt.frm_fmt.height = f->fmt.pix.height;
-/* strm_fmt.frm_fmt.quantization = f->fmt.pix.quantization; */
-	strm_fmt.frm_fmt.quantization = 0;
+
+	switch (f->fmt.pix.colorspace) {
+	case V4L2_COLORSPACE_SMPTE170M:
+		strm_fmt.frm_fmt.quantization = CIF_ISP11_QUANTIZATION_LIM_RANGE;
+		break;
+	case V4L2_COLORSPACE_JPEG:
+		strm_fmt.frm_fmt.quantization = CIF_ISP11_QUANTIZATION_FULL_RANGE;
+		break;
+	default:
+		strm_fmt.frm_fmt.quantization = CIF_ISP11_QUANTIZATION_LIM_RANGE;
+		cif_isp11_pltfrm_pr_warn(NULL,
+			"It is not support v4l2_colorspace: %d, force switch  yuv clip range!\n",
+			f->fmt.pix.colorspace);
+		break;
+	}
+
 	ret = cif_isp11_s_fmt(dev,
 		to_stream_id(file),
 		&strm_fmt,
@@ -1103,19 +1117,25 @@ static unsigned int cif_isp11_v4l2_poll(
 
 static void cif_isp11_v4l2_vm_open(struct vm_area_struct *vma)
 {
+	unsigned long flags = 0;
 	struct cif_isp11_metadata_s *metadata =
 		(struct cif_isp11_metadata_s *)vma->vm_private_data;
 
+	spin_lock_irqsave(&metadata->spinlock, flags);
 	metadata->vmas++;
+	spin_unlock_irqrestore(&metadata->spinlock, flags);
 	return;
 }
 
 static void cif_isp11_v4l2_vm_close(struct vm_area_struct *vma)
 {
+	unsigned long flags = 0;
 	struct cif_isp11_metadata_s *metadata =
 		(struct cif_isp11_metadata_s *)vma->vm_private_data;
 
+	spin_lock_irqsave(&metadata->spinlock, flags);
 	metadata->vmas--;
+	spin_unlock_irqrestore(&metadata->spinlock, flags);
 	return;
 }
 

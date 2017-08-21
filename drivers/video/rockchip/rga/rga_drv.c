@@ -77,8 +77,6 @@
 #define DRIVER_DESC		"RGA Device Driver"
 #define DRIVER_NAME		"rga"
 
-#define RGA_VERSION   "1.003"
-
 ktime_t rga_start;
 ktime_t rga_end;
 
@@ -104,6 +102,7 @@ struct rga_drvdata {
     //#if defined(CONFIG_ION_ROCKCHIP)
     struct ion_client * ion_client;
     //#endif
+	char *version;
 };
 
 static struct rga_drvdata *drvdata;
@@ -281,7 +280,8 @@ static void rga_power_on(void)
 
 	clk_prepare_enable(drvdata->aclk_rga);
 	clk_prepare_enable(drvdata->hclk_rga);
-	//clk_prepare_enable(drvdata->pd_rga);
+	if (drvdata->pd_rga)
+		clk_prepare_enable(drvdata->pd_rga);
 	wake_lock(&drvdata->wake_lock);
 	rga_service.enable = true;
 }
@@ -303,7 +303,8 @@ static void rga_power_off(void)
 		rga_dump();
 	}
 
-	//clk_disable_unprepare(drvdata->pd_rga);
+	if (drvdata->pd_rga)
+		clk_disable_unprepare(drvdata->pd_rga);
 	clk_disable_unprepare(drvdata->aclk_rga);
 	clk_disable_unprepare(drvdata->hclk_rga);
 	wake_unlock(&drvdata->wake_lock);
@@ -1073,9 +1074,22 @@ static long rga_ioctl(struct file *file, uint32_t cmd, unsigned long arg)
             ret = rga_get_result(session, arg);
             break;
         case RGA_GET_VERSION:
-            ret = copy_to_user((void *)arg, RGA_VERSION, sizeof(RGA_VERSION));
-            //ret = 0;
-            break;
+	    if (!drvdata->version) {
+		drvdata->version = kzalloc(16, GFP_KERNEL);
+		if (!drvdata->version) {
+			ret = -ENOMEM;
+			break;
+		}
+		rga_power_on();
+		udelay(1);
+		if (rga_read(RGA_VERSION) == 0x02018632)
+			snprintf(drvdata->version, 16, "1.6");
+		else
+			snprintf(drvdata->version, 16, "1.003");
+	    }
+
+	    ret = copy_to_user((void *)arg, drvdata->version, 16);
+	    break;
 		default:
 			ERR("unknown ioctl cmd!\n");
 			ret = -EINVAL;
@@ -1244,7 +1258,11 @@ static int rga_drv_probe(struct platform_device *pdev)
 	INIT_DELAYED_WORK(&data->power_off_work, rga_power_off_work);
 	wake_lock_init(&data->wake_lock, WAKE_LOCK_SUSPEND, "rga");
 
-	//data->pd_rga = devm_clk_get(&pdev->dev, "pd_rga");
+	data->pd_rga = devm_clk_get(&pdev->dev, "pd_rga");
+	if (IS_ERR(data->pd_rga)) {
+		dev_err(&pdev->dev, "Failed to get rga power domain");
+		data->pd_rga = NULL;
+	}
     data->aclk_rga = devm_clk_get(&pdev->dev, "aclk_rga");
     data->hclk_rga = devm_clk_get(&pdev->dev, "hclk_rga");
 
@@ -1319,7 +1337,9 @@ static int rga_drv_remove(struct platform_device *pdev)
 	free_irq(data->irq, &data->miscdev);
 	iounmap((void __iomem *)(data->rga_base));
 
-	//clk_put(data->pd_rga);
+	kfree(data->version);
+	if (data->pd_rga)
+		devm_clk_put(&pdev->dev, data->pd_rga);
 	devm_clk_put(&pdev->dev, data->aclk_rga);
 	devm_clk_put(&pdev->dev, data->hclk_rga);
 

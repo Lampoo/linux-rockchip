@@ -118,10 +118,12 @@
 };
 
 &nandc {
+	compatible = "rockchip,nandc";
 	status = "okay"; // used nand set "okay" ,used emmc set "disabled"
 };
 
 &nandc0reg {
+	compatible = "rockchip,nandc";
 	status = "disabled"; // used nand set "disabled" ,used emmc set "okay"
 };
 
@@ -258,10 +260,17 @@
 		status = "okay";
 	};
 
+	fm1288@60 {
+		compatible = "fm1288";
+		reg = <0x60>;
+		pwd-con-gpio = <&gpio2 GPIO_B7 GPIO_ACTIVE_HIGH>;
+		status = "okay";
+	};
+
 	es8396: es8396@10 {
 		compatible = "es8396";
 		reg = <0x11>;
-		spk-con-gpio = <&gpio0 GPIO_D6 GPIO_ACTIVE_HIGH>;
+		spk-con-gpio = <&gpio3 GPIO_C4 GPIO_ACTIVE_HIGH>;
 		clocks = <&clk_i2s_2ch_out>;
 		clock-names = "mclk";
 		status = "okay";

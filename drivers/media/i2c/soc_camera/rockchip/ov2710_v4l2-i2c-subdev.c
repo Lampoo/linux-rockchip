@@ -381,9 +381,8 @@ static int ov2710_write_aec(struct ov_camera_module *cam_mod)
 		u32 exp_time = cam_mod->exp_config.exp_time;
 		a_gain = a_gain * cam_mod->exp_config.gain_percent / 100;
 
-		mutex_lock(&cam_mod->lock);
 		/* hold reg en */
-		ret = ov_camera_module_write_reg(cam_mod,
+		ret |= ov_camera_module_write_reg(cam_mod,
 			OV2710_AEC_GROUP_UPDATE_ADDRESS,
 			OV2710_AEC_GROUP_UPDATE_START_DATA);
 
@@ -414,7 +413,6 @@ static int ov2710_write_aec(struct ov_camera_module *cam_mod)
 		ret |= ov_camera_module_write_reg(cam_mod,
 			OV2710_AEC_GROUP_UPDATE_ADDRESS,
 			OV2710_AEC_GROUP_UPDATE_END_LAUNCH);
-		mutex_unlock(&cam_mod->lock);
 	}
 
 	if (IS_ERR_VALUE(ret))
@@ -692,11 +690,10 @@ static int ov2710_start_streaming(struct ov_camera_module *cam_mod)
 	if (IS_ERR_VALUE(ret))
 		goto err;
 
-	mutex_lock(&cam_mod->lock);
 	ret = ov_camera_module_write_reg(cam_mod, 0x3008, 0x02);
 	ret |= ov_camera_module_write_reg(cam_mod, 0x4201, 0x00);
 	ret |= ov_camera_module_write_reg(cam_mod, 0x4202, 0x00);
-	mutex_unlock(&cam_mod->lock);
+
 	if (IS_ERR_VALUE(ret))
 		goto err;
 
@@ -714,11 +711,10 @@ static int ov2710_stop_streaming(struct ov_camera_module *cam_mod)
 	int ret = 0;
 
 	ov_camera_module_pr_info(cam_mod, "\n");
-	mutex_lock(&cam_mod->lock);
 	ret = ov_camera_module_write_reg(cam_mod, 0x3008, 0x42);
 	ret |= ov_camera_module_write_reg(cam_mod, 0x4201, 0x00);
 	ret |= ov_camera_module_write_reg(cam_mod, 0x4202, 0x0f);
-	mutex_unlock(&cam_mod->lock);
+
 	if (IS_ERR_VALUE(ret))
 		goto err;
 
@@ -856,7 +852,6 @@ static int ov2710_probe(
 
 	ov2710.custom = ov2710_custom_config;
 
-	mutex_init(&ov2710.lock);
 	dev_info(&client->dev, "probing successful\n");
 	return 0;
 }
@@ -873,7 +868,6 @@ static int ov2710_remove(
 	if (!client->adapter)
 		return -ENODEV;	/* our client isn't attached */
 
-	mutex_destroy(&cam_mod->lock);
 	ov_camera_module_release(cam_mod);
 
 	dev_info(&client->dev, "removed\n");

@@ -447,7 +447,6 @@ struct cif_isp11_buffer {
 struct cif_isp11_metadata_s {
 	unsigned int cnt;
 	unsigned int vmas;
-	spinlock_t spinlock;
 	unsigned char *d;
 };
 

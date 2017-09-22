@@ -169,7 +169,11 @@ static int dsp_dev_work(struct dsp_dev *dev, struct dsp_work *work)
 
 	dsp_debug_enter();
 
-	mutex_lock(&dev->lock);
+	if (!mutex_trylock(&dev->lock)) {
+		ret = -EBUSY;
+		dsp_debug(DEBUG_DEVICE, "DSP device is busy\n");
+		goto out;
+	}
 
 	schedule_delayed_work(&dev->guard_work, HZ);
 
@@ -182,7 +186,7 @@ static int dsp_dev_work(struct dsp_dev *dev, struct dsp_work *work)
 	dev->running_work = work;
 	dev->mbox->send_data(dev->mbox, MBOX_CHAN_0, DSP_CMD_WORK,
 			     work->dma_addr);
-
+out:
 	dsp_debug_leave();
 	return ret;
 }
@@ -406,6 +410,8 @@ static int dsp_dev_power_on(struct dsp_dev *dev)
 	reset_control_deassert(dev->oecm_rst);
 	udelay(1);
 
+	dsp_mbox_enable(dev->mbox);
+
 	ret = dsp_loader_load_image(dev->device, dev->loader, "MAIN");
 	if (ret) {
 		dev->status = DSP_ON;
@@ -445,6 +451,8 @@ static int dsp_dev_power_off(struct dsp_dev *dev)
 	dev->client->device_pause(dev->client);
 
 	dsp_dev_trace(dev, dev->trace_index + DSP_TRACE_SLOT_COUNT);
+
+	dsp_mbox_disable(dev->mbox);
 
 	reset_control_assert(dev->core_rst);
 	reset_control_assert(dev->sys_rst);

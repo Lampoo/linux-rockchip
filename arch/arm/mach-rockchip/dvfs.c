@@ -19,6 +19,7 @@
 #include <linux/stat.h>
 #include <linux/of.h>
 #include <linux/opp.h>
+#include <linux/rockchip/cru.h>
 #include <linux/rockchip/dvfs.h>
 #include <linux/rockchip/common.h>
 #include <linux/fb.h>
@@ -194,6 +195,53 @@ static struct notifier_block early_suspend_notifier = {
 		.notifier_call = early_suspend_notifier_call,
 };
 
+static int early_suspend_limit_notifier_call(struct notifier_block *self,
+					     unsigned long action, void *data)
+{
+	struct fb_event *event = data;
+	struct dvfs_node *clk_dvfs_node;
+	unsigned int early_suspend_freq;
+	static unsigned int min_rate = 0, max_rate = UINT_MAX;
+	static int freq_limit_en = 1;
+
+	clk_dvfs_node = container_of(self, struct dvfs_node, early_suspend_nb);
+	early_suspend_freq = clk_dvfs_node->early_suspend_freq;
+	if ((!clk_dvfs_node->enable_count) || !early_suspend_freq)
+		return NOTIFY_OK;
+
+	if (action == FB_EVENT_BLANK) {
+		switch (*((int *)event->data)) {
+		case FB_BLANK_UNBLANK:
+			clk_dvfs_node->boost_en = 1;
+			if (freq_limit_en)
+				dvfs_clk_enable_limit(clk_dvfs_node,
+						      min_rate,
+						      max_rate);
+			else
+				dvfs_clk_disable_limit(clk_dvfs_node);
+			break;
+		default:
+			break;
+		}
+	} else if (action == FB_EARLY_EVENT_BLANK) {
+		switch (*((int *)event->data)) {
+		case FB_BLANK_POWERDOWN:
+			clk_dvfs_node->boost_en = 0;
+			freq_limit_en = dvfs_clk_get_limit(clk_dvfs_node,
+							   &min_rate,
+							   &max_rate);
+			dvfs_clk_enable_limit(clk_dvfs_node,
+					      0,
+					      early_suspend_freq * 1000);
+			break;
+		default:
+			break;
+		}
+	}
+
+	return NOTIFY_OK;
+}
+
 #define CPU_TARGET_TMEP_4K	105
 #define CPU_MIN_RATE_4K		408000000
 #define CPU_MAX_RATE_4K		816000000
@@ -202,7 +250,9 @@ static int sys_stat_notifier_call(struct notifier_block *nb,
 {
 	if (clk_cpu_dvfs_node && cpu_is_rk322x()) {
 		mutex_lock(&temp_limit_mutex);
-		if (val & (SYS_STATUS_VIDEO_4K_10B | SYS_STATUS_VIDEO_4K)) {
+		if (val & (SYS_STATUS_VIDEO_4K_10B | SYS_STATUS_VIDEO_4K |
+			   SYS_STATUS_VIDEO_4K_60FPS |
+			   SYS_STATUS_VIDEO_4K_10B_60FPS)) {
 			clk_cpu_dvfs_node->min_rate = CPU_MIN_RATE_4K;
 			clk_cpu_dvfs_node->max_rate = CPU_MAX_RATE_4K;
 			clk_cpu_dvfs_node->target_temp = CPU_TARGET_TMEP_4K;
@@ -1279,7 +1329,8 @@ static void dvfs_temp_limit_4k(void)
 
 	if (cpu_is_rk322x() &&
 	    (rockchip_get_system_status() &
-	     (SYS_STATUS_VIDEO_4K | SYS_STATUS_VIDEO_4K_10B))) {
+	     (SYS_STATUS_VIDEO_4K | SYS_STATUS_VIDEO_4K_10B |
+	      SYS_STATUS_VIDEO_4K_60FPS | SYS_STATUS_VIDEO_4K_10B_60FPS))) {
 		clk = clk_get(NULL, "aclk_rkvdec");
 		if (!IS_ERR_OR_NULL(clk)) {
 			clk_set_rate(clk, 100 * MHz);
@@ -1316,7 +1367,9 @@ static void dvfs_temp_unlimit_4k(void)
 				  clk_ddr_dvfs_node->last_set_rate);
 
 		if (rockchip_get_system_status() &
-		    (SYS_STATUS_VIDEO_4K | SYS_STATUS_VIDEO_4K_10B)) {
+		    (SYS_STATUS_VIDEO_4K | SYS_STATUS_VIDEO_4K_10B |
+		     SYS_STATUS_VIDEO_4K_60FPS |
+		     SYS_STATUS_VIDEO_4K_10B_60FPS)) {
 			clk = clk_get(NULL, "aclk_rkvdec");
 			if (!IS_ERR_OR_NULL(clk)) {
 				clk_set_rate(clk, 500 * MHz);
@@ -1444,6 +1497,7 @@ void register_dvfs_notifier_callback(struct dvfs_node *dvfs_node,
 	blocking_notifier_chain_register(&dvfs_notifier_list,
 					 &dvfs_node->dvfs_nb);
 }
+EXPORT_SYMBOL(register_dvfs_notifier_callback);
 
 static void dvfs_temp_limit_work_func(struct work_struct *work)
 {
@@ -1664,6 +1718,31 @@ int dvfs_set_freq_volt_table(struct dvfs_node *clk_dvfs_node, struct cpufreq_fre
 }
 EXPORT_SYMBOL(dvfs_set_freq_volt_table);
 
+static void adjust_avs_by_leakage(struct dvfs_node *dvfs_node)
+{
+	int i, j = -1, leakage = 0;
+
+	if (!dvfs_node->vd || !dvfs_node->scaling_sel_tbl)
+		return;
+
+	if (dvfs_node->vd->leakage == 0) {
+		leakage = rockchip_get_leakage(dvfs_node->channel);
+		if (!leakage)
+			return;
+		dvfs_node->vd->leakage = leakage;
+	} else {
+		leakage = dvfs_node->vd->leakage;
+	}
+
+	for (i = 0; dvfs_node->scaling_sel_tbl[i].sel != CPUFREQ_TABLE_END;
+	     i++) {
+		if (leakage >= dvfs_node->scaling_sel_tbl[i].min)
+			j = i;
+	}
+	if (j != -1)
+		rockchip_adjust_avs(dvfs_node->scaling_sel_tbl[j].sel);
+}
+
 static int get_adjust_volt_by_leakage(struct dvfs_node *dvfs_node)
 {
 	int leakage = 0;
@@ -1727,6 +1806,11 @@ static void adjust_table_by_leakage(struct dvfs_node *dvfs_node)
 		if (dvfs_node->dvfs_table[i].frequency >=
 			dvfs_node->lkg_info.min_adjust_freq)
 			dvfs_node->dvfs_table[i].index += adjust_volt;
+		if (dvfs_node->lkg_info.max_volt &&
+		    (dvfs_node->dvfs_table[i].index >
+		     dvfs_node->lkg_info.max_volt))
+			dvfs_node->dvfs_table[i].index =
+				dvfs_node->lkg_info.max_volt;
 	}
 }
 
@@ -1812,6 +1896,9 @@ static int initialize_dvfs_node(struct dvfs_node *clk_dvfs_node)
 	dvfs_get_rate_range(clk_dvfs_node);
 	clk_dvfs_node->freq_limit_en = 1;
 	clk_dvfs_node->max_limit_freq = clk_dvfs_node->max_rate;
+	clk_dvfs_node->boost_en = 1;
+
+	adjust_avs_by_leakage(clk_dvfs_node);
 
 	volt = rockchip_efuse_get_volt_adjust(clk_dvfs_node->channel);
 	if (volt) {
@@ -1828,6 +1915,10 @@ static int initialize_dvfs_node(struct dvfs_node *clk_dvfs_node)
 		clk_dvfs_node->vd->volt_init_enable_cnt++;
 
 	INIT_DELAYED_WORK(&clk_dvfs_node->dwork, dvfs_clk_boost_work_func);
+
+	clk_dvfs_node->early_suspend_nb.notifier_call =
+		early_suspend_limit_notifier_call;
+	fb_register_client(&clk_dvfs_node->early_suspend_nb);
 
 	clk_dvfs_node->is_initialized = true;
 
@@ -1956,6 +2047,7 @@ int clk_disable_dvfs(struct dvfs_node *clk_dvfs_node)
 				__func__, __clk_get_name(clk_dvfs_node->clk));
 			volt_new = dvfs_vd_get_newvolt_byclk(clk_dvfs_node);
 			dvfs_scale_volt_direct(clk_dvfs_node->vd, volt_new);
+			fb_unregister_client(&clk_dvfs_node->early_suspend_nb);
 
 #if 0
 			clk_notifier_unregister(clk, clk_dvfs_node->dvfs_nb);
@@ -1989,7 +2081,7 @@ static unsigned long dvfs_get_limit_rate(struct dvfs_node *clk_dvfs_node, unsign
 			limit_rate = clk_dvfs_node->max_limit_freq;
 	}
 
-	if (clk_dvfs_node->boost_freq &&
+	if (clk_dvfs_node->boost_freq && clk_dvfs_node->boost_en &&
 	    clk_dvfs_node->old_temp < clk_dvfs_node->target_temp &&
 	    clk_dvfs_node->boost_freq > limit_rate)
 		limit_rate = clk_dvfs_node->boost_freq;
@@ -2467,12 +2559,55 @@ static struct lkg_adjust_volt_table
 	return lkg_adjust_volt_table;
 }
 
+static  struct scaling_sel_table *of_get_sel_table(struct device_node *np,
+						   char *propname)
+{
+	struct scaling_sel_table *sel_table = NULL;
+	const struct property *prop;
+	int count, i;
+
+	prop = of_find_property(np, propname, NULL);
+	if (!prop)
+		return NULL;
+
+	if (!prop->value)
+		return NULL;
+
+	count = of_property_count_u32_elems(np, propname);
+	if (count < 0)
+		return NULL;
+
+	if (count % 3)
+		return NULL;
+
+	sel_table = kzalloc(sizeof(*sel_table) * (count / 3 + 1), GFP_KERNEL);
+	if (!sel_table)
+		return NULL;
+
+	for (i = 0; i < count / 3; i++) {
+		of_property_read_u32_index(np, propname, 3 * i,
+					   &sel_table[i].min);
+		of_property_read_u32_index(np, propname, 3 * i + 1,
+					   &sel_table[i].max);
+		of_property_read_u32_index(np, propname, 3 * i + 2,
+					   &sel_table[i].sel);
+	}
+	sel_table[i].min = 0;
+	sel_table[i].max = 0;
+	sel_table[i].sel = CPUFREQ_TABLE_END;
+
+	return sel_table;
+}
+
 static int dvfs_node_parse_dt(struct device_node *np,
 			      struct dvfs_node *dvfs_node)
 {
 	int process_version = rockchip_process_version();
 	int i = 0;
 	int ret;
+
+	of_property_read_u32_index(np, "early_suspend_freq", 0,
+				   &dvfs_node->early_suspend_freq);
 
 	of_property_read_u32_index(np, "skip_adjusting_volt", 0,
 				   &dvfs_node->skip_adjusting_volt);
@@ -2572,10 +2707,16 @@ static int dvfs_node_parse_dt(struct device_node *np,
 					   &dvfs_node->lkg_info.min_adjust_freq
 					   );
 
+		of_property_read_u32_index(np, "max_adjust_volt", 0,
+					   &dvfs_node->lkg_info.max_volt);
+
 		dvfs_node->lkg_info.table =
 			of_get_lkg_adjust_volt_table(np,
 						     "lkg_adjust_volt_table");
 	}
+
+	dvfs_node->scaling_sel_tbl = of_get_sel_table(np,
+						      "leakage-scaling-sel");
 
 	return 0;
 }

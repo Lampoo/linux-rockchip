@@ -82,7 +82,6 @@ struct dvfs_node *clk_cpu_dvfs_node = NULL;
 struct dvfs_node *clk_gpu_dvfs_node = NULL;
 struct dvfs_node *aclk_vio1_dvfs_node = NULL;
 struct dvfs_node *clk_ddr_dvfs_node = NULL;
-struct dvfs_node *clk_rkvdec_dvfs_node;
 /*******************************************************/
 static unsigned int cpufreq_get_rate(unsigned int cpu)
 {
@@ -114,29 +113,6 @@ static unsigned int get_freq_from_table(unsigned int max_freq)
 		target_freq = max_freq;
 	return target_freq;
 }
-
-static int cpufreq_notifier_policy(struct notifier_block *nb, unsigned long val, void *data)
-{
-	static unsigned int min_rate=0, max_rate=-1;
-	struct cpufreq_policy *policy = data;
-
-	if (val != CPUFREQ_ADJUST)
-		return 0;
-
-	if (cpufreq_is_ondemand(policy)) {
-		FREQ_DBG("queue work\n");
-		dvfs_clk_enable_limit(clk_cpu_dvfs_node, min_rate, max_rate);
-	} else {
-		FREQ_DBG("cancel work\n");
-		dvfs_clk_get_limit(clk_cpu_dvfs_node, &min_rate, &max_rate);
-	}
-
-	return 0;
-}
-
-static struct notifier_block notifier_policy_block = {
-	.notifier_call = cpufreq_notifier_policy
-};
 
 static int cpufreq_verify(struct cpufreq_policy *policy)
 {
@@ -176,39 +152,6 @@ static int cpufreq_scale_rate_for_dvfs(struct clk *clk, unsigned long rate)
 	
 }
 
-extern void rkvdec_set_clk(unsigned long vcodec_rate,
-			   unsigned long core_rate,
-			   unsigned long cabac_rate,
-			   int thermal_en);
-static int rkvdec_dvfs_notifier_call(struct notifier_block *nb,
-				     unsigned long action, void *data)
-{
-	static int thermal_en;
-	struct dvfs_node *dvfs_node;
-	int temp, delta_temp = 0;
-
-	dvfs_node = container_of(nb, struct dvfs_node, dvfs_nb);
-	if (!dvfs_node->temp_limit_enable)
-		return NOTIFY_OK;
-
-	temp = rockchip_tsadc_get_temp(dvfs_node->tsadc_ch, 0);
-	/* debounce */
-	delta_temp = (dvfs_node->old_temp > temp) ? (dvfs_node->old_temp - temp) :
-			(temp - dvfs_node->old_temp);
-	if (delta_temp <= 1)
-		return NOTIFY_OK;
-
-	if ((temp >= dvfs_node->target_temp) && !thermal_en) {
-		thermal_en = 1;
-		rkvdec_set_clk(0, 0, 0, thermal_en);
-	} else if ((temp < dvfs_node->target_temp) && thermal_en) {
-		thermal_en = 0;
-		rkvdec_set_clk(0, 0, 0, thermal_en);
-	}
-
-	return NOTIFY_OK;
-}
-
 static int cpufreq_init_cpu0(struct cpufreq_policy *policy)
 {
 	unsigned int i;
@@ -241,13 +184,6 @@ static int cpufreq_init_cpu0(struct cpufreq_policy *policy)
 		clk_enable_dvfs(clk_ddr_dvfs_node);
 	}
 
-	clk_rkvdec_dvfs_node = clk_get_dvfs_node("aclk_rkvdec");
-	if (clk_rkvdec_dvfs_node) {
-		clk_enable_dvfs(clk_rkvdec_dvfs_node);
-		register_dvfs_notifier_callback(clk_rkvdec_dvfs_node,
-						rkvdec_dvfs_notifier_call);
-	}
-
 	clk_cpu_dvfs_node = clk_get_dvfs_node("clk_core");
 	if (!clk_cpu_dvfs_node){
 		return -EINVAL;
@@ -267,8 +203,6 @@ static int cpufreq_init_cpu0(struct cpufreq_policy *policy)
 	}
 	low_battery_freq = get_freq_from_table(low_battery_freq);
 	clk_enable_dvfs(clk_cpu_dvfs_node);
-
-	cpufreq_register_notifier(&notifier_policy_block, CPUFREQ_POLICY_NOTIFIER);
 
 	printk("cpufreq version " VERSION ", suspend freq %d MHz\n", suspend_freq / 1000);
 	return 0;
@@ -308,7 +242,6 @@ static int cpufreq_exit(struct cpufreq_policy *policy)
 
 	cpufreq_frequency_table_cpuinfo(policy, freq_table);
 	clk_put_dvfs_node(clk_cpu_dvfs_node);
-	cpufreq_unregister_notifier(&notifier_policy_block, CPUFREQ_POLICY_NOTIFIER);
 
 	return 0;
 }

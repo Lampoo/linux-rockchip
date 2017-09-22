@@ -322,9 +322,9 @@ static enum cif_isp11_pix_fmt cif_isp11_v4l2_pix_fmt2cif_isp11_pix_fmt(
 	switch (v4l2_pix_fmt) {
 	case V4L2_PIX_FMT_GREY:
 		#if (CIF_ISP11_PIX_FMT_Y_AS_BAYER)
-		return CIF_YUV400;
-		#else
 		return CIF_BAYER_SBGGR8;
+		#else
+		return CIF_YUV400;
 		#endif
 	case V4L2_PIX_FMT_Y10:
 		#if (CIF_ISP11_PIX_FMT_Y_AS_BAYER)
@@ -1117,19 +1117,25 @@ static unsigned int cif_isp11_v4l2_poll(
 
 static void cif_isp11_v4l2_vm_open(struct vm_area_struct *vma)
 {
+	unsigned long flags = 0;
 	struct cif_isp11_metadata_s *metadata =
 		(struct cif_isp11_metadata_s *)vma->vm_private_data;
 
+	spin_lock_irqsave(&metadata->spinlock, flags);
 	metadata->vmas++;
+	spin_unlock_irqrestore(&metadata->spinlock, flags);
 	return;
 }
 
 static void cif_isp11_v4l2_vm_close(struct vm_area_struct *vma)
 {
+	unsigned long flags = 0;
 	struct cif_isp11_metadata_s *metadata =
 		(struct cif_isp11_metadata_s *)vma->vm_private_data;
 
+	spin_lock_irqsave(&metadata->spinlock, flags);
 	metadata->vmas--;
+	spin_unlock_irqrestore(&metadata->spinlock, flags);
 	return;
 }
 

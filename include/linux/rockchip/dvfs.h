@@ -106,9 +106,16 @@ struct lkg_adjust_volt_table {
 	int	dlt_volt;
 };
 
+struct scaling_sel_table {
+	int min;
+	int max;
+	int sel;
+};
+
 struct lkg_info {
 	int	def_table_lkg;
 	int	min_adjust_freq;
+	int	max_volt;
 	struct	lkg_adjust_volt_table *table;
 };
 
@@ -138,8 +145,10 @@ struct dvfs_node {
 	int			support_pvtm;
 	unsigned int		min_rate;	//limit min frequency
 	unsigned int		max_rate;	//limit max frequency
+	unsigned int		boost_en;
 	unsigned long		boost_freq;
 	unsigned long		last_set_rate;
+	unsigned int		early_suspend_freq;
 	unsigned int		channel;
 	unsigned int		tsadc_ch;
 	unsigned long		temp_limit_rate;
@@ -153,6 +162,7 @@ struct dvfs_node {
 	struct vd_node		*vd;
 	struct list_head	node;
 	struct notifier_block	dvfs_nb;
+	struct notifier_block	early_suspend_nb;
 	struct delayed_work	dwork;
 	struct cpufreq_frequency_table	*dvfs_table;
 	struct cpufreq_frequency_table	*pvtm_table;
@@ -169,6 +179,7 @@ struct dvfs_node {
 	unsigned int		cluster;
 	unsigned int        max_limit_freq;
 	unsigned int        pvtm_min_temp;
+	struct scaling_sel_table	*scaling_sel_tbl;
 };
 
 

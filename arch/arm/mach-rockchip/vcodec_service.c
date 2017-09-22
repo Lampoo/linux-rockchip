@@ -43,6 +43,7 @@
 #include <linux/rockchip/pmu.h>
 #include <linux/rockchip/grf.h>
 #include <linux/rockchip/dvfs.h>
+#include <linux/rockchip/common.h>
 
 #if defined(CONFIG_ION_ROCKCHIP)
 #include <linux/rockchip_ion.h>
@@ -450,6 +451,8 @@ struct vpu_service_info {
 	ion_phys_addr_t pf_pa;
 	unsigned long war_iova;
 	struct regmap *cru;
+	struct clk *p_cpll;
+	struct clk *p_gpll;
 	unsigned long cpll_rate;
 	unsigned long gpll_rate;
 };
@@ -730,12 +733,16 @@ static void rkvdec_set_clk_by_cru(unsigned long vcodec_rate,
 					     0x00df0000 | (aclk_div - 1));
 				vpu_dvfs->aclk_vcodec->rate =
 					vpu_dvfs->cpll_rate / aclk_div;
+				clk_set_parent(vpu_dvfs->aclk_vcodec,
+					       vpu_dvfs->p_cpll);
 			} else {
 				aclk_div = vpu_dvfs->gpll_rate / vcodec_rate;
 				regmap_write(vpu_dvfs->cru, 0x1c0,
 					     0x00df0040 | aclk_div);
 				vpu_dvfs->aclk_vcodec->rate =
 					vpu_dvfs->gpll_rate / (aclk_div + 1);
+				clk_set_parent(vpu_dvfs->aclk_vcodec,
+					       vpu_dvfs->p_gpll);
 			}
 			vcodec_old_rate = vcodec_rate;
 		}
@@ -746,12 +753,16 @@ static void rkvdec_set_clk_by_cru(unsigned long vcodec_rate,
 					     0x00df0000 | (core_div - 1));
 				vpu_dvfs->clk_core->rate =
 					vpu_dvfs->cpll_rate / core_div;
+				clk_set_parent(vpu_dvfs->clk_core,
+					       vpu_dvfs->p_cpll);
 			} else {
 				core_div = vpu_dvfs->gpll_rate / core_rate;
 				regmap_write(vpu_dvfs->cru, 0x1c4,
 					     0x00df0040 | core_div);
 				vpu_dvfs->clk_core->rate =
 					vpu_dvfs->gpll_rate / (core_div + 1);
+				clk_set_parent(vpu_dvfs->clk_core,
+					       vpu_dvfs->p_gpll);
 			}
 			core_old_rate = core_rate;
 		}
@@ -763,12 +774,16 @@ static void rkvdec_set_clk_by_cru(unsigned long vcodec_rate,
 					     ((cabac_div - 1) << 8));
 				vpu_dvfs->clk_cabac->rate =
 					vpu_dvfs->cpll_rate / cabac_div;
+				clk_set_parent(vpu_dvfs->clk_cabac,
+					       vpu_dvfs->p_cpll);
 			} else {
 				cabac_div = vpu_dvfs->gpll_rate / cabac_rate;
 				regmap_write(vpu_dvfs->cru, 0x1c0,
 					     0xdf004000 | (cabac_div << 8));
 				vpu_dvfs->clk_cabac->rate =
 					vpu_dvfs->gpll_rate / (cabac_div + 1);
+				clk_set_parent(vpu_dvfs->clk_cabac,
+					       vpu_dvfs->p_gpll);
 			}
 			cabac_old_rate = cabac_rate;
 		}
@@ -3051,6 +3066,35 @@ static void vcodec_init_drvdata(struct vpu_service_info *pservice)
 		pservice->hw_var->init(pservice);
 }
 
+static int rkvdec_dvfs_notifier_call(struct notifier_block *nb,
+				     unsigned long action, void *data)
+{
+	static int thermal_en;
+	struct dvfs_node *dvfs_node;
+	int temp, delta_temp = 0;
+
+	dvfs_node = container_of(nb, struct dvfs_node, dvfs_nb);
+	if (!dvfs_node->temp_limit_enable)
+		return NOTIFY_OK;
+
+	temp = rockchip_tsadc_get_temp(dvfs_node->tsadc_ch, 0);
+	/* debounce */
+	delta_temp = (dvfs_node->old_temp > temp) ? (dvfs_node->old_temp - temp) :
+			(temp - dvfs_node->old_temp);
+	if (delta_temp <= 1)
+		return NOTIFY_OK;
+
+	if ((temp >= dvfs_node->target_temp) && !thermal_en) {
+		thermal_en = 1;
+		rkvdec_set_clk(0, 0, 0, thermal_en);
+	} else if ((temp < dvfs_node->target_temp) && thermal_en) {
+		thermal_en = 0;
+		rkvdec_set_clk(0, 0, 0, thermal_en);
+	}
+
+	return NOTIFY_OK;
+}
+
 static int vcodec_probe(struct platform_device *pdev)
 {
 	int i;
@@ -3060,6 +3104,7 @@ static int vcodec_probe(struct platform_device *pdev)
 	struct device_node *np = pdev->dev.of_node;
 	struct vpu_service_info *pservice =
 		devm_kzalloc(dev, sizeof(struct vpu_service_info), GFP_KERNEL);
+	struct dvfs_node *clk_rkvdec_dvfs_node;
 
 	pservice->dev = dev;
 
@@ -3109,10 +3154,19 @@ static int vcodec_probe(struct platform_device *pdev)
 	pservice->cru =
 		syscon_regmap_lookup_by_compatible("rockchip,rk322xh-cru");
 	if (!IS_ERR(pservice->cru)) {
-		pservice->cpll_rate = clk_get_rate(clk_get(NULL, "clk_cpll"));
-		pservice->gpll_rate = clk_get_rate(clk_get(NULL, "clk_gpll"));
+		pservice->p_cpll = clk_get(NULL, "clk_cpll");
+		pservice->p_gpll = clk_get(NULL, "clk_gpll");
+		pservice->cpll_rate = clk_get_rate(pservice->p_cpll);
+		pservice->gpll_rate = clk_get_rate(pservice->p_gpll);
 	}
 	vpu_dvfs = pservice;
+
+	clk_rkvdec_dvfs_node = clk_get_dvfs_node("aclk_rkvdec");
+	if (clk_rkvdec_dvfs_node) {
+		clk_enable_dvfs(clk_rkvdec_dvfs_node);
+		register_dvfs_notifier_callback(clk_rkvdec_dvfs_node,
+						rkvdec_dvfs_notifier_call);
+	}
 
 	pr_info("init success\n");
 

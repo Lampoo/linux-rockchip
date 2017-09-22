@@ -1644,7 +1644,8 @@ static int cif_isp11_config_isp(
 	output = &dev->config.isp_config.output;
 	cam_itf = &dev->config.cam_itf;
 
-	if (CIF_ISP11_PIX_FMT_IS_RAW_BAYER(in_pix_fmt)) {
+	if (CIF_ISP11_PIX_FMT_IS_RAW_BAYER(in_pix_fmt) ||
+		(in_pix_fmt == CIF_Y10)) {
 		if (!dev->config.mi_config.raw_enable) {
 			output->pix_fmt = CIF_YUV422I;
 
@@ -1665,6 +1666,9 @@ static int cif_isp11_config_isp(
 			if (dev->sp_stream.state == CIF_ISP11_STATE_READY) {
 				output->quantization =
 					dev->config.mi_config.sp.output.quantization;
+
+				if (in_pix_fmt == CIF_Y10)
+					output->pix_fmt = CIF_YUV400;
 			}
 
 			if (dev->mp_stream.state == CIF_ISP11_STATE_READY) {
@@ -1676,8 +1680,13 @@ static int cif_isp11_config_isp(
 					dev->config.mi_config.y12.output.quantization;
 			}
 
-			cif_iowrite32(0xc,
-				dev->config.base_addr + CIF_ISP_DEMOSAIC);
+			if (in_pix_fmt == CIF_Y10) {
+				cif_iowrite32(0x40c,
+					dev->config.base_addr + CIF_ISP_DEMOSAIC);
+			} else {
+				cif_iowrite32(0xc,
+					dev->config.base_addr + CIF_ISP_DEMOSAIC);
+			}
 
 			if (PLTFRM_CAM_ITF_IS_BT656(dev->config.cam_itf.type)) {
 				cif_iowrite32(CIF_ISP_CTRL_ISP_MODE_BAYER_ITU656,
@@ -1718,31 +1727,34 @@ static int cif_isp11_config_isp(
 		}
 
 		bpp = CIF_ISP11_PIX_FMT_GET_BPP(in_pix_fmt);
-		if (bpp == 8)
+		if (bpp == 8) {
 			isp_input_sel = CIF_ISP_ACQ_PROP_IN_SEL_8B_MSB;
-		else if (bpp == 10)
+		} else if (bpp == 10) {
 			isp_input_sel = CIF_ISP_ACQ_PROP_IN_SEL_10B_MSB;
-		else if (bpp == 12)
+		} else if (bpp == 12) {
 			isp_input_sel = CIF_ISP_ACQ_PROP_IN_SEL_12B;
-		else {
+		} else {
 			cif_isp11_pltfrm_pr_err(dev->dev,
 				"%d bits per pixel not supported\n", bpp);
 			ret = -EINVAL;
 			goto err;
 		}
-		if (CIF_ISP11_PIX_FMT_BAYER_PAT_IS_BGGR(in_pix_fmt))
-			isp_bayer_pat = CIF_ISP_ACQ_PROP_BAYER_PAT_BGGR;
-		else if (CIF_ISP11_PIX_FMT_BAYER_PAT_IS_GBRG(in_pix_fmt))
-			isp_bayer_pat = CIF_ISP_ACQ_PROP_BAYER_PAT_GBRG;
-		else if (CIF_ISP11_PIX_FMT_BAYER_PAT_IS_GRBG(in_pix_fmt))
-			isp_bayer_pat = CIF_ISP_ACQ_PROP_BAYER_PAT_GRBG;
-		else if (CIF_ISP11_PIX_FMT_BAYER_PAT_IS_RGGB(in_pix_fmt))
-			isp_bayer_pat = CIF_ISP_ACQ_PROP_BAYER_PAT_RGGB;
-		else {
-			cif_isp11_pltfrm_pr_err(dev->dev,
-				"BAYER pattern not supported\n");
-			ret = -EINVAL;
-			goto err;
+
+		if (CIF_ISP11_PIX_FMT_IS_RAW_BAYER(in_pix_fmt)) {
+			if (CIF_ISP11_PIX_FMT_BAYER_PAT_IS_BGGR(in_pix_fmt)) {
+				isp_bayer_pat = CIF_ISP_ACQ_PROP_BAYER_PAT_BGGR;
+			} else if (CIF_ISP11_PIX_FMT_BAYER_PAT_IS_GBRG(in_pix_fmt)) {
+				isp_bayer_pat = CIF_ISP_ACQ_PROP_BAYER_PAT_GBRG;
+			} else if (CIF_ISP11_PIX_FMT_BAYER_PAT_IS_GRBG(in_pix_fmt)) {
+				isp_bayer_pat = CIF_ISP_ACQ_PROP_BAYER_PAT_GRBG;
+			} else if (CIF_ISP11_PIX_FMT_BAYER_PAT_IS_RGGB(in_pix_fmt)) {
+				isp_bayer_pat = CIF_ISP_ACQ_PROP_BAYER_PAT_RGGB;
+			} else {
+				cif_isp11_pltfrm_pr_err(dev->dev,
+					"BAYER pattern not supported\n");
+				ret = -EINVAL;
+				goto err;
+			}
 		}
 	} else if (CIF_ISP11_PIX_FMT_IS_YUV(in_pix_fmt)) {
 		output->pix_fmt = in_pix_fmt;
@@ -2017,6 +2029,8 @@ static int cif_isp11_config_mipi(
 			(CIF_ISP11_PIX_FMT_YUV_GET_Y_SUBS(in_pix_fmt) == 4) &&
 			(CIF_ISP11_PIX_FMT_GET_BPP(in_pix_fmt) == 20))
 			data_type = CSI2_DT_YUV422_10b;
+		else if (in_pix_fmt == CIF_Y10)
+			data_type = CSI2_DT_RAW10;
 		else {
 			cif_isp11_pltfrm_pr_err(dev->dev,
 				"unsupported format %s\n",
@@ -2391,6 +2405,10 @@ static int cif_isp11_config_mi_sp(
 			CIF_ISP11_PIX_FMT_YUV_GET_NUM_CPLANES(out_pix_fmt);
 		if (num_cplanes == 0) {
 			writeformat = CIF_ISP11_BUFF_FMT_INTERLEAVED;
+
+			if (out_pix_fmt == CIF_YUV400)
+				writeformat = CIF_ISP11_BUFF_FMT_PLANAR;
+
 		} else {
 			dev->config.mi_config.sp.y_size =
 				(dev->config.mi_config.sp.y_size * 4)
@@ -3624,6 +3642,7 @@ static void cif_isp11_init_stream(
 	stream->updt_cfg = false;
 	stream->stop = false;
 	stream->stall = false;
+	spin_lock_init(&stream->metadata.spinlock);
 
 	cif_isp11_pltfrm_event_clear(dev->dev, &stream->done);
 	stream->state = CIF_ISP11_STATE_INACTIVE;
@@ -4030,6 +4049,18 @@ static int cif_isp11_s_fmt_mp(
 		strm_fmt->frm_fmt.quantization);
 
 	/* TBD: check whether format is a valid format for MP */
+	if (strm_fmt->frm_fmt.pix_fmt == CIF_YUV400) {
+		cif_isp11_pltfrm_pr_err(dev->dev,
+			"format %s %dx%d@%d/%dfps, stride = %d not supported on MP\n",
+			cif_isp11_pix_fmt_string(strm_fmt->frm_fmt.pix_fmt),
+			strm_fmt->frm_fmt.width,
+			strm_fmt->frm_fmt.height,
+			strm_fmt->frm_intrvl.numerator,
+			strm_fmt->frm_intrvl.denominator,
+			stride);
+		ret = -EINVAL;
+		goto err;
+	}
 
 	if (CIF_ISP11_PIX_FMT_IS_JPEG(strm_fmt->frm_fmt.pix_fmt))
 		dev->config.jpeg_config.enable = true;
@@ -4416,6 +4447,7 @@ static int cif_isp11_mi_frame_end(
 				stream->curr_buf->state = VIDEOBUF_DONE;
 			wake_now = false;
 
+			spin_lock(&stream->metadata.spinlock);
 			if (stream->metadata.d && dev->isp_dev.streamon) {
 				struct v4l2_buffer_metadata_s *metadata;
 
@@ -4425,6 +4457,7 @@ static int cif_isp11_mi_frame_end(
 				metadata->frame_id = dev->isp_dev.frame_id;
 				metadata->frame_t.vs_t = dev->isp_dev.vs_t;
 				metadata->frame_t.fi_t = dev->isp_dev.fi_t;
+				spin_unlock(&stream->metadata.spinlock);
 
 				work = (struct cif_isp11_isp_readout_work *)
 					kmalloc(
@@ -4459,6 +4492,7 @@ static int cif_isp11_mi_frame_end(
 					wake_now = true;
 				}
 			} else {
+				spin_unlock(&stream->metadata.spinlock);
 				wake_now = true;
 			}
 
@@ -4528,9 +4562,11 @@ static void cif_isp11_stream_metadata_reset(
 )
 {
 	unsigned int i;
+	unsigned long flags = 0;
 	struct v4l2_buffer_metadata_s *metadata;
 	struct cifisp_isp_metadata *isp_metadata;
 
+	spin_lock_irqsave(&stream_dev->metadata.spinlock, flags);
 	if (stream_dev->metadata.d) {
 		for (i = 0; i < stream_dev->metadata.cnt; i++) {
 			metadata = (struct v4l2_buffer_metadata_s *)
@@ -4542,6 +4578,7 @@ static void cif_isp11_stream_metadata_reset(
 			isp_metadata->meas_cfg.s_frame_id = 0xffffffff;
 		}
 	}
+	spin_unlock_irqrestore(&stream_dev->metadata.spinlock, flags);
 
 	return;
 }
@@ -4925,6 +4962,8 @@ static int cif_isp11_stop(
 			msleep(1);
 		};
 		local_irq_restore(flags);
+
+		cifisp_clr_readout_wq(&dev->isp_dev);
 
 		if (!CIF_ISP11_INP_IS_DMA(dev->config.input_sel)) {
 			if (IS_ERR_VALUE(cif_isp11_img_src_set_state(dev,
@@ -6092,6 +6131,7 @@ int cif_isp11_release(
 	int stream_ids)
 {
 	int ret;
+	unsigned long flags = 0;
 	struct cif_isp11_stream *strm_dev;
 
 	cif_isp11_pltfrm_pr_dbg(NULL, "0x%08x\n", stream_ids);
@@ -6120,11 +6160,13 @@ int cif_isp11_release(
 		strm_dev = NULL;
 
 	if (strm_dev) {
+		spin_lock_irqsave(&strm_dev->metadata.spinlock, flags);
 		if (strm_dev->metadata.d != NULL) {
 			vfree(strm_dev->metadata.d);
 			strm_dev->metadata.d = NULL;
 			strm_dev->metadata.cnt = 0;
 		}
+		spin_unlock_irqrestore(&strm_dev->metadata.spinlock, flags);
 	}
 
 	if (stream_ids & CIF_ISP11_STREAM_SP) {
@@ -6381,6 +6423,7 @@ int cif_isp11_reqbufs(
 	enum cif_isp11_stream_id strm,
 	struct v4l2_requestbuffers *req)
 {
+	unsigned long flags = 0;
 	struct cif_isp11_stream *strm_dev;
 
 	switch (strm) {
@@ -6399,7 +6442,9 @@ int cif_isp11_reqbufs(
 		break;
 	}
 
+	spin_lock_irqsave(&strm_dev->metadata.spinlock, flags);
 	strm_dev->metadata.cnt = req->count;
+	spin_unlock_irqrestore(&strm_dev->metadata.spinlock, flags);
 
 	return 0;
 
@@ -6515,6 +6560,7 @@ int cif_isp11_s_vb_metadata(
 	struct cif_isp11_device *dev,
 	struct cif_isp11_isp_readout_work *readout_work)
 {
+	unsigned long flags = 0;
 	unsigned int stream_id =
 		readout_work->stream_id;
 	struct videobuf_buffer *vb =
@@ -6536,23 +6582,39 @@ int cif_isp11_s_vb_metadata(
 	default:
 		cif_isp11_pltfrm_pr_err(dev->dev,
 			"unknown stream id%d\n", stream_id);
-		break;
+		return -1;
 	}
 
+	if (strm_dev->state != CIF_ISP11_STATE_STREAMING) {
+		cif_isp11_pltfrm_pr_err(dev->dev,
+			"stream id%d is not streaming\n", stream_id);
+		return -1;
+	}
+
+	cif_isp11_sensor_mode_data_sync(dev,
+			readout_work->frame_id,
+			&sensor_mode);
+
+	spin_lock_irqsave(&strm_dev->metadata.spinlock, flags);
 	if (vb && strm_dev->metadata.d) {
+		if (vb->i >= strm_dev->metadata.cnt) {
+			cif_isp11_pltfrm_pr_err(dev->dev,
+				"vb->i %d is bigger than metadata.cnt %d\n",
+				vb->i, strm_dev->metadata.cnt);
+			spin_unlock_irqrestore(&strm_dev->metadata.spinlock, flags);
+			return -1;
+		}
 		metadata = (struct v4l2_buffer_metadata_s *)
 			(strm_dev->metadata.d +
 			vb->i*CAMERA_METADATA_LEN);
 
 		metadata->frame_id = readout_work->frame_id;
-		cif_isp11_sensor_mode_data_sync(dev,
-			metadata->frame_id,
-			&sensor_mode);
 		metadata->sensor.exp_time =
 			sensor_mode.exp_time;
 		metadata->sensor.gain =
 			sensor_mode.gain;
 	}
+	spin_unlock_irqrestore(&strm_dev->metadata.spinlock, flags);
 
 	if (vb) {
 		cif_isp11_pltfrm_pr_dbg(NULL,
@@ -6571,6 +6633,7 @@ int cif_isp11_mmap(
 	void *mem_vaddr;
 	int retval = 0, pages;
 	unsigned long mem_size;
+	unsigned long flags = 0;
 
 	switch (stream_id) {
 	case CIF_ISP11_STREAM_MP:
@@ -6618,7 +6681,9 @@ int cif_isp11_mmap(
 		goto done;
 	}
 
+	spin_lock_irqsave(&strm_dev->metadata.spinlock, flags);
 	strm_dev->metadata.d = (unsigned char *)mem_vaddr;
+	spin_unlock_irqrestore(&strm_dev->metadata.spinlock, flags);
 
 	vma->vm_private_data = (void *)&strm_dev->metadata;
 

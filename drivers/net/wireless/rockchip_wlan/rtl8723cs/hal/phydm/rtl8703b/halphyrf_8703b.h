@@ -27,108 +27,103 @@
 #define RF_T_METER_8703B		0x42
 
 #if (DM_ODM_SUPPORT_TYPE & (ODM_WIN))
-	#include "../halphyrf_win.h"
+#include "../halphyrf_win.h"
 #elif (DM_ODM_SUPPORT_TYPE & (ODM_CE))
-	#include "../halphyrf_ce.h"
+#include "../halphyrf_ce.h"
 #endif
 
-void configure_txpower_track_8703b(
-	struct _TXPWRTRACK_CFG	*p_config
-);
+void ConfigureTxpowerTrack_8703B(
+	PTXPWRTRACK_CFG	pConfig
+	);
 
-void do_iqk_8703b(
-	void		*p_dm_void,
-	u8		delta_thermal_index,
-	u8		thermal_value,
-	u8		threshold
-);
+void DoIQK_8703B(
+	PVOID		pDM_VOID,
+	u1Byte 		DeltaThermalIndex,
+	u1Byte		ThermalValue,	
+	u1Byte 		Threshold
+	);
 
-void
-odm_tx_pwr_track_set_pwr_8703b(
-	void		*p_dm_void,
-	enum pwrtrack_method	method,
-	u8				rf_path,
-	u8				channel_mapped_index
-);
+VOID
+ODM_TxPwrTrackSetPwr_8703B(
+	IN	PVOID		pDM_VOID,
+	PWRTRACK_METHOD 	Method,
+	u1Byte 				RFPath,
+	u1Byte 				ChannelMappedIndex
+	);
 
-void
-odm_txxtaltrack_set_xtal_8703b(
-	void		*p_dm_void
-);
+//1 7.	IQK
 
-
-/* 1 7.	IQK */
-
-void
-phy_iq_calibrate_8703b(
+void	
+PHY_IQCalibrate_8703B(	
 #if (DM_ODM_SUPPORT_TYPE & ODM_AP)
-	struct PHY_DM_STRUCT		*p_dm_odm,
+	IN PDM_ODM_T		pDM_Odm,
 #else
-	struct _ADAPTER	*adapter,
+	IN PADAPTER	Adapter,
 #endif
-	boolean	is_recovery);
+	IN	BOOLEAN 	bReCovery);
 
-boolean
-odm_set_iqc_by_rfpath_8703b(
-	struct PHY_DM_STRUCT		*p_dm_odm
+BOOLEAN
+ODM_SetIQCbyRFpath_8703B(
+	IN PDM_ODM_T		pDM_Odm
+	);
+
+//
+// LC calibrate
+//
+void	
+PHY_LCCalibrate_8703B(
+	PVOID		pDM_VOID
 );
 
-/*
- * LC calibrate
- *   */
-void
-phy_lc_calibrate_8703b(
-	void		*p_dm_void
-);
-
-/*
- * AP calibrate
- *   */
-void
-phy_ap_calibrate_8703b(
+//
+// AP calibrate
+//
+void	
+PHY_APCalibrate_8703B(		
 #if (DM_ODM_SUPPORT_TYPE & ODM_AP)
-	struct PHY_DM_STRUCT		*p_dm_odm,
+	IN PDM_ODM_T		pDM_Odm,
 #else
-	struct _ADAPTER	*p_adapter,
+	IN	PADAPTER	pAdapter,
 #endif
-	s8		delta);
-void
-phy_digital_predistortion_8703b(struct _ADAPTER	*p_adapter);
+							IN 	s1Byte		delta);
+void	
+PHY_DigitalPredistortion_8703B(		IN	PADAPTER	pAdapter);
 
 
-void
-_phy_save_adda_registers_8703b(
+VOID
+_PHY_SaveADDARegisters_8703B(
 #if (DM_ODM_SUPPORT_TYPE & ODM_AP)
-	struct PHY_DM_STRUCT		*p_dm_odm,
+	IN PDM_ODM_T		pDM_Odm,
 #else
-	struct _ADAPTER	*p_adapter,
+	IN	PADAPTER	pAdapter,
 #endif
-	u32		*adda_reg,
-	u32		*adda_backup,
-	u32		register_num
-);
+	IN	pu4Byte		ADDAReg,
+	IN	pu4Byte		ADDABackup,
+	IN	u4Byte		RegisterNum
+	);
 
-void
-_phy_path_adda_on_8703b(
+VOID
+_PHY_PathADDAOn_8703B(
 #if (DM_ODM_SUPPORT_TYPE & ODM_AP)
-	struct PHY_DM_STRUCT		*p_dm_odm,
+	IN PDM_ODM_T		pDM_Odm,
 #else
-	struct _ADAPTER	*p_adapter,
+	IN	PADAPTER	pAdapter,
 #endif
-	u32		*adda_reg,
-	boolean		is_path_a_on,
-	boolean		is2T
-);
+	IN	pu4Byte		ADDAReg,
+	IN	BOOLEAN		isPathAOn,
+	IN	BOOLEAN		is2T
+	);
 
-void
-_phy_mac_setting_calibration_8703b(
+VOID
+_PHY_MACSettingCalibration_8703B(
 #if (DM_ODM_SUPPORT_TYPE & ODM_AP)
-	struct PHY_DM_STRUCT		*p_dm_odm,
+	IN PDM_ODM_T		pDM_Odm,
 #else
-	struct _ADAPTER	*p_adapter,
+	IN	PADAPTER	pAdapter,
 #endif
-	u32		*mac_reg,
-	u32		*mac_backup
-);
+	IN	pu4Byte		MACReg,
+	IN	pu4Byte		MACBackup	
+	);
+							
+#endif	// #ifndef __HAL_PHY_RF_8188E_H__								
 
-#endif	/*  #ifndef __HAL_PHY_RF_8188E_H__ */

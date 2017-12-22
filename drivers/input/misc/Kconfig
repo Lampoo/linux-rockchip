@@ -670,4 +670,8 @@ config INPUT_XEN_KBDDEV_FRONTEND
 	  To compile this driver as a module, choose M here: the
 	  module will be called xen-kbdfront.
 
+config STMVL6180
+	bool "STM VL6180 FlightSense TOF sensor"
+	default n
+
 endif

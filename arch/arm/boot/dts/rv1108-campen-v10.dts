@@ -363,6 +363,15 @@
 		layout = <1>;
 		status = "okay";
 	};
+
+	stmvl6180: stmvl6180@29 {
+		compatible = "st,stmvl6180";
+		reg = <0x29>;
+		power-gpio = <&gpio1 GPIO_D1 GPIO_ACTIVE_HIGH>;
+		irq-gpio = <&gpio1 GPIO_D2 GPIO_ACTIVE_LOW>;
+		irq_enable = <1>;
+		status = "okay";
+	};
 };
 
 &camera0 {

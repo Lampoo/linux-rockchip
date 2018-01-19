@@ -159,6 +159,8 @@ struct rockchip_pmu_operations {
 	int (*set_power_domain)(enum pmu_power_domain pd, bool on);
 	bool (*power_domain_is_on)(enum pmu_power_domain pd);
 	int (*set_idle_request)(enum pmu_idle_req req, bool idle);
+	void (*save_qos)(enum pmu_idle_req req);
+	void (*restore_qos)(enum pmu_idle_req req);
 };
 
 extern struct rockchip_pmu_operations rockchip_pmu_ops;

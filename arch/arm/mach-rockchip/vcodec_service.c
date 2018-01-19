@@ -900,6 +900,9 @@ static void vpu_reset(struct vpu_subdev_data *data)
 
 #ifdef CONFIG_RESET_CONTROLLER
 	if (pservice->rst_a && pservice->rst_h) {
+		if (rockchip_pmu_ops.save_qos)
+			rockchip_pmu_ops.save_qos(type);
+
 		if (rockchip_pmu_ops.set_idle_request)
 			ret = rockchip_pmu_ops.set_idle_request(type, true);
 		if (ret < 0) {
@@ -926,6 +929,9 @@ static void vpu_reset(struct vpu_subdev_data *data)
 			if (rockchip_pmu_ops.set_idle_request)
 				rockchip_pmu_ops.set_idle_request(type, false);
 		}
+
+		if (rockchip_pmu_ops.restore_qos)
+			rockchip_pmu_ops.restore_qos(type);
 	}
 #endif
 

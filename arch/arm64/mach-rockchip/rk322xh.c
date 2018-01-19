@@ -124,6 +124,118 @@ static int rk322xh_do_idle_request(enum pmu_idle_req req, bool idle)
 	return 0;
 }
 
+static void rk322xh_save_qos(enum pmu_idle_req req)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&pmu_idle_lock, flags);
+
+	switch (req) {
+	case IDLE_REQ_VIO:
+		PD_SAVE_QOS(hdcp);
+		PD_SAVE_QOS(vop);
+		PD_SAVE_QOS(iep);
+		PD_SAVE_QOS(vip);
+		PD_SAVE_QOS(rga_r);
+		PD_SAVE_QOS(rga_w);
+		break;
+	case IDLE_REQ_VIDEO:
+		PD_SAVE_QOS(rkvdec_r);
+		PD_SAVE_QOS(rkvdec_w);
+		break;
+	case IDLE_REQ_HEVC:
+		PD_SAVE_QOS(h265);
+		PD_SAVE_QOS(h264);
+		break;
+	case IDLE_REQ_VPU:
+		PD_SAVE_QOS(vpu);
+		break;
+	case IDLE_REQ_GPU:
+		PD_SAVE_QOS(gpu0);
+		PD_SAVE_QOS(gpu1);
+		break;
+	case IDLE_REQ_PERI:
+		PD_SAVE_QOS(emmc);
+		PD_SAVE_QOS(gmac2io);
+		PD_SAVE_QOS(sdio);
+		PD_SAVE_QOS(sdmmc);
+		PD_SAVE_QOS(usbhost0);
+		PD_SAVE_QOS(usb3otg);
+		PD_SAVE_QOS(usbotg);
+		PD_SAVE_QOS(gmac2phy);
+		PD_SAVE_QOS(sdmmc_ext);
+		break;
+	case IDLE_REQ_BUS:
+		PD_SAVE_QOS(dma);
+		PD_SAVE_QOS(crypto);
+		PD_SAVE_QOS(tsp);
+		break;
+	case IDLE_REQ_CORE:
+		PD_SAVE_QOS(cpu);
+		break;
+	default:
+		break;
+	}
+
+	spin_unlock_irqrestore(&pmu_idle_lock, flags);
+}
+
+static void rk322xh_restore_qos(enum pmu_idle_req req)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&pmu_idle_lock, flags);
+
+	switch (req) {
+	case IDLE_REQ_VIO:
+		PD_RESTORE_QOS(hdcp);
+		PD_RESTORE_QOS(vop);
+		PD_RESTORE_QOS(iep);
+		PD_RESTORE_QOS(vip);
+		PD_RESTORE_QOS(rga_r);
+		PD_RESTORE_QOS(rga_w);
+		break;
+	case IDLE_REQ_VIDEO:
+		PD_RESTORE_QOS(rkvdec_r);
+		PD_RESTORE_QOS(rkvdec_w);
+		break;
+	case IDLE_REQ_HEVC:
+		PD_RESTORE_QOS(h265);
+		PD_RESTORE_QOS(h264);
+		break;
+	case IDLE_REQ_VPU:
+		PD_RESTORE_QOS(vpu);
+		break;
+	case IDLE_REQ_GPU:
+		PD_RESTORE_QOS(gpu0);
+		PD_RESTORE_QOS(gpu1);
+		break;
+	case IDLE_REQ_PERI:
+		PD_RESTORE_QOS(emmc);
+		PD_RESTORE_QOS(gmac2io);
+		PD_RESTORE_QOS(sdio);
+		PD_RESTORE_QOS(sdmmc);
+		PD_RESTORE_QOS(usbhost0);
+		PD_RESTORE_QOS(usb3otg);
+		PD_RESTORE_QOS(usbotg);
+		PD_RESTORE_QOS(gmac2phy);
+		PD_RESTORE_QOS(sdmmc_ext);
+		break;
+	case IDLE_REQ_BUS:
+		PD_RESTORE_QOS(dma);
+		PD_RESTORE_QOS(crypto);
+		PD_RESTORE_QOS(tsp);
+		break;
+	case IDLE_REQ_CORE:
+		PD_RESTORE_QOS(cpu);
+		break;
+	default:
+		break;
+	}
+
+	spin_unlock_irqrestore(&pmu_idle_lock, flags);
+}
+
 static int rk322xh_set_idle_request(enum pmu_idle_req req, bool idle)
 {
 	unsigned long flags;
@@ -131,84 +243,10 @@ static int rk322xh_set_idle_request(enum pmu_idle_req req, bool idle)
 
 	spin_lock_irqsave(&pmu_idle_lock, flags);
 
-	if (idle) {
-		if (req == IDLE_REQ_VIO) {
-			PD_SAVE_QOS(hdcp);
-			PD_SAVE_QOS(vop);
-			PD_SAVE_QOS(iep);
-			PD_SAVE_QOS(vip);
-			PD_SAVE_QOS(rga_r);
-			PD_SAVE_QOS(rga_w);
-		} else if (req == IDLE_REQ_VIDEO) {
-			PD_SAVE_QOS(rkvdec_r);
-			PD_SAVE_QOS(rkvdec_w);
-		} else if (req == IDLE_REQ_HEVC) {
-			PD_SAVE_QOS(h265);
-			PD_SAVE_QOS(h264);
-		} else if (req == IDLE_REQ_VPU) {
-			PD_SAVE_QOS(vpu);
-		} else if (req == IDLE_REQ_GPU) {
-			PD_SAVE_QOS(gpu0);
-			PD_SAVE_QOS(gpu1);
-		} else if (req == IDLE_REQ_PERI) {
-			PD_SAVE_QOS(emmc);
-			PD_SAVE_QOS(gmac2io);
-			PD_SAVE_QOS(sdio);
-			PD_SAVE_QOS(sdmmc);
-			PD_SAVE_QOS(usbhost0);
-			PD_SAVE_QOS(usb3otg);
-			PD_SAVE_QOS(usbotg);
-			PD_SAVE_QOS(gmac2phy);
-			PD_SAVE_QOS(sdmmc_ext);
-		} else if (req == IDLE_REQ_BUS) {
-			PD_SAVE_QOS(dma);
-			PD_SAVE_QOS(crypto);
-			PD_SAVE_QOS(tsp);
-		} else if (req == IDLE_REQ_CORE) {
-			PD_SAVE_QOS(cpu);
-		}
-	}
-
 	ret = rk322xh_do_idle_request(req, idle);
 
-	if (!idle) {
-		if (req == IDLE_REQ_VIO) {
-			PD_RESTORE_QOS(hdcp);
-			PD_RESTORE_QOS(vop);
-			PD_RESTORE_QOS(iep);
-			PD_RESTORE_QOS(vip);
-			PD_RESTORE_QOS(rga_r);
-			PD_RESTORE_QOS(rga_w);
-		} else if (req == IDLE_REQ_VIDEO) {
-			PD_RESTORE_QOS(rkvdec_r);
-			PD_RESTORE_QOS(rkvdec_w);
-		} else if (req == IDLE_REQ_HEVC) {
-			PD_RESTORE_QOS(h265);
-			PD_RESTORE_QOS(h264);
-		} else if (req == IDLE_REQ_VPU) {
-			PD_RESTORE_QOS(vpu);
-		} else if (req == IDLE_REQ_GPU) {
-			PD_RESTORE_QOS(gpu0);
-			PD_RESTORE_QOS(gpu1);
-		} else if (req == IDLE_REQ_PERI) {
-			PD_RESTORE_QOS(emmc);
-			PD_RESTORE_QOS(gmac2io);
-			PD_RESTORE_QOS(sdio);
-			PD_RESTORE_QOS(sdmmc);
-			PD_RESTORE_QOS(usbhost0);
-			PD_RESTORE_QOS(usb3otg);
-			PD_RESTORE_QOS(usbotg);
-			PD_RESTORE_QOS(gmac2phy);
-			PD_RESTORE_QOS(sdmmc_ext);
-		} else if (req == IDLE_REQ_BUS) {
-			PD_RESTORE_QOS(dma);
-			PD_RESTORE_QOS(crypto);
-			PD_RESTORE_QOS(tsp);
-		} else if (req == IDLE_REQ_CORE) {
-			PD_RESTORE_QOS(cpu);
-		}
-	}
 	spin_unlock_irqrestore(&pmu_idle_lock, flags);
+
 	return ret;
 }
 
@@ -229,6 +267,8 @@ static __init int rk322xh_dt_init(void)
 		return -ENODEV;
 	}
 	rockchip_pmu_ops.set_idle_request = rk322xh_set_idle_request;
+	rockchip_pmu_ops.save_qos = rk322xh_save_qos;
+	rockchip_pmu_ops.restore_qos = rk322xh_restore_qos;
 
 	node = of_find_compatible_node(NULL, NULL, "rockchip,avs");
 	if (node)

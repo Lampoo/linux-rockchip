@@ -173,6 +173,12 @@ struct samsung_camera_module_custom_config {
 	void *priv;
 };
 
+struct samsung_camera_module_otp_work {
+	struct work_struct work;
+	struct workqueue_struct *wq;
+	void *cam_mod;
+};
+
 struct samsung_camera_module {
 	/* public */
 	struct v4l2_subdev sd;
@@ -185,6 +191,7 @@ struct samsung_camera_module {
 	enum samsung_camera_module_state state;
 	enum samsung_camera_module_state state_before_suspend;
 	struct samsung_camera_module_config *active_config;
+	struct samsung_camera_module_otp_work otp_work;
 	u32 ctrl_updt;
 	u32 vts_cur;
 	u32 vts_min;

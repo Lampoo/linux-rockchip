@@ -611,10 +611,6 @@ int samsung_camera_module_s_power(struct v4l2_subdev *sd, int on)
 				}
 			}
 		}
-		if (cam_mod->update_config) {
-			samsung_camera_module_write_config(cam_mod);
-			cam_mod->update_config = false;
-		}
 	} else {
 		if (SAMSUNG_CAMERA_MODULE_STREAMING == cam_mod->state) {
 			ret = samsung_camera_module_s_stream(sd, 0);
@@ -1021,6 +1017,25 @@ int samsung_camera_module_s_ctrl(
 
 /* ======================================================================== */
 
+static void samsung_camera_module_otp_read(struct work_struct *work)
+{
+	struct samsung_camera_module_otp_work *otp_work =
+		container_of(work, struct samsung_camera_module_otp_work, work);
+	struct samsung_camera_module *cam_mod =
+		(struct samsung_camera_module *)otp_work->cam_mod;
+
+	pltfrm_camera_module_pr_debug(&cam_mod->sd, "enter...");
+
+	samsung_camera_module_s_power(&cam_mod->sd, 1);
+	if (cam_mod->custom.read_otp)
+		(cam_mod->custom.read_otp)(cam_mod);
+	samsung_camera_module_s_power(&cam_mod->sd, 0);
+
+	pltfrm_camera_module_pr_debug(&cam_mod->sd, "exit...");
+}
+
+/* ======================================================================== */
+
 long samsung_camera_module_ioctl(struct v4l2_subdev *sd,
 	unsigned int cmd,
 	void *arg)
@@ -1103,7 +1118,18 @@ long samsung_camera_module_ioctl(struct v4l2_subdev *sd,
 		ret = samsung_camera_module_init(cam_mod, &cam_mod->custom);
 		if (!IS_ERR_VALUE(ret)) {
 			pltfrm_camera_module_ioctl(sd, cmd, arg);
-			return samsung_camera_module_attach(cam_mod);
+			ret =  samsung_camera_module_attach(cam_mod);
+			if (IS_ERR_VALUE(ret)) {
+				samsung_camera_module_release(cam_mod);
+				return ret;
+			}
+
+			if (cam_mod->custom.read_otp) {
+				INIT_WORK(&cam_mod->otp_work.work, samsung_camera_module_otp_read);
+				cam_mod->otp_work.cam_mod = (void *)cam_mod;
+
+				schedule_work(&cam_mod->otp_work.work);
+			}
 		} else {
 			samsung_camera_module_release(cam_mod);
 			return ret;
@@ -1298,6 +1324,9 @@ err:
 void samsung_camera_module_release(struct samsung_camera_module *cam_mod)
 {
 	pltfrm_camera_module_pr_debug(&cam_mod->sd, "\n");
+
+	if (cam_mod->custom.read_otp)
+		cancel_work_sync(&cam_mod->otp_work.work);
 
 	cam_mod->custom.configs = NULL;
 

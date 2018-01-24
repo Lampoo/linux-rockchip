@@ -81,9 +81,9 @@
 /* Low byte of product ID  */
 #define s5k4h8_PIDL_MAGIC 0x88
 
-#define BG_Ratio_Typical  0x129
-#define RG_Ratio_Typical  0x11f
-#define GAIN_DEFAULT       0x0100
+#define BG_Ratio_Typical  0x259
+#define RG_Ratio_Typical  0x281
+#define GAIN_DEFAULT 0x0100
 
 struct s5k4h8_otp_struct {
 	int otp_en;
@@ -546,11 +546,7 @@ static struct samsung_camera_module_config s5k4h8_configs[] = {
 			sizeof(s5k4h8_init_tab_1632_1224_30fps)
 			/
 			sizeof(s5k4h8_init_tab_1632_1224_30fps[0]),
-		.reg_diff_table = (void *)s5k4h8_init_tab_1632_1224_30fps,
-		.reg_diff_table_num_entries =
-			sizeof(s5k4h8_init_tab_1632_1224_30fps)
-			/
-			sizeof(s5k4h8_init_tab_1632_1224_30fps[0]),
+		.reg_diff_table = NULL,
 		.v_blanking_time_us = 8693,
 		PLTFRM_CAM_ITF_MIPI_CFG(0, 4, 480, s5k4h8_EXT_CLK)
 	},
@@ -1063,10 +1059,6 @@ int update_awb_gain(struct samsung_camera_module *cam_mod)
 			0x602a, 0x3058);
 	ret |= samsung_camera_module_write_reg(
 			cam_mod,
-			SAMSUNG_CAMERA_MODULE_REG_CONTINUE_TWO_BYTE_DATA,
-			0x602a, 0x3058);
-	ret |= samsung_camera_module_write_reg(
-			cam_mod,
 			SAMSUNG_CAMERA_MODULE_REG_CONTINUE_ONE_BYTE_DATA,
 			0x6f12, 0x01);
 	ret |= samsung_camera_module_write_reg(
@@ -1089,7 +1081,7 @@ int update_awb_gain(struct samsung_camera_module *cam_mod)
 		samsung_camera_module_pr_err(cam_mod, "otp awb gain apply failed\n");
 	else
 		samsung_camera_module_pr_info(cam_mod,
-					"xuhf: s5k4h8_update:%s, rgain:%x ggain %x bgain %x\n",
+					"s5k4h8_update:%s, rgain:%x ggain %x bgain %x\n",
 					__func__, r_gain, g_gain, b_gain);
 
 	return ret;
@@ -1110,7 +1102,7 @@ static int s5k4h8_start_streaming(struct samsung_camera_module *cam_mod)
 	if (otp_ptr != NULL && otp_ptr->otp_en == 1 && cam_mod->update_config
 	    && cam_mod->active_config->soft_reset) {
 		samsung_camera_module_pr_info(cam_mod,
-					"apply otp data...\n");
+					      "apply otp data...\n");
 		update_awb_gain(cam_mod);
 		update_lenc(cam_mod);
 	}
@@ -1192,7 +1184,6 @@ int  __s5k4h8_read_otp_wb(struct samsung_camera_module *cam_mod)
 {
 	int ret = 0;
 	int temp = 0;
-	u16 r_ratio, b_ratio, gr_gain, gb_gain;
 
 	ret |= samsung_camera_module_read_reg(cam_mod, 1, 0x0A04, &temp);
 	if (IS_ERR_VALUE(ret)) {
@@ -1344,45 +1335,17 @@ int  __s5k4h8_read_otp_wb(struct samsung_camera_module *cam_mod)
 		return 1;
 	}
 
-	r_ratio = 512 * (RG_Ratio_Typical) / (otp_ptr->rg_ratio);
-	b_ratio = 512 * (BG_Ratio_Typical) / (otp_ptr->bg_ratio);
-
-	if (!r_ratio || !b_ratio) {
-		samsung_camera_module_pr_err(cam_mod,
-			"r_ratio or b_ratio is wrong!\n");
-		return 1;
-	}
-
-	if (r_ratio >= 512) {
-		if (b_ratio >= 512) {
-			otp_ptr->R_gain = (u16)(GAIN_DEFAULT * r_ratio / 512);
-			otp_ptr->G_gain = GAIN_DEFAULT;
-			otp_ptr->B_gain = (u16)(GAIN_DEFAULT * b_ratio / 512);
-		} else {
-			otp_ptr->R_gain = (u16)(GAIN_DEFAULT * r_ratio / b_ratio);
-			otp_ptr->G_gain = (u16)(GAIN_DEFAULT * 512 / b_ratio);
-			otp_ptr->B_gain = GAIN_DEFAULT;
-		}
-	} else {
-		if (b_ratio >= 512) {
-			otp_ptr->R_gain = GAIN_DEFAULT;
-			otp_ptr->G_gain = (u16)(GAIN_DEFAULT * 512 / r_ratio);
-			otp_ptr->B_gain = (u16)(GAIN_DEFAULT *  b_ratio / r_ratio);
-		} else {
-			gr_gain = (u16)(GAIN_DEFAULT * 512 / r_ratio);
-			gb_gain = (u16)(GAIN_DEFAULT * 512 / b_ratio);
-
-			if (gr_gain >= gb_gain)	{
-				otp_ptr->R_gain = GAIN_DEFAULT;
-				otp_ptr->G_gain = (u16)(GAIN_DEFAULT * 512 / r_ratio);
-				otp_ptr->B_gain = (u16)(GAIN_DEFAULT * b_ratio / r_ratio);
-			} else {
-				otp_ptr->R_gain = (u16)(GAIN_DEFAULT * r_ratio / b_ratio);
-				otp_ptr->G_gain = (u16)(GAIN_DEFAULT * 512 / b_ratio);
-				otp_ptr->B_gain = GAIN_DEFAULT;
-			}
-		}
-	}
+	samsung_camera_module_pr_debug(cam_mod,
+		"flag: 0x%x, module_integrator_id: 0x%x\n"
+		"production_year: 0x%x, production_month: 0x%x, production_day: 0x%x\n"
+		"rg_ratio: 0x%x, bg_ratio: 0x%x\n",
+		otp_ptr->flag,
+		otp_ptr->module_integrator_id,
+		otp_ptr->production_year,
+		otp_ptr->production_month,
+		otp_ptr->production_day,
+		otp_ptr->rg_ratio,
+		otp_ptr->bg_ratio);
 
 	return ret;
 }
@@ -1528,7 +1491,7 @@ static int s5k4h8_otp_read(struct samsung_camera_module *cam_mod)
 
 	ret |= samsung_camera_module_write_reg(
 		cam_mod,
-		SAMSUNG_CAMERA_MODULE_REG_CONTINUE_TWO_BYTE_DATA,
+		SAMSUNG_CAMERA_MODULE_REG_CONTINUE_ONE_BYTE_DATA,
 		0x0A02, 0x0f);
 	if (IS_ERR_VALUE(ret)) {
 		samsung_camera_module_pr_err(cam_mod,
@@ -1555,16 +1518,6 @@ static int s5k4h8_otp_read(struct samsung_camera_module *cam_mod)
 	if (IS_ERR_VALUE(ret)) {
 		samsung_camera_module_pr_err(cam_mod,
 			"write 0xa02 failed!\n");
-		goto readotperr;
-	}
-
-	ret |= samsung_camera_module_write_reg(
-		cam_mod,
-		SAMSUNG_CAMERA_MODULE_REG_CONTINUE_ONE_BYTE_DATA,
-		s5k4h8_MODE_SELECT, s5k4h8_MODE_SELECT_OFF);
-	if (IS_ERR_VALUE(ret)) {
-		samsung_camera_module_pr_err(cam_mod,
-			"stream on failed!\n");
 		goto readotperr;
 	}
 

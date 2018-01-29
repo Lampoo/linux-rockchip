@@ -874,11 +874,11 @@ static void dvfs_rkvdec_set_clk(u32 vcodec_rate, u32 core_rate, u32 cabac_rate)
 	}
 }
 
+static void vcodec_reduce_freq_rk322xh(struct vpu_service_info *pservice);
 static void vpu_reset(struct vpu_subdev_data *data)
 {
 	struct vpu_service_info *pservice = data->pservice;
 	enum pmu_idle_req type = IDLE_REQ_VIDEO;
-	int ret = -1;
 
 	atomic_set(&pservice->reset_request, 0);
 
@@ -902,13 +902,12 @@ static void vpu_reset(struct vpu_subdev_data *data)
 	if (pservice->rst_a && pservice->rst_h) {
 		if (rockchip_pmu_ops.save_qos)
 			rockchip_pmu_ops.save_qos(type);
-
-		if (rockchip_pmu_ops.set_idle_request)
-			ret = rockchip_pmu_ops.set_idle_request(type, true);
-		if (ret < 0) {
-			pr_info("msch idle request and reset rkvdec\n");
+		if (pservice->hw_ops->reduce_freq ==
+		    vcodec_reduce_freq_rk322xh) {
 			sip_smc_vpu_reset(0, 0, 0);
 		} else {
+			if (rockchip_pmu_ops.set_idle_request)
+				rockchip_pmu_ops.set_idle_request(type, true);
 			if (pservice->hw_ops->reduce_freq)
 				pservice->hw_ops->reduce_freq(pservice);
 

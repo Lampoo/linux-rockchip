@@ -117,3 +117,10 @@ config VCM_GT9760S
 	default n
 	---help---
 	  This is gt9760s driver.
+
+config VIDEO_OV5695
+	tristate "ov5695 driver adapt to rockchip cif isp platform"
+	depends on VIDEO_V4L2 && VIDEO_RK_CIF_ISP11 && I2C
+	default n
+	---help---
+	  This is ov5695 camera driver adapt to rockchip cif isp platform.

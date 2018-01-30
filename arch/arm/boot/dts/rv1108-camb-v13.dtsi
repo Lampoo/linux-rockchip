@@ -191,3 +191,34 @@ camera5: camera-module@37 {
 
 	rockchip,af-ctrl = <&afc0>;
 };
+
+camera6: camera-module@36-2 {
+	status = "okay";
+	compatible = "omnivision,ov5695-v4l2-i2c-subdev";
+	reg = <0x36>;
+	device_type = "v4l2-i2c-subdev";
+	clocks = <&clk_cif_out>;
+	clock-names = "clk_cif_out";
+	pinctrl-names = "rockchip,camera_default", "rockchip,camera_sleep";
+	pinctrl-0 = <&cif_dvp_clk_out>;
+	pinctrl-1 = <&cif_dvp_clk_out_sleep>;
+	rockchip,pd-gpio = <&gpio3 GPIO_B0 GPIO_ACTIVE_LOW>;
+	rockchip,pwr-gpio = <&gpio3 GPIO_B5 GPIO_ACTIVE_HIGH>;
+	rockchip,rst-gpio = <&gpio3 GPIO_D1 GPIO_ACTIVE_LOW>;
+	rockchip,camera-module-mclk-name = "clk_cif_out";
+	rockchip,camera-module-facing = "back";
+	rockchip,camera-module-name = "D1741";
+	rockchip,camera-module-len-name = "YM6011P";
+	rockchip,camera-module-fov-h = "128";
+	rockchip,camera-module-fov-v = "55.7";
+	rockchip,camera-module-orientation = <0>;
+	rockchip,camera-module-iq-flip = <0>;
+	rockchip,camera-module-iq-mirror = <0>;
+	rockchip,camera-module-flip = <0>;
+	rockchip,camera-module-mirror = <0>;
+	/* resolution.w, resolution.h, defrect.left, defrect.top, defrect.w, defrect.h */
+	rockchip,camera-module-defrect0 = <2592 1944 0 0 2592 1944>;
+	rockchip,camera-module-defrect1 = <2560 1440 0 0 2560 1440>;
+	rockchip,camera-module-flash-support = <0>;
+	rockchip,camera-module-mipi-dphy-index = <0>;
+};

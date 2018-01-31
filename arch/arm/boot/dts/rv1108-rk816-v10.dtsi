@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 #include "rk816.dtsi"
 &rk816{
 	gpios = <&gpio0 GPIO_B4 GPIO_ACTIVE_HIGH>, <&gpio0 GPIO_B5 GPIO_ACTIVE_LOW>;

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _DVFS_TABLE_SCAN_H_
 #define _DVFS_TABLE_SCAN_H_
 ssize_t dvfs_table_scan_show(struct kobject *kobj, struct kobj_attribute *attr,

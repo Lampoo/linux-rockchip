@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 #include "rk312x.dtsi"
 
 &clk_gpll_div2 {

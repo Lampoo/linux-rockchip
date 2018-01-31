@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
 * $Copyright Open 2009 Broadcom Corporation$
 * $Id: wlfc_proto.h 499510 2014-08-28 23:40:47Z $

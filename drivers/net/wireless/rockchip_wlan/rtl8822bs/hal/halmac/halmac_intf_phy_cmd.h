@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef HALMAC_INTF_PHY_CMD
 #define HALMAC_INTF_PHY_CMD
 

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #include "rk_camera.h"
 #include "rk30_camera.h"
 #include <linux/gpio.h>

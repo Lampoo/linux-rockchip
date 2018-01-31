@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * BCM43XX Sonics SiliconBackplane PCMCIA core hardware definitions.
  *

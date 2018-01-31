@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _CLK_RATE_H_
 #define _CLK_RATE_H_
 ssize_t clk_rate_show(struct kobject *kobj, struct kobj_attribute *attr,

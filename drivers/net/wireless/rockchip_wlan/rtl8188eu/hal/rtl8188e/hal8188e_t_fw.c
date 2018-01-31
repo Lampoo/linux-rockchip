@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #include "drv_types.h"
 #ifdef LOAD_FW_HEADER_FROM_DRIVER
 

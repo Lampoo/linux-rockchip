@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /* Copyright Statement:
 *This firmware are protected under relevant copyright laws, this information contained
 *herein is confidential and proprietary to Goodix.

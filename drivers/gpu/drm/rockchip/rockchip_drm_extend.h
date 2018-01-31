@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #include "../../../video/rockchip/rk_drm_fb.h"
 #include "../../../video/rockchip/hdmi/rockchip-hdmi.h"
 #define WINDOWS_NR	4

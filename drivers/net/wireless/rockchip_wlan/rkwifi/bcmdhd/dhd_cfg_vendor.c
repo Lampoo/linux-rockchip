@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Linux cfg80211 vendor command/event handlers of DHD
  *

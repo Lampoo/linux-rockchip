@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 afc0: af-controller@0 {
 	compatible = "silicon touch,gt9760s-v4l2-i2c-subdev";
 	reg = <0x0c>;

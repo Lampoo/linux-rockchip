@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _EFUSE_H_
 #define _EFUSE_H_
 

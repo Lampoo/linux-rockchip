@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0
 obj-y += ../../arm/mach-rockchip/common.o
 obj-y += ../../arm/mach-rockchip/cpu.o
 obj-y += ../../arm/mach-rockchip/efuse.o

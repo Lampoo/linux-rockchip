@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Helper macros to support writing architecture specific
  * pie linker scripts.

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _CLK_VOLT_H_
 #define _CLK_VOLT_H_
 ssize_t clk_volt_show(struct kobject *kobj, struct kobj_attribute *attr,

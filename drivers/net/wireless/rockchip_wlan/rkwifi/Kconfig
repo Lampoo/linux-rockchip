@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0
 config RKWIFI
 	tristate "RK901/RK903/BCM4330/AP6XXX wireless cards support"
 	#depends on MMC && WLAN_80211

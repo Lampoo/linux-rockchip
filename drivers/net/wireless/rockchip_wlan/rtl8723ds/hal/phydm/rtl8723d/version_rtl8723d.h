@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*RTL8723D PHY Parameters*/
 #define	SVN_COMMIT_VERSION_8723D	22597
 #define	RELEASE_DATE_8723D		20161209

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Broadcom PCI-SPI Host Controller Register Definitions
  *

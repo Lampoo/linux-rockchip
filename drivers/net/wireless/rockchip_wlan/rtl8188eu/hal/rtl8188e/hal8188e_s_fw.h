@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _FW_HEADER_8188E_S_H
 #define _FW_HEADER_8188E_S_H
 #ifdef CONFIG_SFW_SUPPORTED

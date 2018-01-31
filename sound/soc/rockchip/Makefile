@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0
 # ROCKCHIP Platform Support
 snd-soc-rockchip-objs := rk_pcm.o card_info.o
 ifdef CONFIG_ARCH_RK29

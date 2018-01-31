@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0
 config SDCARD_FS
 	tristate "sdcard file system"
 	depends on CONFIGFS_FS

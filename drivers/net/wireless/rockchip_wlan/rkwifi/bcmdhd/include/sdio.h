@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * SDIO spec header file
  * Protocol and standard (common) device definitions

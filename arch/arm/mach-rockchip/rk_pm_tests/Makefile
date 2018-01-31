@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0
 obj-y += rk_pm_tests.o
 obj-y += clk_rate.o
 obj-y += clk_volt.o

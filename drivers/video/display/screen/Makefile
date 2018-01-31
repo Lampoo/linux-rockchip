@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0
 obj-$(CONFIG_LCD_RK29_NULL) += lcd_null.o
 
 obj-$(CONFIG_LCD_RK29_LG_LP097X02)+=	lcd_LG_LP097X02.o

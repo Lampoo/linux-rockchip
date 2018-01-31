@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
 * $Copyright Open 2009 Broadcom Corporation$
 * $Id: dhd_wlfc.h 501046 2014-09-06 01:25:16Z $

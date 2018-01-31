@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _SSV_VERSION_H_
 #define _SSV_VERSION_H_
 

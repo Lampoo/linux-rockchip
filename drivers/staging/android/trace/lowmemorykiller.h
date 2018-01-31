@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #undef TRACE_SYSTEM
 #define TRACE_INCLUDE_PATH ../../drivers/staging/android/trace
 #define TRACE_SYSTEM lowmemorykiller

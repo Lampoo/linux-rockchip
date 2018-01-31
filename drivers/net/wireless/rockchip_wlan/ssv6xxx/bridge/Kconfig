@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0
 config SSV_SDIO_BRIDGE_HW
 	tristate
 	default m

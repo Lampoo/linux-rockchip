@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 / {
 	disp_timings: display-timings {
 		native-mode = <&timing0>;

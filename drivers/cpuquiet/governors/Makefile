@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0
 GCOV_PROFILE := y
 
 obj-$(CONFIG_CPUQUIET_GOVERNOR_USERSPACE) += userspace.o

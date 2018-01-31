@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 #include "px5.dtsi"
 #include "../../../arm/mach-rockchip/rk_camera_sensor_info.h"
 

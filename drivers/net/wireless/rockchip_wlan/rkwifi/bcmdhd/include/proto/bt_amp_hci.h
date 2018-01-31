@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * BT-AMP (BlueTooth Alternate Mac and Phy) HCI (Host/Controller Interface)
  *

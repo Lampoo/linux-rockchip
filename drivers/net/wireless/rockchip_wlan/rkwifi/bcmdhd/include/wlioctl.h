@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Custom OID/ioctl definitions for
  * Broadcom 802.11abg Networking Device Driver

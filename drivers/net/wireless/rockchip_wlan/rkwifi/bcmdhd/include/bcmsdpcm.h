@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Broadcom SDIO/PCMCIA
  * Software-specific definitions shared between device and host side

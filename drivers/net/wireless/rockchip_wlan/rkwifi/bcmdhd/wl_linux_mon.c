@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Broadcom Dongle Host Driver (DHD), Linux monitor network interface
  *

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Initialization and support routines for self-booting compressed image.
  *

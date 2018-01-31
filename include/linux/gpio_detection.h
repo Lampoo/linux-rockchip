@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef __GPIO_DETECTION_H
 #define __GPIO_DETECTION_H
 

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * DHD Protocol Module for CDC and BDC.
  *

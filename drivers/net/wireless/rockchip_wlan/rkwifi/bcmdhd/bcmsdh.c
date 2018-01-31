@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  *  BCMSDH interface glue
  *  implement bcmsdh API for SDIOH driver

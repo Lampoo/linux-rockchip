@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #if defined(CONFIG_DDR_TEST)
 #include <linux/kernel.h>
 #include <linux/slab.h>

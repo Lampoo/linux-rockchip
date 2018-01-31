@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
     0xea0000a2 ,
     0xe0801300 ,
     0xe3010fff ,

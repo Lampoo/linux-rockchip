@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #define pr_fmt(fmt) "ddrfreq: " fmt
 #define DEBUG
 #include <linux/clk.h>

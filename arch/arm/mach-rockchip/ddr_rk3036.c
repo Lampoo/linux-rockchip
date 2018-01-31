@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * arch/arm/mach-rk2928/ddr.c-- for ddr3&ddr2
  *

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0
 config TOUCHSCREEN_GT910
 	tristate "goodix gt910 touchscreen"
 	depends on I2C

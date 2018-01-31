@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 #include <generated/autoconf.h>
 #include <dt-bindings/clock/rk_system_status.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>

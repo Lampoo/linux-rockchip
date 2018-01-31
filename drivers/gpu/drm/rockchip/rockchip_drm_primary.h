@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #include "../../../video/rockchip/rk_drm_fb.h"
 #define WINDOWS_NR	3   /* change by hjc for px3se 4 to 3 */
 

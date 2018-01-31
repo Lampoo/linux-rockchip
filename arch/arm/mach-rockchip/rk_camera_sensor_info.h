@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef __RK_CAMERA_SENSOR_INFO_H_
 #define __RK_CAMERA_SENSOR_INFO_H_
 

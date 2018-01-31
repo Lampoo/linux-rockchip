@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Broadcom SiliconBackplane SDIO/PCMCIA hardware-specific
  * device core support

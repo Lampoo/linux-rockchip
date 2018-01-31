@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _CPU_USAGE_H_
 #define _CPU_USAGE_H_
 ssize_t cpu_usage_show(struct kobject *kobj, struct kobj_attribute *attr,

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0
 ifeq ($(KBUILD_TOP),)
     ifneq ($(KBUILD_EXTMOD),)
     KBUILD_DIR := $(KBUILD_EXTMOD)

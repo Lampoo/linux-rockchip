@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * SDIO host client driver interface of Broadcom HNBU
  *     export functions to client drivers

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #include "Mp_Precomp.h"
 #include <hal_btcoex_wifionly.h>
 

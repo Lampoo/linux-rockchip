@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #include <linux/rk_fb.h>
 
 #define RK_DRM_WIN_MASK  0x7fff

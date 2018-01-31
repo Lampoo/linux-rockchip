@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Definitions for API from sdio common code (bcmsdh) to individual
  * host controller drivers.

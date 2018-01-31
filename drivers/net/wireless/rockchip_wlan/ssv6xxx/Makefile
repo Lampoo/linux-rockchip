@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0
 KMODULE_NAME=ssv6051
 
 KBUILD_TOP := drivers/net/wireless/rockchip_wlan/ssv6xxx

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef __LINUX_CLASS_DUAL_ROLE_H__
 #define __LINUX_CLASS_DUAL_ROLE_H__
 

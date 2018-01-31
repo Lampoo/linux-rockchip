@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Definitions for ioctls to access DHD iovars.
  * Based on wlioctl.h (for Broadcom 802.11abg driver).

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0
 # Rockchip Soc Audio Configurations. if a new machine audio driver added,
 # the new machine driver's config entry should be added here at the same time.
 

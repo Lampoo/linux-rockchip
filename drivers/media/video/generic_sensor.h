@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef __ASM_ARCH_GENERIC_SENSOR_RK_H_
 #include <linux/videodev2.h>
 #include <linux/slab.h>

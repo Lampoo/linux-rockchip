@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Misc utility routines for accessing the SOC Interconnects
  * of Broadcom HNBU chips.

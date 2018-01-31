@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0
 obj-y += common.o
 obj-y += cpu.o
 obj-$(CONFIG_CPU_RV110X) += rv1108.o

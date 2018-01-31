@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #include <media/soc_camera.h>
 #include <media/camsys_head.h>
 #include <linux/android_pmem.h>

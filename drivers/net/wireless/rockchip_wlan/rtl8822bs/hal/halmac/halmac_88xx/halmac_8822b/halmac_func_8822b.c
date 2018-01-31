@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #include "halmac_8822b_cfg.h"
 #if HALMAC_PLATFORM_WINDOWS
 /*SDIO RQPN Mapping for Windows, extra queue is not implemented in Driver code*/

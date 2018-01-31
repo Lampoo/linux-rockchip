@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * $Copyright Open Broadcom Corporation$
  * $Id: typedefs.h 484281 2014-06-12 22:42:26Z $

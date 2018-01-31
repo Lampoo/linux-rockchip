@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /* This Lcd Driver is HSD070IDW1 write by cst 2009.10.27 */
 #include <linux/fb.h>
 #include <linux/delay.h>

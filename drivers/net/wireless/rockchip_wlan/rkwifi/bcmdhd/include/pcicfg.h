@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * pcicfg.h: PCI configuration constants and structures.
  *

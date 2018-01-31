@@ -885,6 +885,22 @@ int aptina_camera_module_g_ctrl(struct v4l2_subdev *sd,
 		return 0;
 	}
 
+	if (ctrl->id == V4L2_CID_HFLIP) {
+		ctrl->value = cam_mod->hflip;
+		pltfrm_camera_module_pr_debug(&cam_mod->sd,
+			"V4L2_CID_HFLIP %d\n",
+			ctrl->value);
+		return 0;
+	}
+
+	if (ctrl->id == V4L2_CID_VFLIP) {
+		ctrl->value = cam_mod->vflip;
+		pltfrm_camera_module_pr_debug(&cam_mod->sd,
+			"V4L2_CID_VFLIP %d\n",
+			ctrl->value);
+		return 0;
+	}
+
 	if (IS_ERR_OR_NULL(cam_mod->active_config)) {
 		pltfrm_camera_module_pr_err(&cam_mod->sd,
 			"no active configuration\n");
@@ -981,10 +997,6 @@ int aptina_camera_module_g_ctrl(struct v4l2_subdev *sd,
 			"V4L2_CID_FOCUS_ABSOLUTE %d\n",
 			ctrl->value);
 		break;
-	case V4L2_CID_HFLIP:
-	case V4L2_CID_VFLIP:
-		/* TBD */
-		/* fallthrough */
 	default:
 		pltfrm_camera_module_pr_debug(&cam_mod->sd,
 			"failed, unknown ctrl %d\n", ctrl->id);

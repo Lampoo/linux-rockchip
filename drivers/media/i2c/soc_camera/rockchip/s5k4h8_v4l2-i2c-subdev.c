@@ -65,7 +65,7 @@
 #define s5k4h8_FLIP_REG 0x0101
 #define s5k4h8_MIRROR_REG 0x0101
 
-#define s5k4h8_EXT_CLK 26000000
+#define s5k4h8_EXT_CLK 24000000
 
 #define s5k4h8_FULL_SIZE_RESOLUTION_WIDTH 3264
 #define s5k4h8_BINING_SIZE_RESOLUTION_WIDTH 1632
@@ -115,6 +115,7 @@ static struct samsung_camera_module_custom_config s5k4h8_custom_config;
 
 /* MCLK:24MHz  3264x2448  18fps   mipi 4lane   480Mbps/lane */
 static struct samsung_camera_module_reg s5k4h8_init_tab_3264_2448_30fps[] = {
+	{SAMSUNG_CAMERA_MODULE_REG_CONTINUE_ONE_BYTE_DATA, 0x0103, 0x1},
 	{SAMSUNG_CAMERA_MODULE_REG_CONTINUE_TWO_BYTE_DATA, 0x6028, 0x2000},
 	{SAMSUNG_CAMERA_MODULE_REG_CONTINUE_TWO_BYTE_DATA, 0x602A, 0x1FD0},
 	{SAMSUNG_CAMERA_MODULE_REG_CONTINUE_TWO_BYTE_DATA, 0x6F12, 0x0448},
@@ -315,11 +316,11 @@ static struct samsung_camera_module_reg s5k4h8_init_tab_3264_2448_30fps[] = {
 	{SAMSUNG_CAMERA_MODULE_REG_CONTINUE_TWO_BYTE_DATA, 0x030C, 0x0006},
 	{SAMSUNG_CAMERA_MODULE_REG_CONTINUE_TWO_BYTE_DATA, 0x030E, 0x008C},
 	{SAMSUNG_CAMERA_MODULE_REG_CONTINUE_TWO_BYTE_DATA, 0x3008, 0x0000},
-	{SAMSUNG_CAMERA_MODULE_REG_CONTINUE_ONE_BYTE_DATA, 0x0103, 0x1},
 	{SAMSUNG_CAMERA_MODULE_REG_CONTINUE_TWO_BYTE_DATA, 0x0100, 0x0},
 };
 
 static const struct samsung_camera_module_reg s5k4h8_init_tab_1632_1224_30fps[] = {
+	{SAMSUNG_CAMERA_MODULE_REG_CONTINUE_ONE_BYTE_DATA, 0x0103, 0x1},
 	{SAMSUNG_CAMERA_MODULE_REG_CONTINUE_TWO_BYTE_DATA, 0x6028, 0x2000},
 	{SAMSUNG_CAMERA_MODULE_REG_CONTINUE_TWO_BYTE_DATA, 0x602A, 0x1FD0},
 	{SAMSUNG_CAMERA_MODULE_REG_CONTINUE_TWO_BYTE_DATA, 0x6F12, 0x0448},
@@ -519,7 +520,6 @@ static const struct samsung_camera_module_reg s5k4h8_init_tab_1632_1224_30fps[] 
 	{SAMSUNG_CAMERA_MODULE_REG_CONTINUE_TWO_BYTE_DATA, 0x030C, 0x0006},
 	{SAMSUNG_CAMERA_MODULE_REG_CONTINUE_TWO_BYTE_DATA, 0x030E, 0x0078},
 	{SAMSUNG_CAMERA_MODULE_REG_CONTINUE_TWO_BYTE_DATA, 0x3008, 0x0000},
-	{SAMSUNG_CAMERA_MODULE_REG_CONTINUE_ONE_BYTE_DATA, 0x0103, 0x1},
 	{SAMSUNG_CAMERA_MODULE_REG_CONTINUE_ONE_BYTE_DATA, 0x0100, 0x0},
 };
 
@@ -564,7 +564,7 @@ static struct samsung_camera_module_config s5k4h8_configs[] = {
 		.frm_intrvl = {
 			.interval = {
 				.numerator = 1,
-				.denominator = 30
+				.denominator = 24
 			}
 		},
 		.auto_exp_enabled = false,
@@ -578,7 +578,7 @@ static struct samsung_camera_module_config s5k4h8_configs[] = {
 		.reg_diff_table = NULL,
 		.reg_diff_table_num_entries = 0,
 		.v_blanking_time_us = 7251,
-		PLTFRM_CAM_ITF_MIPI_CFG(0, 4, 560, s5k4h8_EXT_CLK)
+		PLTFRM_CAM_ITF_MIPI_CFG(0, 4, 480, s5k4h8_EXT_CLK)
 	}
 };
 

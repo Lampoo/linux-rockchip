@@ -167,11 +167,21 @@
 		compatible = "rockchip,key";
 		pinctrl-names = "default";
 		pinctrl-0 = <&key_en>;
+		status = "okay";
+		io-channels = <&adc 0>;
+		adc-drift = <45>;
+
 		esc-key {
 			gpios = <&gpio0 GPIO_A4 GPIO_ACTIVE_LOW>;
 			linux,code = <1>;
 			label = "esc";
 			gpio-key,wakeup;
+		};
+
+		voice-key {
+			linux,code = <8>;
+			label = "voice";
+			rockchip,adc_value = <1>;
 		};
 	};
 

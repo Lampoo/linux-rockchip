@@ -293,7 +293,8 @@ static void stmvl6180_work_handler(struct work_struct *work)
 			VL6180x_RangeSetSystemMode(vl6180x_dev, MODE_START_STOP |  MODE_SINGLESHOT);
 
 		/* restart timer */
-		schedule_delayed_work(&data->dwork, msecs_to_jiffies((data->delay_ms)));
+		if (!data->irq_enable)
+			schedule_delayed_work(&data->dwork, msecs_to_jiffies((data->delay_ms)));
 
 	    /* vl6180_dbgmsg("End\n"); */
 	}
@@ -702,7 +703,8 @@ static int stmvl6180_start(struct stmvl6180_data *data, uint8_t scaling, init_mo
 	data->enable_ps_sensor = 1;
 
 	/* enable work handler */
-	stmvl6180_schedule_handler(data);
+	if (!data->irq_enable)
+		stmvl6180_schedule_handler(data);
 
 	vl6180_dbgmsg("End\n");
 
@@ -751,6 +753,7 @@ static int stmvl6180_setup(struct stmvl6180_data *data)
 {
 	int rc = 0;
 	int irq = 0;
+	unsigned long irq_flag = 0;
 
 	vl6180_dbgmsg("Enter\n");
 
@@ -759,9 +762,14 @@ static int stmvl6180_setup(struct stmvl6180_data *data)
 	mutex_init(&data->work_mutex);
 
 	/* init interrupt */
-	vl6180_dbgmsg("irq_enable=%d \n", data->irq_enable);
+	vl6180_dbgmsg("irq_enable=%d, irq_flags: 0x%lx\n", data->irq_enable, data->irq_flags);
 	if (data->irq_enable)
 	{
+		if (!data->irq_flags)
+			irq_flag = IRQF_TRIGGER_RISING;
+		else
+			irq_flag = IRQF_TRIGGER_FALLING;
+
 		gpio_request(data->irq_pin, "vl6180_gpio_int");
 		gpio_direction_input(data->irq_pin);
 		irq = gpio_to_irq(data->irq_pin);
@@ -770,7 +778,7 @@ static int stmvl6180_setup(struct stmvl6180_data *data)
 		} else {
 			vl6180_dbgmsg("register_irq:%d\n", irq);
 			/* IRQF_TRIGGER_FALLING- poliarity:0 IRQF_TRIGGER_RISNG - poliarty:1 */
-			rc = request_threaded_irq(irq, NULL, stmvl6180_interrupt_handler, IRQF_TRIGGER_RISING | IRQF_ONESHOT| IRQF_SHARED, "vl6180_lb_gpio_int", (void *)data);
+			rc = request_threaded_irq(irq, NULL, stmvl6180_interrupt_handler, irq_flag | IRQF_ONESHOT| IRQF_SHARED, "vl6180_lb_gpio_int", (void *)data);
 			if (rc) {
 				vl6180_errmsg("%d, Could not allocate STMVL6180_INT ! result:%d\n",  __LINE__, rc);
 				return rc;

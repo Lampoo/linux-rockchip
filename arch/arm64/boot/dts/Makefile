@@ -1,5 +1,6 @@
 dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	px5-sdk.dtb \
+	rk3228h-box-discretepow.dtb \
 	rk3228h-demo.dtb \
 	rk3228h-evb.dtb \
 	rk3228h-z.dtb \

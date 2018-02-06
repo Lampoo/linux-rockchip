@@ -1,0 +1,283 @@
+/*
+ * Copyright (c) 2017 Fuzhou Rockchip Electronics Co., Ltd
+ *
+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ */
+
+/dts-v1/;
+
+#include "rk3228h.dtsi"
+#include "rk322xh-evb.dtsi"
+#include "rk-stb-keymap.dtsi"
+
+/ {
+	leds {
+		compatible = "gpio-leds";
+
+		power-green {
+			gpios = <&gpio2 GPIO_D2 GPIO_ACTIVE_LOW>;
+			linux,default-trigger = "none";
+			default-state = "on";
+			mode = <0x23>;
+		};
+
+		net-green {
+			gpios = <&gpio2 GPIO_B7 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "none";
+			default-state = "off";
+			mode = <0x05>;
+		};
+
+		net-red {
+			gpios = <&gpio2 GPIO_C1 GPIO_ACTIVE_LOW>;
+			linux,default-trigger = "none";
+			default-state = "on";
+			mode = <0x05>;
+		};
+
+		ir {
+			gpios = <&gpio0 GPIO_A0 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "ir";
+			default-state = "off";
+			mode = <0x00>;
+		};
+	};
+
+	i2s1 {
+		i2s1-mclk {
+			rockchip,pins =
+				<2 GPIO_B7 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+
+		i2s1-lrcktx {
+			rockchip,pins =
+				<2 GPIO_C1 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
+	rockchip_clocks_init: clocks-init {
+		rockchip,clocks-init-rate =
+			<&clk_gpll 1440000000>, <&clk_core 600000000>,
+			<&clk_cpll 1200000000>, <&aclk_bus 150000000>,
+			<&hclk_bus 75000000>, <&pclk_bus 75000000>,
+			<&clk_crypto 150000000>, <&aclk_peri 150000000>,
+			<&hclk_peri 75000000>, <&pclk_peri 75000000>,
+			<&aclk_vio 300000000>, <&hclk_vio 100000000>,
+			<&aclk_rga 300000000>, <&clk_rga 200000000>,
+			<&aclk_vop 400000000>, <&aclk_rkvdec 500000000>,
+			<&aclk_rkvenc 200000000>, <&aclk_vpu 300000000>,
+			<&clk_vdec_cabac 300000000>, <&clk_vdec_core 200000000>,
+			<&clk_venc_core 200000000>, <&clk_venc_dsp 100000000>,
+			<&clk_efuse 24000000>, <&aclk_gmac 150000000>,
+			<&pclk_ddr 100000000>, /*<&clk_rtc32k 32768>,*/
+			<&clk_pdm 61440000>, <&pclk_gmac 50000000>,
+			<&clk_usb3otg0_s 32768>;
+			/*rockchip,clocks-uboot-has-init =
+			<&dclk_vop>, <&dclk_vop_pll>;*/
+			rockchip,set_div_for_pll_init;
+	};
+
+	regulators {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		vccio_1v8_reg: regulator@0 {
+			compatible = "regulator-fixed";
+			regulator-name = "vccio_1v8";
+			regulator-min-microvolt = <1800000>;
+			regulator-max-microvolt = <1800000>;
+			regulator-always-on;
+		};
+
+		vccio_3v3_reg: regulator@1 {
+			compatible = "regulator-fixed";
+			regulator-name = "vccio_3v3";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+			regulator-always-on;
+		};
+	};
+
+	fiq-debugger {
+		 rockchip,irq-mode-enable = <1>;
+		 status = "okay";
+	};
+
+	wireless-wlan {
+		compatible = "wlan-platdata";
+		wifi_chip_type = "rtl8822bs";
+		sdio_vref = <1800>;
+		WIFI,poweren_gpio = <&gpio1 GPIO_C2 GPIO_ACTIVE_HIGH>;
+		WIFI,host_wake_irq = <&gpio1 GPIO_C3 GPIO_ACTIVE_HIGH>;
+		status = "okay";
+	};
+
+	wireless-bluetooth {
+		compatible = "bluetooth-platdata";
+		uart_rts_gpios = <&gpio1 GPIO_B2 GPIO_ACTIVE_LOW>;
+		pinctrl-names = "default", "rts_gpio";
+		pinctrl-0 = <&uart0_rts>;
+		pinctrl-1 = <&uart0_rts_gpio>;
+		BT,power_gpio = <&gpio1 GPIO_C5 GPIO_ACTIVE_HIGH>;
+		BT,wake_gpio = <&gpio3 GPIO_A0 GPIO_ACTIVE_HIGH>;
+		BT,wake_host_irq = <&gpio1 GPIO_D2 GPIO_ACTIVE_HIGH>;
+		status = "okay";
+	};
+
+	gpio_poweroff {
+		status = "disabled";
+	};
+
+	pwm-regulator0  {
+		compatible = "rockchip_pwm_regulator";
+		pwms = <&pwm0 0 2000 0>;
+		rockchip,pwm_id= <0>;
+		rockchip,pwm_voltage_map= <950000 975000 1000000 1025000 1050000 1075000 1100000 1125000 1150000 1175000 1200000 1225000 1250000 1275000 1300000 1325000 1350000 1375000 1400000>;
+		rockchip,pwm_voltage= <1225000>;
+		rockchip,pwm_min_voltage= <950000>;
+		rockchip,pwm_max_voltage= <1400000>;
+		rockchip,pwm_suspend_voltage= <950000>;
+		rockchip,pwm_coefficient= <450>;
+		status = "okay";
+		regulators {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			pwm_reg0: regulator@0 {
+				regulator-compatible = "pwm_dcdc1";
+				regulator-name= "vdd_arm";
+				regulator-min-microvolt = <950000>;
+				regulator-max-microvolt = <1400000>;
+				regulator-always-on;
+				regulator-boot-on;
+			};
+		};
+	};
+
+	pwm-regulator1 {
+		compatible = "rockchip_pwm_regulator";
+		pwms = <&pwm1 0 25000 0>;
+		rockchip,pwm_id= <1>;
+		rockchip,pwm_voltage_map= <1000000 1025000 1050000 1075000 1100000 1125000 1150000 1175000 1200000 1225000 1250000 1275000 1300000>;
+		rockchip,pwm_voltage= <1050000>;
+		rockchip,pwm_min_voltage= <1000000>;
+		rockchip,pwm_max_voltage= <1300000>;
+		rockchip,pwm_suspend_voltage= <1250000>;
+		rockchip,pwm_coefficient= <400>;
+		status = "okay";
+		regulators {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			pwm_reg1: regulator@1 {
+				regulator-compatible = "pwm_dcdc2";
+				regulator-name= "vdd_logic";
+				regulator-min-microvolt = <1000000>;
+				regulator-max-microvolt = <1300000>;
+				regulator-always-on;
+				regulator-boot-on;
+			};
+		};
+	};
+
+	io_domains {
+		status = "okay";
+		vccio1-supply = <&vccio_3v3_reg>;
+		vccio2-supply = <&vccio_1v8_reg>;
+		vccio3-supply = <&vccio_3v3_reg>;
+		vccio4-supply = <&vccio_1v8_reg>;
+		vccio5-supply = <&vccio_3v3_reg>;
+		vccio6-supply = <&vccio_3v3_reg>;
+		pmuio-supply = <&vccio_3v3_reg>;
+	};
+};
+
+&sdio {
+	clock-frequency = <180000000>;
+	clock-freq-min-max = <200000 180000000>;
+};
+
+&u3phy {
+	usb30-drv-gpio = <>;
+ };
+
+&i2c1 {
+	status = "disabled";
+};
+
+&i2c0 {
+	status = "disabled";
+};
+
+&pwm0 {
+	status = "okay";
+};
+
+&pwm1 {
+	status = "okay";
+};
+
+&cif {
+	status = "disabled";
+};
+
+&rk3228_cif_sensor {
+	status = "disabled";
+};
+
+&clk_core_dvfs_table {
+	operating-points = <
+		/* KHz    uV */
+		408000 975000
+		600000 975000
+		816000 1025000
+		1008000 1125000
+		1200000 1250000
+		1296000 1325000
+		1392000 1375000
+		1512000 1375000
+		1608000 1375000
+		1800000 1375000
+		2016000 1375000
+		>;
+	status = "okay";
+};
+
+&clk_ddr_dvfs_table {
+	operating-points = <
+		/* KHz    uV */
+		400000 900000
+		600000 1050000
+		786000 1100000
+		800000 1125000
+		933000 1125000
+		>;
+
+	freq-table = <
+		/*status		freq(KHz)*/
+		SYS_STATUS_NORMAL	933000
+		SYS_STATUS_SUSPEND	933000
+		SYS_STATUS_VIDEO_1080P  933000
+		SYS_STATUS_VIDEO_4K     933000
+		SYS_STATUS_PERFORMANCE  933000
+		SYS_STATUS_DUALVIEW	933000
+		SYS_STATUS_BOOST	933000
+		SYS_STATUS_ISP		933000
+		>;
+	auto-freq-table = <
+		933000
+		933000
+		>;
+	auto-freq = <0>;
+	status = "okay";
+};
+
+&clk_gpu_dvfs_table {
+	operating-points = <
+		/* KHz    uV */
+		200000 900000
+		300000 950000
+		400000 1025000
+		500000 1100000
+		>;
+	status = "okay";
+};

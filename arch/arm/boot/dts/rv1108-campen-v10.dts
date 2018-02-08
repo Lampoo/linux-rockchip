@@ -339,6 +339,19 @@
 //#include "rv1108-camb-v11.dtsi" /* camera board v11 */
 //#include "rv1108-camb-v12.dtsi" /* camera board v12 */
 #include "rv1108-camb-v13.dtsi" /* camera board v13 */
+
+	lis2ds_acc: lis2ds_acc@1d {
+		compatible = "lis2ds_acc";
+		pinctrl-names = "default";
+		pinctrl-0 = <&gsensor_en>;
+		reg = <0x1d>;
+		type = <SENSOR_TYPE_ACCEL>;
+		irq-gpio = <&gpio3 GPIO_A6 IRQ_TYPE_LEVEL_HIGH>;
+		irq_enable = <1>;
+		poll_delay_ms = <30>;
+		layout = <1>;
+		status = "okay";
+	};
 };
 
 &i2c3 {
@@ -584,6 +597,12 @@
 	key {
 		key_en: key-en {
 			rockchip,pins = <0 GPIO_A4 RK_FUNC_GPIO &pcfg_pull_up>;
+		};
+	};
+
+	gsensor {
+		gsensor_en: gsensor-en {
+			rockchip,pins = <3 GPIO_A6 RK_FUNC_GPIO &pcfg_pull_up>;
 		};
 	};
 };

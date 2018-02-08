@@ -104,6 +104,13 @@ config LSM6DS3_ACC
 	  To have support for your specific gsesnor you will have to
 	  select the proper drivers which depend on this option.
 
+config LIS2DS_ACC
+	bool "Sensor lis2ds_acc"
+	default n
+	help
+	  To have support for your specific gsesnor you will have to
+	  select the proper drivers which depend on this option.
+
 source "drivers/input/sensors/accel/da380/Kconfig"
 
 endif

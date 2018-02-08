@@ -14,3 +14,4 @@ obj-$(CONFIG_BMA2XX_ACC)    += bma2xx.o
 obj-$(CONFIG_SENSORS_DA380)	+= input-polldev.o
 obj-$(CONFIG_SENSORS_DA380)	+= da380/
 obj-$(CONFIG_LSM6DS3_ACC)	+= lsm6ds3_acc.o
+obj-$(CONFIG_LIS2DS_ACC)	+= lis2ds_acc.o

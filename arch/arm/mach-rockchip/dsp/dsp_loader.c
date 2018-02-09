@@ -364,7 +364,8 @@ out:
 	return ret;
 }
 
-int dsp_loader_create(struct dsp_dma *dma, struct dsp_loader **loader_out)
+int dsp_loader_create(struct dsp_dma *dma, struct ion_client *ion_client,
+		      struct dsp_loader **loader_out)
 {
 	int ret = 0;
 	struct dsp_loader *loader;
@@ -377,16 +378,9 @@ int dsp_loader_create(struct dsp_dma *dma, struct dsp_loader **loader_out)
 		ret = -ENOMEM;
 		goto out;
 	}
-
-	loader->ion_client = rockchip_ion_client_create("dsp");
-	if (IS_ERR(loader->ion_client)) {
-		ret = PTR_ERR(loader->ion_client);
-		dsp_err("cannot create ion client\n");
-		goto out;
-	}
-	loader->ext_text_hdl = ion_alloc(loader->ion_client,
-					 (size_t)DSP_TEXT_MEM_SIZE, 0,
-					 ION_HEAP(ION_CARVEOUT_HEAP_ID), 0);
+	loader->ion_client = ion_client;
+	loader->ext_text_hdl = ion_alloc(ion_client, (size_t)DSP_TEXT_MEM_SIZE,
+					 0, ION_HEAP(ION_CARVEOUT_HEAP_ID), 0);
 	if (IS_ERR(loader->ext_text_hdl)) {
 		dsp_err("cannnot alloc memory for dsp to run\n");
 		ret = PTR_ERR(loader->ext_text_hdl);
@@ -426,8 +420,6 @@ int dsp_loader_destroy(struct dsp_loader *loader)
 
 	ion_unmap_kernel(loader->ion_client, loader->ext_text_hdl);
 	ion_free(loader->ion_client, loader->ext_text_hdl);
-
-	ion_client_destroy(loader->ion_client);
 
 	kfree(loader);
 out:

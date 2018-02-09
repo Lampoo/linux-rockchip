@@ -76,6 +76,8 @@ struct dsp_algorithm_params {
  * @trace_buffer: a share buffer for DSP debug
  * @trace_buffer_size: trace buffer size
  * @trace_slot_size: trace slot size
+ * @heap: external ddr heap address for DSP malloc section
+ * @heap_size: in MB, allocated from ION CMA heap
  */
 struct dsp_config_params {
 	u32 type;
@@ -84,7 +86,9 @@ struct dsp_config_params {
 	u32 trace_buffer;
 	u32 trace_buffer_size;
 	u32 trace_slot_size;
-	u32 reserve[8];
+	u32 heap;
+	u32 heap_size;
+	u32 reserve[6];
 };
 
 /*

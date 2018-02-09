@@ -261,6 +261,29 @@ static int dsp_dev_config(struct dsp_dev *dev)
 		config_params.trace_buffer_size = 0;
 	}
 
+	/* Prepare a dedicated heap for DSP if needed. */
+	if (dev->heap.size) {
+		dev->heap.ion_hdl = ion_alloc(dev->ion_client,
+				(size_t)dev->heap.size, 0,
+				ION_HEAP(ION_CMA_HEAP_ID), 0);
+		if (IS_ERR(dev->heap.ion_hdl)) {
+			ret = PTR_ERR(dev->heap.ion_hdl);
+			dsp_err("Cannot alloc memory for dsp heap\n");
+			config_params.heap = 0;
+			config_params.heap_size = 0;
+			dev->heap.ion_hdl = NULL;
+		} else {
+			ion_phys(dev->ion_client, dev->heap.ion_hdl,
+				 (ion_phys_addr_t *)&config_params.heap,
+				 &config_params.heap_size);
+		}
+		dsp_debug(DEBUG_DEVICE, "dsp heap size=%d\n",
+			  config_params.heap_size);
+	} else {
+		config_params.heap = 0;
+		config_params.heap_size = 0;
+	}
+
 	dsp_debug(DEBUG_DEVICE, "dsp trace start 0x%08x\n", dev->trace_dma);
 
 	/* Config DSP image information */
@@ -465,6 +488,9 @@ static int dsp_dev_power_off(struct dsp_dev *dev)
 	dsp_grf_global_reset_assert(dev);
 	dsp_dev_clk_disable(dev);
 
+	if (dev->heap.ion_hdl)
+		ion_free(dev->ion_client, dev->heap.ion_hdl);
+
 	dev->status = DSP_OFF;
 	pr_info("DSP power off\n");
 	mutex_unlock(&dev->lock);
@@ -578,12 +604,24 @@ int dsp_dev_register_client(struct dsp_dev *dev, struct dsp_dev_client *client)
 	return 0;
 }
 
+int dsp_dev_parse_dt(struct device_node *node, struct dsp_dev *dev)
+{
+	if (of_property_read_u32(node, "rockchip,dsp-timeout-ms",
+				 &dev->timeout))
+		dev->timeout = DSP_DEV_DEFAULT_TIMEOUT;
+
+	if (of_property_read_u32(node, "rockchip,dsp-heap-size",
+				 &dev->heap.size))
+		dev->heap.size = 0;
+
+	return 0;
+}
+
 int dsp_dev_create(struct platform_device *pdev, struct dma_pool *dma_pool,
 		   struct dsp_dev **dev_out)
 {
 	int ret = 0;
 	dma_addr_t dma_addr = 0;
-	struct device_node *node = pdev->dev.of_node;
 	struct dsp_dev *dev;
 
 	dsp_debug_enter();
@@ -629,7 +667,14 @@ int dsp_dev_create(struct platform_device *pdev, struct dma_pool *dma_pool,
 	}
 	dsp_mbox_register_client(dev->mbox, &dev->mbox_client);
 
-	ret = dsp_loader_create(dev->dma, &dev->loader);
+	dev->ion_client = rockchip_ion_client_create("dsp");
+	if (IS_ERR(dev->ion_client)) {
+		ret = PTR_ERR(dev->ion_client);
+		dsp_err("cannot create ion client\n");
+		goto out;
+	}
+
+	ret = dsp_loader_create(dev->dma, dev->ion_client, &dev->loader);
 	if (ret) {
 		dsp_err("cannot create dsp image loader\n");
 		goto out;
@@ -641,9 +686,7 @@ int dsp_dev_create(struct platform_device *pdev, struct dma_pool *dma_pool,
 		dev->trace_dma = dma_addr;
 	}
 
-	if (of_property_read_u32(node, "rockchip,dsp-timeout-ms",
-				 &dev->timeout))
-		dev->timeout = DSP_DEV_DEFAULT_TIMEOUT;
+	dsp_dev_parse_dt(pdev->dev.of_node, dev);
 
 	dev->dsp_dvfs_node = clk_get_dvfs_node("clk_dsp");
 	INIT_DELAYED_WORK(&dev->guard_work, dsp_dev_work_timeout);
@@ -655,6 +698,7 @@ out:
 		if (dev) {
 			dsp_loader_destroy(dev->loader);
 			dsp_dma_destroy(dev->dma);
+			ion_client_destroy(dev->ion_client);
 		}
 
 		(*dev_out) = NULL;
@@ -670,6 +714,7 @@ int dsp_dev_destroy(struct dsp_dev *dev)
 	dsp_debug_enter();
 	dsp_mbox_destroy(dev->mbox);
 	dsp_dma_destroy(dev->dma);
+	ion_client_destroy(dev->ion_client);
 	dsp_loader_destroy(dev->loader);
 	dma_pool_free(dev->dma_pool, dev->trace_buffer, dev->trace_dma);
 	dsp_debug_leave();

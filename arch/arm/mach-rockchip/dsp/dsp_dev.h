@@ -20,6 +20,10 @@
 #include <linux/clk.h>
 #include <linux/reset.h>
 #include <linux/rockchip/dvfs.h>
+#if defined(CONFIG_ION_ROCKCHIP)
+#include <linux/rockchip_ion.h>
+#endif
+
 #include "dsp_loader.h"
 #include "dsp_dma.h"
 #include "dsp_mbox.h"
@@ -29,6 +33,13 @@ enum dsp_status {
 	DSP_OFF      = 0,
 	DSP_ON       = 1,
 	DSP_SLEEP    = 2,
+};
+
+struct dsp_heap {
+	u32 size;
+	u32 phys;
+	void *virt;
+	struct ion_handle *ion_hdl;
 };
 
 struct dsp_dev_client {
@@ -56,8 +67,10 @@ struct dsp_dev {
 	struct dma_pool *dma_pool;
 	struct dsp_dev_client *client;
 	struct dsp_mbox_client mbox_client;
+	struct ion_client *ion_client;
 	struct dsp_work *running_work;
 	struct delayed_work guard_work;
+	struct dsp_heap heap;
 
 	char *trace_buffer;
 	u32 trace_dma;

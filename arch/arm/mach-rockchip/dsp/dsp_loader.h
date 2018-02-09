@@ -78,7 +78,8 @@ struct dsp_loader {
 	u8 *ext_text;
 };
 
-int dsp_loader_create(struct dsp_dma *dma, struct dsp_loader **loader);
+int dsp_loader_create(struct dsp_dma *dma, struct ion_client *ion_client,
+		      struct dsp_loader **loader_out);
 int dsp_loader_destroy(struct dsp_loader *loader);
 int dsp_loader_load_image(struct device *device, struct dsp_loader *loader,
 			  const char *name);

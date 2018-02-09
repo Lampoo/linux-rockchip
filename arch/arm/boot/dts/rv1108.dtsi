@@ -1285,6 +1285,7 @@
 		reset-names = "core_rst", "sys_rst",
 			      "global_rst", "oecm_rst";
 		interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+		rockchip,dsp-timeout-ms = <1000>;
 	};
 
 	pinctrl: pinctrl {

@@ -42,6 +42,7 @@ struct dsp_dev_client {
 struct dsp_dev {
 	struct device *device;
 	enum dsp_status status;
+	u32 timeout;
 
 	int (*on)(struct dsp_dev *);
 	int (*off)(struct dsp_dev *);

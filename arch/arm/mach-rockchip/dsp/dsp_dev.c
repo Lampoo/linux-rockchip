@@ -41,7 +41,8 @@
 #	define DSP_PSU_CORE_IDLE    BIT(5)
 #	define DSP_PSU_DSP_IDLE     BIT(4)
 
-#define DSP_DEV_SESSION      0
+#define DSP_DEV_SESSION           0
+#define DSP_DEV_DEFAULT_TIMEOUT   1000
 
 static int dsp_dev_power_off(struct dsp_dev *dev);
 
@@ -175,7 +176,7 @@ static int dsp_dev_work(struct dsp_dev *dev, struct dsp_work *work)
 		goto out;
 	}
 
-	schedule_delayed_work(&dev->guard_work, HZ);
+	schedule_delayed_work(&dev->guard_work, msecs_to_jiffies(dev->timeout));
 
 	if (dev->dsp_dvfs_node)
 		work->rate = dvfs_clk_get_rate(dev->dsp_dvfs_node);
@@ -582,6 +583,7 @@ int dsp_dev_create(struct platform_device *pdev, struct dma_pool *dma_pool,
 {
 	int ret = 0;
 	dma_addr_t dma_addr = 0;
+	struct device_node *node = pdev->dev.of_node;
 	struct dsp_dev *dev;
 
 	dsp_debug_enter();
@@ -638,6 +640,10 @@ int dsp_dev_create(struct platform_device *pdev, struct dma_pool *dma_pool,
 		memset(dev->trace_buffer, 0, DSP_TRACE_BUFFER_SIZE);
 		dev->trace_dma = dma_addr;
 	}
+
+	if (of_property_read_u32(node, "rockchip,dsp-timeout-ms",
+				 &dev->timeout))
+		dev->timeout = DSP_DEV_DEFAULT_TIMEOUT;
 
 	dev->dsp_dvfs_node = clk_get_dvfs_node("clk_dsp");
 	INIT_DELAYED_WORK(&dev->guard_work, dsp_dev_work_timeout);

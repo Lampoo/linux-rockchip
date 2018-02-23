@@ -1380,7 +1380,9 @@ static int ion_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma)
 		return 0;
 	}
 
-	if (!(buffer->flags & ION_FLAG_CACHED))
+	if (buffer->flags & ION_FLAG_CACHED_NEEDS_SYNC)
+		vma->vm_page_prot = pgprot_noncoherent(vma->vm_page_prot);
+	else
 		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
 
 	mutex_lock(&buffer->lock);

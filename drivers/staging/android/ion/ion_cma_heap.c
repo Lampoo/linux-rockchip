@@ -75,6 +75,9 @@ static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
 #endif
 	dev_dbg(dev, "Request buffer allocation len %ld\n", len);
 
+	if (buffer->flags & (ION_FLAG_CACHED | ION_FLAG_CACHED_NEEDS_SYNC))
+		dma_set_attr(DMA_ATTR_NON_CONSISTENT, &attrs);
+
 	if (align > PAGE_SIZE)
 		return -EINVAL;
 

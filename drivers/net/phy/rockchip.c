@@ -64,12 +64,16 @@
 
 #define PHY_ABNORMAL_THRESHOLD			15
 
+#define ENABLE_PHY_FIXUP_RESET
+
 struct rk_int_phy_priv {
 	int restore_reg0;
 	int restore_a3_config;
 	int force_10m_full_mode;
 	int a3_config_set;
 	int txrx_counters_done_count;
+	int last_state;
+	int reset;
 };
 
 static int rockchip_integrated_phy_init_tstmode(struct phy_device *phydev)
@@ -313,6 +317,30 @@ static void rockchip_integrated_phy_fixup_100M(struct phy_device *phydev)
 	}
 }
 
+#ifdef ENABLE_PHY_FIXUP_RESET
+static int rockchip_integrated_phy_fixup_reset(struct phy_device *phydev)
+{
+	int ret;
+	struct rk_int_phy_priv *priv = phydev->priv;
+
+	/* reset phy once
+	 * solve failed to linkup for very few chip
+	 * reduce udp package lost rate sometimes
+	 */
+	if (priv->last_state == PHY_NOLINK && phydev->state == PHY_NOLINK) {
+		if (++priv->reset == 2) {
+			DBG("%s\n", __func__);
+			ret = rockchip_integrated_phy_reset(phydev);
+			if (ret < 0)
+				return ret;
+		}
+	}
+
+	priv->last_state = phydev->state;
+	return 0;
+}
+#endif
+
 static int rockchip_integrated_phy_read_status(struct phy_device *phydev)
 {
 	int err;
@@ -326,6 +354,12 @@ static int rockchip_integrated_phy_read_status(struct phy_device *phydev)
 	rockchip_integrated_phy_fixup_10M(phydev);
 
 	rockchip_integrated_phy_fixup_100M(phydev);
+
+#ifdef ENABLE_PHY_FIXUP_RESET
+	err = rockchip_integrated_phy_fixup_reset(phydev);
+	if (err)
+		return err;
+#endif
 
 	return 0;
 }

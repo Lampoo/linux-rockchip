@@ -394,8 +394,34 @@ alt_store(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR(alt, 0644, alt_show, alt_store);
 
+static ssize_t
+sample_rate_show(struct device *dev, struct device_attribute *attr,
+		 char *buf)
+{
+	struct audio_dev *audio = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%lld\n", audio->sample_rate);
+}
+
+static ssize_t
+sample_rate_store(struct device *dev, struct device_attribute *attr,
+		  const char *buf, size_t size)
+{
+	s64 value;
+	struct audio_dev *audio = dev_get_drvdata(dev);
+
+	if (sscanf(buf, "%lld\n", &value) != 1)
+		return -EINVAL;
+
+	audio->sample_rate = value;
+	schedule_work(&audio->sample_rate_work);
+	return size;
+}
+static DEVICE_ATTR_RW(sample_rate);
+
 static struct device_attribute *audio_source_attributes[] = {
 	&dev_attr_alt,
+	&dev_attr_sample_rate,
 	NULL
 };
 

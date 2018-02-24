@@ -42,6 +42,11 @@ struct ion_phys_data {
 	unsigned long size;
 };
 
+struct ion_sync_data {
+	int fd;
+	int dir;
+};
+
 struct ion_client *rockchip_ion_client_create(const char *name);
 
 #define ION_IOC_ROCKCHIP_MAGIC 'R'
@@ -55,4 +60,11 @@ struct ion_client *rockchip_ion_client_create(const char *name);
  * Set memory region secured.
  */
 #define ION_IOC_SET_SECURED	_IOWR(ION_IOC_ROCKCHIP_MAGIC, 1, bool)
+
+/**
+ * Sync memory from/to device.
+ */
+#define ION_IOC_SYNC_DIRECTION  _IOWR(ION_IOC_ROCKCHIP_MAGIC, 2, \
+						struct ion_sync_data)
+
 #endif

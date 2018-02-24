@@ -207,6 +207,29 @@ static int rockchip_ion_get_phys(struct ion_client *client, unsigned long arg)
 	return 0;
 }
 
+static int rockchip_ion_sync_direction(struct ion_client *client,
+				       unsigned long arg)
+{
+	struct ion_sync_data data;
+	struct dma_buf *dmabuf;
+	struct ion_buffer *buffer;
+
+	if (copy_from_user(&data, (void __user *)arg,
+			   sizeof(struct ion_sync_data)))
+		return -EFAULT;
+
+	dmabuf = dma_buf_get(data.fd);
+	if (IS_ERR(dmabuf))
+		return PTR_ERR(dmabuf);
+
+	buffer = dmabuf->priv;
+
+	dma_sync_sg_for_device(NULL, buffer->sg_table->sgl,
+			       buffer->sg_table->nents, data.dir);
+	dma_buf_put(dmabuf);
+	return 0;
+}
+
 static long rockchip_custom_ioctl (struct ion_client *client, unsigned int cmd,
 			      unsigned long arg)
 {
@@ -246,6 +269,8 @@ static long rockchip_custom_ioctl (struct ion_client *client, unsigned int cmd,
 			return rockchip_ion_get_phys(client, arg);
 		case ION_IOC_SET_SECURED:
 			return rockchip_ion_set_secured(client, arg);
+		case ION_IOC_SYNC_DIRECTION:
+			return rockchip_ion_sync_direction(client, arg);
 		default:
 			return -ENOTTY;
 		}

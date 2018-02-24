@@ -287,9 +287,11 @@ struct audio_dev {
 	struct list_head		idle_reqs;
 	struct usb_ep			*in_ep;
 
-	struct work_struct		work;
+	struct work_struct		alt_work;
+	struct work_struct		sample_rate_work;
 
 	spinlock_t			lock;
+	struct mutex			uevent_lock;
 
 	/* beginning, end and current position in our buffer */
 	void				*buffer_start;
@@ -324,24 +326,10 @@ static inline struct audio_dev *func_to_audio(struct usb_function *f)
 	return container_of(f, struct audio_dev, func);
 }
 
-static void audio_source_work(struct work_struct *data)
+static void audio_source_send_uevent(struct audio_dev *audio,
+				       char **uevent_envp)
 {
-	struct audio_dev *audio = container_of(data, struct audio_dev, work);
-	char buffer[64];
-	char *set_interface[4]	= { "USB_STATE=SET_INTERFACE", NULL, NULL,
-				    NULL };
-	char **uevent_envp = NULL;
-
-	if (audio->alt)
-		set_interface[1] = "STREAM_STATE=ON";
-	else
-		set_interface[1] = "STREAM_STATE=OFF";
-
-	sprintf(buffer, "SAMPLE_RATE=%lld", audio->sample_rate);
-	set_interface[2] = buffer;
-
-	uevent_envp = set_interface;
-
+	mutex_lock(&audio->uevent_lock);
 	if (uevent_envp) {
 		kobject_uevent_env(&audio->dev->kobj, KOBJ_CHANGE,
 				   uevent_envp);
@@ -351,6 +339,32 @@ static void audio_source_work(struct work_struct *data)
 		pr_info("%s: did not send uevent set interface\n",
 			__func__);
 	}
+	mutex_unlock(&audio->uevent_lock);
+}
+
+static void audio_source_sample_rate_work(struct work_struct *data)
+{
+	struct audio_dev *audio = container_of(data, struct audio_dev,
+					       sample_rate_work);
+	char *set_sample_rate[3] = { "USB_STATE=SET_SAMPLE_RATE", NULL, NULL};
+	char buffer[64];
+
+	sprintf(buffer, "SAMPLE_RATE=%lld", audio->sample_rate);
+	set_sample_rate[1] = buffer;
+	audio_source_send_uevent(audio, set_sample_rate);
+}
+
+static void audio_source_alt_work(struct work_struct *data)
+{
+	struct audio_dev *audio = container_of(data, struct audio_dev,
+					       alt_work);
+	char *set_interface[2] = { "USB_STATE=SET_INTERFACE", NULL};
+
+	if (audio->alt)
+		set_interface[1] = "STREAM_STATE=ON";
+	else
+		set_interface[1] = "STREAM_STATE=OFF";
+	audio_source_send_uevent(audio, set_interface);
 }
 
 static ssize_t
@@ -374,7 +388,7 @@ alt_store(struct device *dev, struct device_attribute *attr,
 
 	if (audio->alt != value) {
 		audio->alt = value;
-		schedule_work(&audio->work);
+		schedule_work(&audio->alt_work);
 	}
 	return size;
 }
@@ -593,6 +607,7 @@ static void audio_control_complete(struct usb_ep *ep, struct usb_request *req)
 			do_div(audio->frames_per_msec, 1000);
 			pr_info("audio source set sample rate to %lld\n",
 				audio->sample_rate);
+			schedule_work(&audio->sample_rate_work);
 			break;
 		case UAC_SET_MIN:
 			/* fallthrough */
@@ -850,7 +865,7 @@ static int audio_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 
 	if (audio->alt != alt) {
 		audio->alt = alt;
-		schedule_work(&audio->work);
+		schedule_work(&audio->alt_work);
 	}
 
 	usb_ep_enable(audio->in_ep);
@@ -951,7 +966,9 @@ audio_unbind(struct usb_configuration *c, struct usb_function *f)
 	while ((req = audio_req_get(audio)))
 		audio_request_free(req, audio->in_ep);
 
-	cancel_work_sync(&audio->work);
+	cancel_work_sync(&audio->alt_work);
+	cancel_work_sync(&audio->sample_rate_work);
+	mutex_destroy(&audio->uevent_lock);
 	device_destroy(audio_source_class, audio->dev->devt);
 	class_destroy(audio_source_class);
 
@@ -1160,7 +1177,9 @@ int audio_source_bind_config(struct usb_configuration *c,
 	if (IS_ERR(audio_source_class))
 		return PTR_ERR(audio_source_class);
 
-	INIT_WORK(&audio->work, audio_source_work);
+	mutex_init(&audio->uevent_lock);
+	INIT_WORK(&audio->alt_work, audio_source_alt_work);
+	INIT_WORK(&audio->sample_rate_work, audio_source_sample_rate_work);
 	audio_source_create_device(audio);
 
 	return 0;

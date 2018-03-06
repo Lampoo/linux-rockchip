@@ -41,10 +41,9 @@
 #	define DSP_PSU_CORE_IDLE    BIT(5)
 #	define DSP_PSU_DSP_IDLE     BIT(4)
 
-#define DSP_DEV_SESSION           0
-#define DSP_DEV_DEFAULT_TIMEOUT   1000
-
-static int dsp_dev_power_off(struct dsp_dev *dev);
+#define DSP_DEV_SESSION              0
+#define DSP_DEV_DEFAULT_DSP_TIMEOUT  1000
+#define DSP_DEV_DEFAULT_IDLE_TIMEOUT 50
 
 static void dsp_set_div_clk(struct clk *clock, int divide)
 {
@@ -152,13 +151,16 @@ static int dsp_dev_work_done(struct dsp_dev *dev, struct dsp_work *work)
 		dsp_debug(DEBUG_DEVICE, "request DSP rate=%d\n", work->rate);
 	}
 
-	/* We should not cancel work in timeout callback */
+	/* We should not cancel work in device timeout callback */
 	if (work->result != DSP_WORK_ETIMEOUT)
 		cancel_delayed_work_sync(&dev->guard_work);
 
 	dsp_work_set_status(work, DSP_WORK_DONE);
 	dev->client->work_done(dev->client, work);
 	mutex_unlock(&dev->lock);
+
+	schedule_delayed_work(&dev->idle_work,
+			      msecs_to_jiffies(dev->idle_timeout));
 
 	dsp_debug_leave();
 	return 0;
@@ -176,7 +178,11 @@ static int dsp_dev_work(struct dsp_dev *dev, struct dsp_work *work)
 		goto out;
 	}
 
-	schedule_delayed_work(&dev->guard_work, msecs_to_jiffies(dev->timeout));
+	dev->resume(dev);
+	cancel_delayed_work_sync(&dev->idle_work);
+
+	schedule_delayed_work(&dev->guard_work,
+			      msecs_to_jiffies(dev->dsp_timeout));
 
 	if (dev->dsp_dvfs_node)
 		work->rate = dvfs_clk_get_rate(dev->dsp_dvfs_node);
@@ -226,6 +232,23 @@ static void dsp_dev_work_timeout(struct work_struct *work)
 	rockchip_pmu_ops.set_idle_request(IDLE_REQ_DSP, false);
 	reset_control_deassert(dev->core_rst);
 
+	dsp_debug_leave();
+}
+
+static void dsp_dev_idle_timeout(struct work_struct *work)
+{
+	struct dsp_dev *dev =
+		container_of(work, struct dsp_dev, idle_work.work);
+
+	dsp_debug_enter();
+	if (!mutex_trylock(&dev->lock))
+		goto out;
+
+	dev->suspend(dev);
+
+	mutex_unlock(&dev->lock);
+
+out:
 	dsp_debug_leave();
 }
 
@@ -385,7 +408,7 @@ static int dsp_dev_suspend(struct dsp_dev *dev)
 	 */
 	status = readl_relaxed(dev->dsp_grf + DSP_GRF_STAT1);
 	if (status & DSP_PSU_DSP_IDLE) {
-		dsp_debug(DEBUG_DEVICE, "Disbale DSP clk when standby\n");
+		dsp_debug(DEBUG_DEVICE, "DSP suspend\n");
 		dsp_dev_clk_disable(dev);
 		dev->status = DSP_SLEEP;
 	} else {
@@ -408,7 +431,7 @@ static int dsp_dev_resume(struct dsp_dev *dev)
 		goto out;
 
 	/* Restore DSP external clock when DSP is in standby mode */
-	dsp_debug(DEBUG_DEVICE, "Enable DSP clk when standby\n");
+	dsp_debug(DEBUG_DEVICE, "DSP resume\n");
 	dsp_dev_clk_enable(dev);
 	dev->status = DSP_ON;
 
@@ -452,7 +475,7 @@ static int dsp_dev_power_on(struct dsp_dev *dev)
 	pr_info("DSP power on\n");
 out:
 	if (ret)
-		dsp_dev_power_off(dev);
+		dev->off(dev);
 
 	dsp_debug_leave();
 	return ret;
@@ -467,13 +490,12 @@ static int dsp_dev_power_off(struct dsp_dev *dev)
 	if (dev->status == DSP_OFF)
 		goto out;
 
-	dev->resume(dev);
-
 	/*
 	 * Before DSP device power off, we must make sure that there is not
 	 * coming work request from device client.
 	 */
 	mutex_lock(&dev->lock);
+	dev->resume(dev);
 	dev->client->device_pause(dev->client);
 
 	dsp_dev_trace(dev, dev->trace_index + DSP_TRACE_SLOT_COUNT);
@@ -607,12 +629,16 @@ int dsp_dev_register_client(struct dsp_dev *dev, struct dsp_dev_client *client)
 int dsp_dev_parse_dt(struct device_node *node, struct dsp_dev *dev)
 {
 	if (of_property_read_u32(node, "rockchip,dsp-timeout-ms",
-				 &dev->timeout))
-		dev->timeout = DSP_DEV_DEFAULT_TIMEOUT;
+				 &dev->dsp_timeout))
+		dev->dsp_timeout = DSP_DEV_DEFAULT_DSP_TIMEOUT;
 
 	if (of_property_read_u32(node, "rockchip,dsp-heap-size",
 				 &dev->heap.size))
 		dev->heap.size = 0;
+
+	if (of_property_read_u32(node, "rockchip,dsp-idle-ms",
+				 &dev->idle_timeout))
+		dev->idle_timeout = DSP_DEV_DEFAULT_IDLE_TIMEOUT;
 
 	return 0;
 }
@@ -690,6 +716,7 @@ int dsp_dev_create(struct platform_device *pdev, struct dma_pool *dma_pool,
 
 	dev->dsp_dvfs_node = clk_get_dvfs_node("clk_dsp");
 	INIT_DELAYED_WORK(&dev->guard_work, dsp_dev_work_timeout);
+	INIT_DELAYED_WORK(&dev->idle_work, dsp_dev_idle_timeout);
 
 	dev->device = &pdev->dev;
 	(*dev_out) = dev;

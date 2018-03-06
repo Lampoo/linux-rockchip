@@ -1286,6 +1286,7 @@
 			      "global_rst", "oecm_rst";
 		interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
 		rockchip,dsp-timeout-ms = <1000>;
+		rockchip,dsp-idle-ms = <50>;
 		rockchip,dsp-heap-size = <0>;
 	};
 

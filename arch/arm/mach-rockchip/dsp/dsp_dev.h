@@ -53,7 +53,6 @@ struct dsp_dev_client {
 struct dsp_dev {
 	struct device *device;
 	enum dsp_status status;
-	u32 timeout;
 
 	int (*on)(struct dsp_dev *);
 	int (*off)(struct dsp_dev *);
@@ -69,8 +68,12 @@ struct dsp_dev {
 	struct dsp_mbox_client mbox_client;
 	struct ion_client *ion_client;
 	struct dsp_work *running_work;
-	struct delayed_work guard_work;
 	struct dsp_heap heap;
+
+	struct delayed_work guard_work;
+	struct delayed_work idle_work;
+	u32 dsp_timeout;
+	u32 idle_timeout;
 
 	char *trace_buffer;
 	u32 trace_dma;

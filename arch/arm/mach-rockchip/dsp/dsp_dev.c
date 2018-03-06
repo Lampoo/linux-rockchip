@@ -628,6 +628,8 @@ int dsp_dev_register_client(struct dsp_dev *dev, struct dsp_dev_client *client)
 
 int dsp_dev_parse_dt(struct device_node *node, struct dsp_dev *dev)
 {
+	u32 reload_firmware = 0;
+
 	if (of_property_read_u32(node, "rockchip,dsp-timeout-ms",
 				 &dev->dsp_timeout))
 		dev->dsp_timeout = DSP_DEV_DEFAULT_DSP_TIMEOUT;
@@ -639,6 +641,11 @@ int dsp_dev_parse_dt(struct device_node *node, struct dsp_dev *dev)
 	if (of_property_read_u32(node, "rockchip,dsp-idle-ms",
 				 &dev->idle_timeout))
 		dev->idle_timeout = DSP_DEV_DEFAULT_IDLE_TIMEOUT;
+
+	if (of_property_read_u32(node, "rockchip,dsp-reload-firmware",
+				 &reload_firmware))
+		reload_firmware = 0;
+	dsp_loader_need_reload_firmware(dev->loader, reload_firmware);
 
 	return 0;
 }

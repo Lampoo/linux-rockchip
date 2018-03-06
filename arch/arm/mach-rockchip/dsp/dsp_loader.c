@@ -122,8 +122,8 @@ static int dsp_loader_image_parse(struct dsp_loader *loader,
 	int idx;
 	u32 offset = 0, dst_offset = 0;
 	u32 phys_size = 0;
-	struct dsp_image *image;
-	struct dsp_image_header *image_hdr;
+	struct dsp_image *image = NULL;
+	struct dsp_image_header *image_hdr = NULL;
 
 	dsp_debug_enter();
 
@@ -220,6 +220,26 @@ out:
 	return ret;
 }
 
+static int dsp_loader_release_image(struct dsp_loader *loader)
+{
+	struct list_head *pos, *n;
+
+	dsp_debug_enter();
+
+	list_for_each_safe(pos, n, &loader->images) {
+		struct dsp_image *image = container_of(pos,
+				struct dsp_image, list_node);
+
+		list_del(pos);
+		dsp_loader_image_destroy(loader, image);
+	}
+
+	loader->image_prepared = 0;
+
+	dsp_debug_leave();
+	return 0;
+}
+
 /*
  * dsp_loader_prepare_image - DSP firmware is parsed here,
  * image information can be extract from firmware file.
@@ -304,6 +324,24 @@ out:
 }
 
 /*
+ * dsp_loader_need_reload_firmware - set reload firmware flag
+ *
+ * @loader: DSP loader ptr
+ * @need_reload: reload firmware every time from file system if set to 1
+ */
+int dsp_loader_need_reload_firmware(struct dsp_loader *loader, int need_reload)
+{
+	if (!loader)
+		return -EINVAL;
+
+	dsp_debug_enter();
+	loader->reload_firmware = need_reload;
+	dsp_debug_leave();
+
+	return 0;
+}
+
+/*
  * dsp_loader_load_image - load DSP image by image name
  *
  * @loader: DSP loader ptr
@@ -317,6 +355,9 @@ int dsp_loader_load_image(struct device *device,
 	struct dsp_image *image;
 
 	dsp_debug_enter();
+
+	if (loader->reload_firmware)
+		dsp_loader_release_image(loader);
 
 	ret = dsp_loader_prepare_image(device, loader);
 	if (ret) {
@@ -404,23 +445,13 @@ out:
 
 int dsp_loader_destroy(struct dsp_loader *loader)
 {
-	struct list_head *pos, *n;
-
 	if (!loader)
 		goto out;
 
 	dsp_debug_enter();
-	list_for_each_safe(pos, n, &loader->images) {
-		struct dsp_image *image = container_of(pos,
-				struct dsp_image, list_node);
-
-		list_del(pos);
-		dsp_loader_image_destroy(loader, image);
-	}
-
+	dsp_loader_release_image(loader);
 	ion_unmap_kernel(loader->ion_client, loader->ext_text_hdl);
 	ion_free(loader->ion_client, loader->ext_text_hdl);
-
 	kfree(loader);
 out:
 	dsp_debug_leave();

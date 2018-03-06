@@ -1288,6 +1288,7 @@
 		rockchip,dsp-timeout-ms = <1000>;
 		rockchip,dsp-idle-ms = <50>;
 		rockchip,dsp-heap-size = <0>;
+		rockchip,dsp-reload-firmware = <0>;
 	};
 
 	pinctrl: pinctrl {

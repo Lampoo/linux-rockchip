@@ -72,6 +72,7 @@ struct dsp_loader {
 	struct ion_client *ion_client;
 	struct list_head images;
 	int image_prepared;
+	int reload_firmware;
 
 	/* Reserved dsp external text memory */
 	struct ion_handle *ext_text_hdl;
@@ -81,6 +82,7 @@ struct dsp_loader {
 int dsp_loader_create(struct dsp_dma *dma, struct ion_client *ion_client,
 		      struct dsp_loader **loader_out);
 int dsp_loader_destroy(struct dsp_loader *loader);
+int dsp_loader_need_reload_firmware(struct dsp_loader *loader, int need_reload);
 int dsp_loader_load_image(struct device *device, struct dsp_loader *loader,
 			  const char *name);
 

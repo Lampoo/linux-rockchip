@@ -496,6 +496,7 @@ static int dsp_dev_power_off(struct dsp_dev *dev)
 	 */
 	mutex_lock(&dev->lock);
 	dev->resume(dev);
+	cancel_delayed_work_sync(&dev->idle_work);
 	dev->client->device_pause(dev->client);
 
 	dsp_dev_trace(dev, dev->trace_index + DSP_TRACE_SLOT_COUNT);

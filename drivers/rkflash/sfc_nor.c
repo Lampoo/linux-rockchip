@@ -575,6 +575,22 @@ int snor_read_id(u8 *data)
 	return ret;
 }
 
+static int snor_read_parameter(u32 addr, u8 *data)
+{
+	int ret;
+	union SFCCMD_DATA     sfcmd;
+
+	sfcmd.d32 = 0;
+	sfcmd.b.cmd = CMD_READ_PARAMETER;
+	sfcmd.b.datasize = 1;
+	sfcmd.b.addrbits = SFC_ADDR_24BITS;
+	sfcmd.b.dummybits = 8;
+
+	ret = sfc_request(sfcmd.d32, 0, addr, data);
+
+	return ret;
+}
+
 u32 snor_get_capacity(void)
 {
 	struct SFNOR_DEV *p_dev = &sfnor_dev;
@@ -902,6 +918,23 @@ static struct flash_info *snor_get_flash_info(u8 *flash_id)
 	return NULL;
 }
 
+/* Adjust flash info in ram base on parameter */
+static void *snor_flash_info_adjust(struct flash_info *spi_flash_info)
+{
+	u32 addr;
+	u8 para_version;
+
+	if (spi_flash_info->id == 0xc84019) {
+		addr = 0x09;
+		snor_read_parameter(addr, &para_version);
+		if (para_version == 0x06) {
+			spi_flash_info->QE_bits = 9;
+			spi_flash_info->prog_cmd_4 = 0x34;
+		}
+	}
+	return 0;
+}
+
 int snor_init(void)
 {
 	int i;
@@ -923,6 +956,7 @@ int snor_init(void)
 	mutex_init(&p_dev->lock);
 	g_spi_flash_info = snor_get_flash_info(id_byte);
 	if (g_spi_flash_info) {
+		snor_flash_info_adjust(g_spi_flash_info);
 		p_dev->capacity = 1 << g_spi_flash_info->density;
 		p_dev->blk_size = g_spi_flash_info->block_size;
 		p_dev->page_size = NOR_SECS_PAGE;

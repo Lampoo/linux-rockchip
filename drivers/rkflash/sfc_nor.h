@@ -64,6 +64,7 @@
 #define CMD_EXIT_4BYTE_MODE     (0xE9)
 #define CMD_ENABLE_RESER	(0x66)
 #define CMD_RESET_DEVICE	(0x99)
+#define CMD_READ_PARAMETER	(0x5A)
 
 enum NOR_ERASE_TYPE {
 	ERASE_SECTOR = 0,

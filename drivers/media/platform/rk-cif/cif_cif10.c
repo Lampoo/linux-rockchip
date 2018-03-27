@@ -1215,7 +1215,7 @@ static int cif_cif10_start(
 	if (IS_ERR_VALUE(ret))
 		goto err;
 	/* capture complete interrupt enable */
-	cif_iowrite32(FRAME_END_EN/* | PST_INF_FRAME_END_EN */,
+	cif_iowrite32(FRAME_END_EN | PST_INF_FRAME_END_EN,
 		      dev->config.base_addr + CIF_CIF_INTEN);
 	cif_iowrite32OR(ENABLE_CAPTURE,
 			dev->config.base_addr + CIF_CIF_CTRL);
@@ -2314,7 +2314,7 @@ irqreturn_t cif_cif10_pingpong_irq(int irq, void *data)
 	reg_intstat =
 		cif_ioread32(base_addr + CIF_CIF_INTSTAT);
 
-	if (/*(reg_intstat & PST_INF_FRAME_END) &&*/
+	if (!(reg_intstat & INTSTAT_ERR) &&
 	    (reg_intstat & FRAME_END)) {
 		cif_iowrite32(INTSTAT_CLS,
 			      base_addr +

@@ -200,6 +200,42 @@
 			label = "car-reverse";
 			gpio,wakeup;
 		};
+
+		cvbsin_plug {
+			gpios = <&gpio1 GPIO_D7 GPIO_ACTIVE_LOW>;
+			linux,debounce-ms = <5>;
+			label = "cvbsin_plug";
+			gpio,wakeup;
+		};
+
+		mix_cif0_plug {
+			gpios = <&gpio1 GPIO_D1 GPIO_ACTIVE_LOW>;
+			linux,debounce-ms = <5>;
+			label = "mix_cif0_plug";
+			gpio,wakeup;
+		};
+
+		mix_cif1_plug {
+			gpios = <&gpio1 GPIO_D0 GPIO_ACTIVE_LOW>;
+			linux,debounce-ms = <5>;
+			label = "mix_cif1_plug";
+			gpio,wakeup;
+		};
+
+		mix_cif2_plug {
+			gpios = <&gpio1 GPIO_D3 GPIO_ACTIVE_LOW>;
+			linux,debounce-ms = <5>;
+			label = "mix_cif2_plug";
+			gpio,wakeup;
+		};
+
+		mix_cif3_plug {
+			gpios = <&gpio1 GPIO_D2 GPIO_ACTIVE_LOW>;
+			linux,debounce-ms = <5>;
+			label = "mix_cif3_plug";
+			gpio,wakeup;
+		};
+
 	};
 };
 

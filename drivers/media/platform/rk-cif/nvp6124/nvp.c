@@ -273,6 +273,7 @@ nvp_module_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	} else if (cmd == PLTFRM_CIFCAM_RESET) {
 		dev_info(&nvp->client->dev,
 			 "nvp softreset\n");
+		nvp6124b_output_enable(nvp, 0);
 		/* rst */
 		return ret;
 	} else {
@@ -305,6 +306,8 @@ nvp_module_s_stream(struct v4l2_subdev *sd, int enable)
 		pr_err("nvp not init\n");
 		return -1;
 	}
+
+	nvp6124b_output_enable(nvp, enable);
 
 	return 0;
 }
@@ -634,6 +637,7 @@ static int nvp_probe(
 		return -ENXIO;
 	nvp6124b_common_init(nvp);
 	nvp_set_channels();
+	nvp6124b_output_enable(nvp, 0);
 	pr_info("%s: success!\n", __func__);
 
 	return 0;

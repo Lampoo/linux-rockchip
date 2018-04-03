@@ -101,5 +101,6 @@ void nvp6124b_set_portmode(
 
 void nvp6124b_common_init(struct nvp *nvp);
 int nvp6124b_check_id(struct nvp *nvp);
+int nvp6124b_output_enable(struct nvp *nvp, int state);
 
 #endif

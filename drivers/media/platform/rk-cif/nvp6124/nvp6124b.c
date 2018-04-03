@@ -225,6 +225,28 @@ static u32 nvp_i2c_write(u8 reg, u8 data)
 	return ret;
 }
 
+int nvp6124b_output_enable(struct nvp *nvp, int state)
+{
+	int ret = 0;
+
+	client = nvp->client;
+
+	ret = nvp_i2c_write(0xFF, 0x1);   /* choose bank 1 */
+	if (ret != 1) {
+		pr_err("%s: write reg(0xff) failed errno %d\n",
+		       __func__,
+		       ret);
+		return -1;
+	}
+
+	if (state)
+		ret = nvp_i2c_write(0xCA, 0xAE);
+	else
+		ret = nvp_i2c_write(0xCA, 0xE);
+
+	return 0;
+}
+
 int nvp6124b_check_id(struct nvp *nvp)
 {
 	int ret = 0;

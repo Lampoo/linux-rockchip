@@ -993,10 +993,9 @@ static int pltfrm_camera_module_write_reglist_node(
 		}
 
 		reg_table_num_entries /= 12;
-		reg_table = (struct pltfrm_camera_module_reg *)
-			kmalloc(reg_table_num_entries *
-				sizeof(struct pltfrm_camera_module_reg),
-				GFP_KERNEL);
+		reg_table = kmalloc_array(reg_table_num_entries,
+			sizeof(struct pltfrm_camera_module_reg),
+			GFP_KERNEL);
 		if (IS_ERR_OR_NULL(reg_table)) {
 			pltfrm_camera_module_pr_err(sd,
 				"memory allocation failed\n");
@@ -1820,7 +1819,6 @@ int pltfrm_camera_module_init(
 	void **pldata)
 {
 	int ret = 0;
-	struct i2c_client *client = v4l2_get_subdevdata(sd);
 	struct pltfrm_camera_module_data *pdata;
 
 	pltfrm_camera_module_pr_debug(sd, "\n");
@@ -1841,9 +1839,7 @@ int pltfrm_camera_module_init(
 			"GPIO initialization failed (%d)\n", ret);
 	}
 
-	if (IS_ERR_VALUE(ret))
-		devm_kfree(&client->dev, pdata);
-	else
+	if (!IS_ERR_VALUE(ret))
 		*(struct pltfrm_camera_module_data **)pldata = pdata;
 
 	return ret;
@@ -1872,8 +1868,17 @@ void pltfrm_camera_module_release(
 		if (!IS_ERR(pdata->regulators.regulator[i].regulator))
 			devm_regulator_put(pdata->regulators.regulator[i].regulator);
 	}
+	if (!IS_ERR_OR_NULL(pdata->regulators.regulator)) {
+		devm_kfree(&client->dev,
+			pdata->regulators.regulator);
+		pdata->regulators.regulator = NULL;
+	}
 	if (pdata->pinctrl)
 		devm_pinctrl_put(pdata->pinctrl);
+	if (!IS_ERR_OR_NULL(pdata)) {
+		devm_kfree(&client->dev, pdata);
+		pdata = NULL;
+	}
 }
 
 /* ======================================================================== */

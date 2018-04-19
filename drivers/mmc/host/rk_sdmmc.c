@@ -1500,7 +1500,20 @@ static int dw_mci_set_sdio_status(struct mmc_host *mmc, int val)
 	return 0;
 }
 
+static int dw_mci_send_uevent(struct dw_mci *host, const char *evnts)
+{
+	struct kobj_uevent_env *env;
 
+	env = kzalloc(sizeof(struct kobj_uevent_env), GFP_KERNEL);
+	if (!env)
+		return -ENOMEM;
+
+	add_uevent_var(env, "DRIVER=rk_sdmmc");
+	add_uevent_var(env, "TARGET_ACTION=%s", evnts);
+	kobject_uevent_env(&host->dev->kobj, KOBJ_CHANGE, env->envp);
+	kfree(env);
+	return 0;
+}
 
 static int dw_mci_get_cd(struct mmc_host *mmc)
 {
@@ -1574,6 +1587,8 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
 	if (present) {
 		set_bit(DW_MMC_CARD_PRESENT, &slot->flags);
 		dev_dbg(&mmc->class_dev, "card is present\n");
+		if (mmc->restrict_caps & RESTRICT_CARD_TYPE_SD)
+			dw_mci_send_uevent(host, "CARD_INSERT");
 	} else {
 		clear_bit(DW_MMC_CARD_PRESENT, &slot->flags);
 		dev_dbg(&mmc->class_dev, "card is not present\n");

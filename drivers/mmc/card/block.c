@@ -1558,19 +1558,21 @@ static int mmc_blk_err_check(struct mmc_card *card,
 
 		timeout = jiffies + msecs_to_jiffies(MMC_BLK_TIMEOUT_MS);
 		do {
-			if (host->ops->card_busy && host->ops->card_busy(host)) {
-				/*
-				 * Schedule for the others request like
-				 * we invoke mmc_wait_for_req_done in
-				 * get_card_status.
-				 */
-				if (cpu_is_rv110x())
-					usleep_range(1000, 3000);
-				else
-					usleep_range(100, 500);
+			if (host->ops->card_busy) {
+				if (host->ops->card_busy(host)) {
+					/*
+					 * Schedule for the others request like
+					 * we invoke mmc_wait_for_req_done in
+					 * get_card_status.
+					 */
+					if (cpu_is_rv110x())
+						usleep_range(1000, 3000);
+					else
+						usleep_range(100, 500);
 
-				if (time_before(jiffies, timeout))
-					continue;
+					if (time_before(jiffies, timeout))
+						continue;
+				}
 			}
 
 			err = get_card_status(card, &status, 5);
@@ -1608,6 +1610,8 @@ static int mmc_blk_err_check(struct mmc_card *card,
 
 				return MMC_BLK_CMD_ERR;
 			}
+			if (cpu_is_rv110x())
+				usleep_range(1000, 3000);
 			/*
 			 * Some cards mishandle the status bits,
 			 * so make sure to check both the busy

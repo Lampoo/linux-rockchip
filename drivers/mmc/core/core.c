@@ -27,6 +27,7 @@
 #include <linux/suspend.h>
 #include <linux/fault-inject.h>
 #include <linux/random.h>
+#include <linux/rockchip/cpu.h>
 #include <linux/slab.h>
 #include <linux/of.h>
 
@@ -511,6 +512,14 @@ static int mmc_wait_for_data_req_done(struct mmc_host *host,
 				cmd->opcode, cmd->error, timeout);
 			host->ops->post_tmo(host);
 			context_info->is_done_rcv = true;
+			/*
+			 * Propagate card as removed for host->areq->err_check
+			 * and mmcqd to block all requests when pre-preparing them
+			 * from the queue. Tricky for sd card if only one cpu is
+			 * online for schedule for whatever reason.
+			 */
+			if (mmc_card_sd(host->card) && cpu_is_rv110x())
+				mmc_card_set_removed(host->card);
 		}
 
 		spin_lock_irqsave(&context_info->lock, flags);

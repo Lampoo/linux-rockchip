@@ -81,7 +81,7 @@ size_t get_fb_size(u8 reserved_fb)
 		size = (xres * yres << 2) << 1; /* two buffer */
 #endif
 
-	return ALIGN(size, SZ_1M);
+	return size;
 }
 
 static int rk_screen_probe(struct platform_device *pdev)

@@ -39,7 +39,8 @@ void nandc_init(void __iomem *nandc_addr)
 	nandc_time_cfg(40);
 
 #ifdef NANDC_MASTER_EN
-	g_master_temp_buf = (u32 *)ftl_malloc(MAX_FLASH_PAGE_SIZE +
+	if (!g_master_temp_buf)
+		g_master_temp_buf = (u32 *)ftl_malloc(MAX_FLASH_PAGE_SIZE +
 					      MAX_FLASH_PAGE_SIZE / 8);
 	master.page_buf = &g_master_temp_buf[0];
 	master.spare_buf = &g_master_temp_buf[MAX_FLASH_PAGE_SIZE / 4];

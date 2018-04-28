@@ -24,9 +24,3 @@ int spi_flash_init(void __iomem	*reg_addr)
 	return ret;
 }
 EXPORT_SYMBOL_GPL(spi_flash_init);
-
-void spi_flash_read_id(u8 chip_sel, void *buf)
-{
-	snor_read_id(buf);
-}
-EXPORT_SYMBOL_GPL(spi_flash_read_id);

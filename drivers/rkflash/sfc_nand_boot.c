@@ -15,8 +15,6 @@
 #include "sfc_nand.h"
 #include "typedef.h"
 
-static DEFINE_MUTEX(g_flash_ops_mutex);
-
 int snand_init(void __iomem *reg_addr)
 {
 	int ret;
@@ -29,15 +27,6 @@ int snand_init(void __iomem *reg_addr)
 }
 EXPORT_SYMBOL_GPL(snand_init);
 
-void snand_read_id(u8 chip_sel, void *buf)
-{
-	mutex_lock(&g_flash_ops_mutex);
-	sfc_nand_read_id(buf);
-	mutex_unlock(&g_flash_ops_mutex);
-
-}
-EXPORT_SYMBOL_GPL(snand_read_id);
-
 unsigned int snand_get_capacity(void)
 {
 	return sftl_get_density();
@@ -45,20 +34,12 @@ unsigned int snand_get_capacity(void)
 
 int snand_write(u32 sec, u32 n_sec, void *p_data)
 {
-	mutex_lock(&g_flash_ops_mutex);
-	sftl_write(sec, n_sec, p_data);
-	mutex_unlock(&g_flash_ops_mutex);
-
-	return 0;
+	return sftl_write(sec, n_sec, p_data);
 }
 
 int snand_read(u32 sec, u32 n_sec, void *p_data)
 {
-	mutex_lock(&g_flash_ops_mutex);
-	sftl_read(sec, n_sec, p_data);
-	mutex_unlock(&g_flash_ops_mutex);
-
-	return 0;
+	return sftl_read(sec, n_sec, p_data);
 }
 
 void snand_deinit(void)

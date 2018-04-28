@@ -103,6 +103,7 @@ static int rkflash_dev_initialised;
 
 static char *mtd_read_temp_buffer;
 #define MTD_RW_SECTORS (512)
+static DEFINE_MUTEX(g_flash_ops_mutex);
 
 void rknand_print_hex(char *s, void *buf, int width, int len)
 {
@@ -115,7 +116,7 @@ void *ftl_malloc(int n_size)
 	return kmalloc(n_size, GFP_KERNEL | GFP_DMA);
 }
 
-void ftl_free(void *p, int size)
+void ftl_free(void *p)
 {
 	kfree(p);
 }
@@ -212,7 +213,9 @@ static int rkflash_xfer(struct flash_blk_dev *dev,
 	case READ:
 		totle_read_data += nsector;
 		totle_read_count++;
+		mutex_lock(&g_flash_ops_mutex);
 		ret = g_boot_ops[g_flash_type]->read(start, nsector, buf);
+		mutex_unlock(&g_flash_ops_mutex);
 		if (ret)
 			ret = -EIO;
 		break;
@@ -220,7 +223,9 @@ static int rkflash_xfer(struct flash_blk_dev *dev,
 	case WRITE:
 		totle_write_data += nsector;
 		totle_write_count++;
+		mutex_lock(&g_flash_ops_mutex);
 		ret = g_boot_ops[g_flash_type]->write(start, nsector, buf);
+		mutex_unlock(&g_flash_ops_mutex);
 		if (ret)
 			ret = -EIO;
 		break;
@@ -682,12 +687,14 @@ int rkflash_dev_exit(void)
 
 int rkflash_dev_suspend(void)
 {
+	mutex_lock(&g_flash_ops_mutex);
 	return 0;
 }
 
 int rkflash_dev_resume(void __iomem *reg_addr)
 {
 	g_boot_ops[g_flash_type]->resume(reg_addr);
+	mutex_unlock(&g_flash_ops_mutex);
 	return 0;
 }
 

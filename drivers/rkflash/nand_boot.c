@@ -15,8 +15,6 @@
 #include "rkflash_api.h"
 #include "typedef.h"
 
-static DEFINE_MUTEX(g_flash_ops_mutex);
-
 int sftl_flash_init(void __iomem *reg_addr)
 {
 	int ret;
@@ -31,9 +29,7 @@ EXPORT_SYMBOL_GPL(sftl_flash_init);
 
 void sftl_flash_read_id(u8 chip_sel, void *buf)
 {
-	mutex_lock(&g_flash_ops_mutex);
 	flash_get_id(chip_sel, buf);
-	mutex_unlock(&g_flash_ops_mutex);
 }
 EXPORT_SYMBOL_GPL(sftl_flash_read_id);
 
@@ -44,19 +40,13 @@ unsigned int sftl_flash_get_capacity(void)
 
 int sftl_flash_write(u32 sec, u32 n_sec, void *p_data)
 {
-	mutex_lock(&g_flash_ops_mutex);
 	sftl_write(sec, n_sec, p_data);
-	mutex_unlock(&g_flash_ops_mutex);
-
 	return 0;
 }
 
 int sftl_flash_read(u32 sec, u32 n_sec, void *p_data)
 {
-	mutex_lock(&g_flash_ops_mutex);
 	sftl_read(sec, n_sec, p_data);
-	mutex_unlock(&g_flash_ops_mutex);
-
 	return 0;
 }
 

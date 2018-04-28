@@ -382,6 +382,8 @@ static int sfc_nand_get_bad_block_list(u16 *table, u32 die)
 			PRINT_E("die[%d], bad_blk[%d]\n", die, blk);
 		}
 	}
+	ftl_free(pread);
+	ftl_free(pspare_read);
 	return (int)bad_cnt;
 }
 

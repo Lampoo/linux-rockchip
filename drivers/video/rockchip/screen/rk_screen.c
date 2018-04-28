@@ -61,8 +61,10 @@ size_t get_fb_size(u8 reserved_fb)
 	/* if there is only one vop, and hdmi buffer must be large enough */
 #ifdef CONFIG_RK_HDMI
 	if (cpu_is_rv110x()) {
-		xres = xres > 1280 ? xres : 1280;
-		yres = yres > 720 ? yres : 720;
+		if (xres * yres < 1280 * 720) {
+			xres = 1280;
+			yres = 720;
+		}
 	}
 #endif
 

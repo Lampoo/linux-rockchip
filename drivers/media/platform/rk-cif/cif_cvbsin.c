@@ -148,6 +148,9 @@ static int cvbsin_module_s_power(struct v4l2_subdev *sd, int on)
 {
 	struct pltfrm_cvbsin_cfg_para cfg_para;
 
+	dev_info(cvbsin->dev,
+		 "%s\n",
+		 (on ? "power on" : "power off"));
 	if (cvbsin->pwr_stat == on) {
 		dev_info(cvbsin->dev,
 			 "cvbsin already %s\n",
@@ -163,9 +166,6 @@ static int cvbsin_module_s_power(struct v4l2_subdev *sd, int on)
 		mdelay(5);
 		write_cvbsin_reg(CVBSIN_OUTCTRL, RST_DISABLE);
 		mdelay(5);
-		write_cvbsin_reg(CVBSIN_CTRL4, CTRL4_VAL);
-		write_cvbsin_reg(CVBSIN_CTRL3, CTRL3_VAL);
-		write_cvbsin_reg(CVBSIN_CTRL2, CTRL2_VAL);
 	} else {
 		cfg_para.cmd = PLTFRM_CVBSIN_POWEROFF;
 		(cvbsin->soc_cfg->soc_cfg)(&cfg_para);
@@ -182,7 +182,6 @@ static long cvbsin_module_ioctl(
 {
 	int ret = 0;
 	struct pltfrm_cam_itf *itf_cfg = NULL;
-	struct pltfrm_cvbsin_cfg_para cfg_para;
 
 	if (!cvbsin || !cvbsin->soc_cfg)
 		return -1;
@@ -208,16 +207,12 @@ static long cvbsin_module_ioctl(
 		return 0;
 	} else if (cmd == PLTFRM_CIFCAM_RESET) {
 		dev_info(cvbsin->dev, "cvbsin softreset\n");
-		cfg_para.cmd = PLTFRM_CVBSIN_RST;
-		(cvbsin->soc_cfg->soc_cfg)(&cfg_para);
 
 		write_cvbsin_reg(CVBSIN_OUTCTRL, RST_ENABLE);
 		mdelay(5);
 		write_cvbsin_reg(CVBSIN_OUTCTRL, RST_DISABLE);
 		mdelay(5);
-		write_cvbsin_reg(CVBSIN_CTRL4, CTRL4_VAL);
-		write_cvbsin_reg(CVBSIN_CTRL3, CTRL3_VAL);
-		write_cvbsin_reg(CVBSIN_CTRL2, CTRL2_VAL);
+
 		return ret;
 	} else {
 		dev_warn(cvbsin->dev, "cvbsin not support this ioctl\n");
@@ -245,6 +240,11 @@ static int cvbsin_module_s_stream(struct v4l2_subdev *sd, int enable)
 		pr_err("cvbsin not init\n");
 		return -1;
 	}
+
+	dev_info(cvbsin->dev,
+		 "%s\n",
+		 (enable ? "stream on" : "stream off"));
+
 	if (enable)
 		write_cvbsin_reg(CVBSIN_OUTCTRL, 0xfc);
 	else
@@ -312,7 +312,7 @@ static int cvbsin_module_s_fmt(
 
 static struct v4l2_subdev_video_ops cvbsin_module_video_ops = {
 	.enum_frameintervals = cvbsin_module_enum_frameintervals,
-	.s_mbus_fmt = cvbsin_module_g_fmt,
+	.g_mbus_fmt = cvbsin_module_g_fmt,
 	.s_mbus_fmt = cvbsin_module_s_fmt,
 	.s_frame_interval = cvbsin_module_s_frame_interval,
 	.s_stream = cvbsin_module_s_stream

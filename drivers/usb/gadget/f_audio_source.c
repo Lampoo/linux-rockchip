@@ -904,6 +904,9 @@ static void audio_disable(struct usb_function *f)
 
 	pr_debug("audio_disable\n");
 	usb_ep_disable(audio->in_ep);
+
+	audio->alt = 0;
+	schedule_work(&audio->alt_work);
 }
 
 /*-------------------------------------------------------------------------*/

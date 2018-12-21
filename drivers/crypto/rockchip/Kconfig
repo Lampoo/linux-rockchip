@@ -5,6 +5,7 @@ config CRYPTO_DEV_ROCKCHIP_ENCRYPT
 	select CRYPTO_TDES
 	select CRYPTO_HASH
 	select CRYPTO_RSA
+	select CRYPTO_BLKCIPHER2
 
 	help
 	  Say Y here to support for Rockchip encryption acceleration.

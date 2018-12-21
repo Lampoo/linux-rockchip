@@ -1152,6 +1152,7 @@ static struct notifier_block cpufreq_interactive_idle_nb = {
 };
 
 #ifdef CONFIG_ARCH_ROCKCHIP
+# ifdef CONFIG_INPUT
 static struct dvfs_node *clk_cpu_dvfs_node;
 static void cpufreq_interactive_input_event(struct input_handle *handle, unsigned int type,
 		unsigned int code, int value)
@@ -1298,6 +1299,7 @@ static struct input_handler cpufreq_interactive_input_handler = {
 	.name		= "cpufreq_interactive",
 	.id_table	= cpufreq_interactive_ids,
 };
+# endif
 #endif
 
 static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
@@ -1388,7 +1390,9 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			cpufreq_register_notifier(&cpufreq_notifier_block,
 					CPUFREQ_TRANSITION_NOTIFIER);
 #ifdef CONFIG_ARCH_ROCKCHIP
+# ifdef CONFIG_INPUT
 			rc = input_register_handler(&cpufreq_interactive_input_handler);
+# endif
 #endif
 		}
 
@@ -1398,7 +1402,9 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		if (!--tunables->usage_count) {
 			if (policy->governor->initialized == 1) {
 #ifdef CONFIG_ARCH_ROCKCHIP
+# ifdef CONFIG_INPUT
 				input_unregister_handler(&cpufreq_interactive_input_handler);
+# endif
 #endif
 				cpufreq_unregister_notifier(&cpufreq_notifier_block,
 						CPUFREQ_TRANSITION_NOTIFIER);

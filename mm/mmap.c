@@ -2586,7 +2586,7 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 	detach_vmas_to_be_unmapped(mm, vma, prev, end);
 	unmap_region(mm, vma, prev, start, end);
 
-#ifdef CONFIG_ARCH_ROCKCHIP
+#ifdef CONFIG_ION_ROCKCHIP
 	{
 		extern int ion_munmap(void *dmabuf, struct vm_area_struct *vma);
 		extern int dma_buf_is_dma_buf(struct file *file);

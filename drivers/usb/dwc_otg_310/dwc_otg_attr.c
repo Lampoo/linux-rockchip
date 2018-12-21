@@ -826,9 +826,10 @@ static ssize_t hcddump_show(struct device *_dev,
 			    struct device_attribute *attr, char *buf)
 {
 #ifndef DWC_DEVICE_ONLY
-
+# ifdef CONFIG_USB
 	dwc_otg_device_t *otg_dev = _dev->platform_data;
 	dwc_otg_hcd_dump_state(otg_dev->hcd);
+# endif /* CONFIG_USB */
 #endif /* DWC_DEVICE_ONLY */
 	return sprintf(buf, "HCD Dump\n");
 }
@@ -844,9 +845,10 @@ static ssize_t hcd_frrem_show(struct device *_dev,
 			      struct device_attribute *attr, char *buf)
 {
 #ifndef DWC_DEVICE_ONLY
-
+# ifdef CONFIG_USB
 	dwc_otg_device_t *otg_dev = _dev->platform_data;
 	dwc_otg_hcd_dump_frrem(otg_dev->hcd);
+# endif /* CONFIG_USB */
 #endif /* DWC_DEVICE_ONLY */
 	return sprintf(buf, "HCD Dump Frame Remaining\n");
 }

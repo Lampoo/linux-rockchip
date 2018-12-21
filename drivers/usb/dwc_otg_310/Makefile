@@ -18,7 +18,9 @@ EXTRA_CFLAGS	+= $(BUS_INTERFACE)
 dwc_otg-objs	:= dwc_otg_driver.o dwc_otg_attr.o
 dwc_otg-objs	+= dwc_otg_cil.o dwc_otg_cil_intr.o
 dwc_otg-objs	+= dwc_otg_pcd_linux.o dwc_otg_pcd.o dwc_otg_pcd_intr.o
+ifeq ($(CONFIG_USB),y)
 dwc_otg-objs	+= dwc_otg_hcd.o dwc_otg_hcd_linux.o dwc_otg_hcd_intr.o dwc_otg_hcd_queue.o dwc_otg_hcd_ddma.o
+endif
 dwc_otg-objs	+= dwc_otg_adp.o
 ifneq ($(CFI),)
 dwc_otg-objs	+= dwc_otg_cfi.o

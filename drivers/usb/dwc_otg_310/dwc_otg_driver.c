@@ -1257,12 +1257,14 @@ static int otg20_driver_remove(struct platform_device *_dev)
 		return 0;
 	}
 #ifndef DWC_DEVICE_ONLY
+# ifdef CONFIG_USB
 	if (otg_dev->hcd) {
 		hcd_remove(_dev);
 	} else {
 		DWC_DEBUGPL(DBG_ANY, "%s: otg_dev->hcd NULL!\n", __func__);
 		return 0;
 	}
+# endif
 #endif
 
 #ifndef DWC_HOST_ONLY
@@ -1593,6 +1595,7 @@ static int otg20_driver_probe(struct platform_device *_dev)
 	}
 #endif
 #ifndef DWC_DEVICE_ONLY
+# ifdef CONFIG_USB
 	/*
 	 * Initialize the HCD
 	 */
@@ -1602,6 +1605,7 @@ static int otg20_driver_probe(struct platform_device *_dev)
 		dwc_otg_device->hcd = NULL;
 		goto fail;
 	}
+# endif
 #endif
 	/* Initialize last_id */
 	dwc_otg_device->last_id = -1;

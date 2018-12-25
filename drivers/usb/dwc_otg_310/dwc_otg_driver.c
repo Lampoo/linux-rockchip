@@ -64,7 +64,9 @@
 #define DWC_DRIVER_VERSION	"3.10a 21-DEC-2012"
 #define DWC_DRIVER_DESC		"HS OTG USB Controller driver"
 
+#ifdef CONFIG_USB
 static const char dwc_host20_driver_name[] = "usb20_host";
+#endif
 static const char dwc_otg20_driver_name[] = "usb20_otg";
 
 dwc_otg_device_t *g_otgdev;

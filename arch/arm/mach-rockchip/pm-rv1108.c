@@ -53,7 +53,7 @@ enum rk_plls_id {
 	END_PLL_ID
 };
 
-#define RV1108_EVB_V11
+//#define RV1108_EVB_V11
 
 static inline void  uart_printch(char bbyte)
 {

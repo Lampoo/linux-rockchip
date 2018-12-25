@@ -58,6 +58,7 @@ $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
 
 $(obj)/zImage-dtb.%: $(obj)/dts/%.dtb $(obj)/zImage FORCE
 	$(Q)cat $(obj)/zImage $< > $@
+	@$(kecho) '  Kernel: $@ is ready'
 
 endif
 

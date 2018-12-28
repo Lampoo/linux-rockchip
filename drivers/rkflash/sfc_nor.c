@@ -40,6 +40,8 @@
 #define FEA_4BYTE_ADDR		BIT(4)
 #define FEA_4BYTE_ADDR_MODE	BIT(5)
 
+#define SECTOR_4K		4096
+
 struct flash_info {
 	u32 id;
 
@@ -77,7 +79,11 @@ static struct flash_info spi_flash_tbl[] = {
 	/* XT25F128A */
 	{0x207018, 128, 8, 0x03, 0x02, 0x6B, 0x32, 0x20, 0xD8, 0x00, 15, 0, 0},
 	/* MX25L25635E/F */
+#ifdef CONFIG_MTD_SPI_NOR_USE_4K_SECTORS
+	{0xc22019, 8, 8, 0x03, 0x02, 0x6B, 0x38, 0x20, 0xD8, 0x30, 16, 6, 0},
+#else
 	{0xc22019, 128, 8, 0x03, 0x02, 0x6B, 0x38, 0x20, 0xD8, 0x30, 16, 6, 0},
+#endif
 };
 
 static struct flash_info *g_spi_flash_info;
@@ -628,7 +634,7 @@ static int sfc_erase_mtd(struct mtd_info *mtd, struct erase_info *instr)
 		}
 	} else {
 		while (len > 0) {
-			ret = snor_erase(addr, ERASE_BLOCK64K);
+			ret = snor_erase(addr, (mtd->erasesize == SECTOR_4K) ? ERASE_SECTOR : ERASE_BLOCK64K);
 			if (ret) {
 				PRINT_E("snor_erase 0x%x ret=%d\n", addr, ret);
 				instr->state = MTD_ERASE_FAILED;

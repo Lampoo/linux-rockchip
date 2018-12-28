@@ -39,8 +39,10 @@
 #include "f_uvc.c"
 #endif
 #include "f_fs.c"
+#ifdef CONFIG_SND
 #include "f_audio_source.c"
 #include "f_midi.c"
+#endif
 #include "f_mass_storage.c"
 #include "f_mtp.c"
 #include "f_accessory.c"
@@ -944,6 +946,8 @@ static struct android_usb_function accessory_function = {
 	.ctrlrequest	= accessory_function_ctrlrequest,
 };
 
+#ifdef CONFIG_SND
+
 static int audio_source_function_init(struct android_usb_function *f,
 			struct usb_composite_dev *cdev)
 {
@@ -1059,6 +1063,7 @@ static struct android_usb_function midi_function = {
 	.bind_config	= midi_function_bind_config,
 	.attributes	= midi_function_attributes,
 };
+#endif
 
 #ifdef CONFIG_VIDEO_DEV
 DECLARE_UVC_HEADER_DESCRIPTOR(1);
@@ -1633,8 +1638,10 @@ static struct android_usb_function *supported_functions[] = {
 	&rndis_function,
 	&mass_storage_function,
 	&accessory_function,
+#ifdef CONFIG_SND
 	&audio_source_function,
 	&midi_function,
+#endif
 #ifdef CONFIG_VIDEO_DEV
 	&webcam_function,
 #endif

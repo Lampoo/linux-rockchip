@@ -1,0 +1,114 @@
+
+/dts-v1/;
+
+#include "rv1108.dtsi"
+
+/ {
+	model = "Jacobian on Rockchip RV1108";
+	compatible = "rockchip,rv1108-jacobian", "rockchip,rv1108";
+
+	memory {
+		device_type = "memory";
+		reg = <0x60000000 0x08000000>;
+	};
+
+	fiq-debugger {
+		status = "okay";
+		rockchip,serial-id = <2>;
+		pinctrl-0 = <&uart2m0_xfer>;
+	};
+
+	chosen {
+		//linux,stdout-path = "serial2:1500000n8"; /* UART2 as default debug port */
+		bootargs = "console_enable=1";
+	};
+
+	io-domains {
+		compatible = "rockchip,rv1108-io-voltage-domain";
+		rockchip,grf = <&grf>;
+		rockchip,pmugrf =<&pmugrf>;
+
+		/* GRF_IO_VSEL */
+		status = "okay";
+		vccio1-supply = <&rk805_dcdc4_reg>;
+		vccio2-supply = <&rk805_ldo2_reg>;
+		vccio3-supply = <&rk805_dcdc4_reg>;
+		vccio5-supply = <&rk805_ldo2_reg>;
+
+		/* PMU_GRF_IO_VSEL */
+		pmu-supply =<&rk805_dcdc4_reg>;
+	};
+
+	/* pmic_sleep */
+	gpio_poweroff {
+		compatible = "gpio-poweroff";
+		gpios = <&gpio0 GPIO_B5 GPIO_ACTIVE_HIGH>;
+		status = "okay";
+	};
+};
+
+&clk_core_dvfs_table {
+	operating-points = <
+		/* KHz	  uV */
+		408000 975000
+		600000 975000
+		816000 1025000
+		1008000 1150000
+		>;
+	lkg_adjust_volt_table = <
+		/*lkg(mA)  volt(uV)*/
+		60         25000
+		>;
+	status = "okay";
+};
+
+&i2c0 {
+	status = "okay";
+
+	i2c-scl-rising-time-ns = <275>;
+	i2c-scl-falling-time-ns = <16>;
+	clock-frequency = <400000>;
+	nack-retry = <1>;
+
+	rk805: rk805@18 {
+		reg = <0x18>;
+		status = "okay";
+	};
+};
+
+&i2c1 {
+	// OmniVision OV9282
+	status = "okay";
+
+	// MIPI configuration
+};
+
+&i2c2 {
+	// Renesas ISL29501
+	status = "okay";
+
+	// Kernel space IIO driver
+};
+
+&uart1 {
+	status = "okay";
+	pinctrl-0 = <&uart1_xfer>;
+};
+
+&sfc {
+	status = "okay";
+};
+
+#include "rv1108-rk805-v12.dtsi" /* rk805 v12 */
+
+&dwc_control_usb {
+	rockchip,remote_wakeup;
+	rockchip,usb_irq_wakeup;
+	status = "okay";
+};
+
+&usb_otg {
+	rockchip,delay-en-diepint-nak-quirk;
+	rockchip,high-bandwidth;
+	status = "okay";
+};

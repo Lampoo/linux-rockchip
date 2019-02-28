@@ -30,6 +30,11 @@ enum iio_chan_type {
 	IIO_CCT,
 	IIO_PRESSURE,
 	IIO_QUATERNION,
+	IIO_COUNT,
+	IIO_INDEX,
+	IIO_GRAVITY,
+	IIO_POSITIONRELATIVE,
+	IIO_PHASE,
 };
 
 enum iio_modifier {
@@ -54,6 +59,7 @@ enum iio_modifier {
 	IIO_MOD_LIGHT_GREEN,
 	IIO_MOD_LIGHT_BLUE,
 	IIO_MOD_R,
+	IIO_MOD_LIGHT_DUV,
 };
 
 #define IIO_VAL_INT 1

@@ -477,6 +477,7 @@ static ssize_t isl29501_write_ext(struct iio_dev *indio_dev,
        .read = isl29501_read_ext, \
        .write = isl29501_write_ext, \
        .private = _ident, \
+       .shared = 0, \
 }
        //.shared = IIO_SEPARATE, \   \\ Jack_modifies this field because the kernel doesn't support it 
 
@@ -507,7 +508,7 @@ static const struct iio_chan_spec isl29501_channels[] = {
                        .storagebits = 16,
                        .endianness = IIO_CPU,
                },
-               .info_mask_shared_by_type = BIT(IIO_CHAN_INFO_INT_TIME) |
+               .info_mask_shared_by_all = BIT(IIO_CHAN_INFO_INT_TIME) |
                                BIT(IIO_CHAN_INFO_SAMP_FREQ), //Jack_modifies by_all to by_type because the kernel doesn't support by_all
                .ext_info = isl29501_ext_info,
        },

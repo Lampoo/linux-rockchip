@@ -746,6 +746,42 @@ static int iio_device_add_channel_sysfs(struct iio_dev *indio_dev,
 		}
 		attrcount++;
 	}
+	for_each_set_bit(i, &chan->info_mask_shared_by_dir, sizeof(long)*8) {
+		ret = __iio_add_chan_devattr(iio_chan_info_postfix[i],
+					     chan,
+					     &iio_read_channel_info,
+					     &iio_write_channel_info,
+					     i,
+					     2,		//BY_DIR
+					     &indio_dev->dev,
+					     &indio_dev->channel_attr_list);
+		if (ret == -EBUSY) {
+			ret = 0;
+			continue;
+		} else if (ret < 0) {
+			dev_err(indio_dev->dev.parent,"jchen: add_channel_sysf_1_dir,i:%d ret:%d\n",i,ret);
+			goto error_ret;
+		}
+		attrcount++;
+	}
+	for_each_set_bit(i, &chan->info_mask_shared_by_all, sizeof(long)*8) {
+		ret = __iio_add_chan_devattr(iio_chan_info_postfix[i],
+					     chan,
+					     &iio_read_channel_info,
+					     &iio_write_channel_info,
+					     i,
+					     3,		//BY_ALL
+					     &indio_dev->dev,
+					     &indio_dev->channel_attr_list);
+		if (ret == -EBUSY) {
+			ret = 0;
+			continue;
+		} else if (ret < 0) {
+			dev_err(indio_dev->dev.parent,"jchen: add_channel_sysf_1_all,i:%d ret:%d\n",i,ret);
+			goto error_ret;
+		}
+		attrcount++;
+	}
 
 	if (chan->ext_info) {
 		unsigned int i = 0;

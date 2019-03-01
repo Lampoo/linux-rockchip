@@ -106,6 +106,14 @@ static const char * const iio_chan_info_postfix[] = {
 	[IIO_CHAN_INFO_PHASE] = "phase",
 	[IIO_CHAN_INFO_HARDWAREGAIN] = "hardwaregain",
 	[IIO_CHAN_INFO_HYSTERESIS] = "hysteresis",
+	[IIO_CHAN_INFO_INT_TIME] = "integration_time",
+	[IIO_CHAN_INFO_ENABLE] = "en",
+	[IIO_CHAN_INFO_CALIBHEIGHT] = "calibheight",
+	[IIO_CHAN_INFO_CALIBWEIGHT] = "calibweight",
+	[IIO_CHAN_INFO_DEBOUNCE_COUNT] = "debounce_count",
+	[IIO_CHAN_INFO_DEBOUNCE_TIME] = "debounce_time",
+	[IIO_CHAN_INFO_CALIBEMISSIVITY] = "calibemissivity",
+	[IIO_CHAN_INFO_OVERSAMPLING_RATIO] = "oversampling_ratio",
 };
 
 const struct iio_chan_spec
@@ -521,12 +529,13 @@ int __iio_device_attr_init(struct device_attribute *dev_attr,
 						struct device_attribute *attr,
 						const char *buf,
 						size_t len),
-			   bool generic)
+			   bool generic, struct device *dev)
 {
 	int ret;
 	char *name_format, *full_postfix;
 	sysfs_attr_init(&dev_attr->attr);
 
+	dev_err(dev, "jchen: __iio_device_attr_init_minus1, chan->modified:%d,!generic:%d,postfix:%s, ext_name:%s\n",chan->modified,(!generic),postfix, chan->extend_name);
 	/* Build up postfix of <extend_name>_<modifier>_postfix */
 	if (chan->modified && !generic) {
 		if (chan->extend_name)
@@ -551,6 +560,7 @@ int __iio_device_attr_init(struct device_attribute *dev_attr,
 	}
 	if (full_postfix == NULL) {
 		ret = -ENOMEM;
+		dev_err(dev, "jchen: __iio_device_attr_init_0 ret: %d, chan->modified:%d,!generic:%d,ext_name:%s\n",ret,chan->modified,(!generic),chan->extend_name);
 		goto error_ret;
 	}
 
@@ -574,6 +584,7 @@ int __iio_device_attr_init(struct device_attribute *dev_attr,
 		else {
 			WARN_ON("Differential channels must be indexed\n");
 			ret = -EINVAL;
+			dev_err(dev, "jchen: __iio_device_attr_init_2 ret: %d \n",ret);
 			goto error_free_full_postfix;
 		}
 	} else { /* Single ended */
@@ -599,6 +610,7 @@ int __iio_device_attr_init(struct device_attribute *dev_attr,
 	}
 	if (name_format == NULL) {
 		ret = -ENOMEM;
+		dev_err(dev, "jchen: __iio_device_attr_init_1 ret: %d, generic:%d,ext_name:%s,index:%d\n",ret,generic,chan->extend_name,chan->indexed);
 		goto error_free_full_postfix;
 	}
 	dev_attr->attr.name = kasprintf(GFP_KERNEL,
@@ -607,6 +619,7 @@ int __iio_device_attr_init(struct device_attribute *dev_attr,
 					chan->channel2);
 	if (dev_attr->attr.name == NULL) {
 		ret = -ENOMEM;
+		dev_err(dev, "jchen: __iio_device_attr_init_2 ret: %d \n",ret);
 		goto error_free_name_format;
 	}
 
@@ -657,13 +670,16 @@ int __iio_add_chan_devattr(const char *postfix,
 	iio_attr = kzalloc(sizeof *iio_attr, GFP_KERNEL);
 	if (iio_attr == NULL) {
 		ret = -ENOMEM;
+		dev_err(dev, "jchen: add_chan_dev_attr_0 ret: %d kzalloc fails\n",ret);
 		goto error_ret;
 	}
 	ret = __iio_device_attr_init(&iio_attr->dev_attr,
 				     postfix, chan,
-				     readfunc, writefunc, generic);
-	if (ret)
+				     readfunc, writefunc, generic, dev);
+	if (ret){
+		dev_err(dev, "jchen: add_chan_dev_attr_1 ret: %d attr_init fails\n",ret);
 		goto error_iio_dev_attr_free;
+	}
 	iio_attr->c = chan;
 	iio_attr->address = mask;
 	list_for_each_entry(t, attr_list, l)
@@ -673,6 +689,7 @@ int __iio_add_chan_devattr(const char *postfix,
 				dev_err(dev, "tried to double register : %s\n",
 					t->dev_attr.attr.name);
 			ret = -EBUSY;
+			dev_err(dev, "jchen: add_chan_dev_attr_2 ret: %d strcmp\n",ret);
 			goto error_device_attr_deinit;
 		}
 	list_add(&iio_attr->l, attr_list);
@@ -705,8 +722,10 @@ static int iio_device_add_channel_sysfs(struct iio_dev *indio_dev,
 					     0,
 					     &indio_dev->dev,
 					     &indio_dev->channel_attr_list);
-		if (ret < 0)
+		if (ret < 0){
+			dev_err(indio_dev->dev.parent,"jchen: add_channel_sysf_0,i:%d ret:%d\n",i,ret);
 			goto error_ret;
+		}
 		attrcount++;
 	}
 	for_each_set_bit(i, &chan->info_mask_shared_by_type, sizeof(long)*8) {
@@ -722,6 +741,7 @@ static int iio_device_add_channel_sysfs(struct iio_dev *indio_dev,
 			ret = 0;
 			continue;
 		} else if (ret < 0) {
+			dev_err(indio_dev->dev.parent,"jchen: add_channel_sysf_1,i:%d ret:%d\n",i,ret);
 			goto error_ret;
 		}
 		attrcount++;
@@ -744,8 +764,10 @@ static int iio_device_add_channel_sysfs(struct iio_dev *indio_dev,
 			if (ret == -EBUSY && ext_info->shared)
 				continue;
 
-			if (ret)
+			if (ret){
+				dev_err(indio_dev->dev.parent,"jchen: add_channel_sysf_2,i:%d ret:%d \n",i,ret);
 				goto error_ret;
+			}
 
 			attrcount++;
 		}
@@ -795,8 +817,10 @@ static int iio_device_register_sysfs(struct iio_dev *indio_dev)
 			ret = iio_device_add_channel_sysfs(indio_dev,
 							   &indio_dev
 							   ->channels[i]);
-			if (ret < 0)
+			if (ret < 0){
+				dev_err(indio_dev->dev.parent,"jchen: i:%d,ret:%d,attrcount:%d\n",i,ret,attrcount);
 				goto error_clear_attrs;
+			}
 			attrcount += ret;
 		}
 
@@ -808,6 +832,7 @@ static int iio_device_register_sysfs(struct iio_dev *indio_dev)
 						   GFP_KERNEL);
 	if (indio_dev->chan_attr_group.attrs == NULL) {
 		ret = -ENOMEM;
+		dev_err(indio_dev->dev.parent,"jchen: kcalloc NULL. i:%d,ret:%d,attrcount:%d\n",i,ret,attrcount);
 		goto error_clear_attrs;
 	}
 	/* Copy across original attributes */

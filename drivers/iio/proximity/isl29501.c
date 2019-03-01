@@ -959,7 +959,7 @@ static int isl29501_probe(struct i2c_client *client,
        struct isl29501_private *isl29501;
        int ret;
 
-       dev_err(&client->dev, "isl29501_probe\n");
+       dev_err(&client->dev, "isl29501_probe 0228\n");
        indio_dev = iio_device_alloc(sizeof(*isl29501));
        if (!indio_dev)
                return -ENOMEM;
@@ -970,11 +970,10 @@ static int isl29501_probe(struct i2c_client *client,
        isl29501->client = client;
 
        mutex_init(&isl29501->lock);
-
-       ret = isl29501_init_chip(isl29501);
-       if (ret < 0)
-               return ret;
-
+       
+       //ret = isl29501_init_chip(isl29501);
+       //if (ret < 0)
+       //        return ret;
        indio_dev->modes = INDIO_DIRECT_MODE;
        indio_dev->dev.parent = &client->dev;
        indio_dev->channels = isl29501_channels;

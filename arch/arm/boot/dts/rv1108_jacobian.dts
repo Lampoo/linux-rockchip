@@ -128,14 +128,14 @@
 	isl29501@57{
 		compatible = "renesas,isl29501";
 		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_isl29501_cen &pinctrl_isl29501_irq &pinctrl_isl29501_ss>;
+		//pinctrl-0 = <&pinctrl_isl29501_cen &pinctrl_isl29501_irq &pinctrl_isl29501_ss>;
 		reg = <0x57>;
-		enable-gpios = <&gpio0 GPIO_B3 GPIO_ACTIVE_LOW>; /* Chip Enable, active low */
-		irq-gpios = <&gpio0 GPIO_A1 GPIO_ACTIVE_LOW>; /* IRQ GPIO, active low */
-		ss-gpios = <&gpio0 GPIO_A5 GPIO_ACTIVE_LOW>; /* SS GPIO, active HIGH->LOW edge */
-		//enable-gpios = <&pioA 34 GPIO_ACTIVE_LOW>; /* Chip Enable, active low */
-		//irq-gpios = <&pioA 33 GPIO_ACTIVE_LOW>; /* IRQ GPIO, active low */
-		//ss-gpios = <&pioA 32 GPIO_ACTIVE_LOW>; /* SS GPIO, active HIGH->LOW edge */
+		//enable-gpios = <&gpio0 GPIO_B3 GPIO_ACTIVE_LOW>; /* Chip Enable, active low */
+		//irq-gpios = <&gpio0 GPIO_A1 GPIO_ACTIVE_LOW>; /* IRQ GPIO, active low */
+		//ss-gpios = <&gpio0 GPIO_A5 GPIO_ACTIVE_LOW>; /* SS GPIO, active HIGH->LOW edge */
+			//enable-gpios = <&pioA 34 GPIO_ACTIVE_LOW>; /* Chip Enable, active low */
+			//irq-gpios = <&pioA 33 GPIO_ACTIVE_LOW>; /* IRQ GPIO, active low */
+			//ss-gpios = <&pioA 32 GPIO_ACTIVE_LOW>; /* SS GPIO, active HIGH->LOW edge */
 	};
 	/* Kernel space IIO driver
 	*I2C2_SDA/I2C2_SCL: i2c2m1_xfer
@@ -143,17 +143,17 @@
 	*GPIO0_A1/SDMMC0_DET-->IRQ0: need pinmux setting
 	*GPIO0_A5/CLK_WIFI_OUT -->SS0: 
 	*/
-	gpio_isl29501_pins{
-		pinctrl_isl29501_cen: isl29501_cen {
-			rockchip,pins = <0 GPIO_B3 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-		pinctrl_isl29501_irq: isl29501_irq {
-			rockchip,pins = <0 GPIO_A1 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-		pinctrl_isl29501_ss: isl29501_ss {
-			rockchip,pins = <0 GPIO_A5 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-	};
+	//gpio_isl29501_pins{
+		//pinctrl_isl29501_cen: isl29501_cen {
+		//	rockchip,pins = <0 GPIO_B3 RK_FUNC_GPIO &pcfg_pull_none>;
+		//};
+		//pinctrl_isl29501_irq: isl29501_irq {
+		//	rockchip,pins = <0 GPIO_A1 RK_FUNC_GPIO &pcfg_pull_none>;
+		//};
+		//pinctrl_isl29501_ss: isl29501_ss {
+		//	rockchip,pins = <0 GPIO_A5 RK_FUNC_GPIO &pcfg_pull_none>;
+		//};
+	//};
 };
 
 &uart1 {

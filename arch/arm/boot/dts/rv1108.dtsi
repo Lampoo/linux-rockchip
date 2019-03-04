@@ -600,7 +600,8 @@
 		#size-cells = <0>;
 		clocks = <&clk_i2c1>, <&clk_gates13 0>;
 		clock-names = "i2c", "pclk";
-		pinctrl-names = "default";
+		//pinctrl-names = "default";
+		pinctrl-names = "default", "gpio";
 		pinctrl-0 = <&i2c1_xfer>;
 		status = "disabled";
 	};
@@ -614,7 +615,8 @@
 		#size-cells = <0>;
 		clocks = <&clk_i2c2>, <&clk_gates13 1>;
 		clock-names = "i2c", "pclk";
-		pinctrl-names = "default";
+		//pinctrl-names = "default";
+		pinctrl-names = "default", "gpio";
 		pinctrl-0 = <&i2c2m1_xfer>;
 		status = "disabled";
 	};

@@ -89,7 +89,7 @@
 		pinctrl-names = "rockchip,camera_default", "rockchip,camera_sleep";
 		/*pinctrl-0 = <&cam0_default_pins>;
 		pinctrl-1 = <&cam0_sleep_pins>;*/
-		pinctrl-0 = <&mipi_cam_xshutdown &cif_dvp_clk_out>; /*need cif_dvp_clk_out_sleep??*/
+		pinctrl-1 = <&mipi_cam_xshutdown &cif_dvp_clk_out>; /*need cif_dvp_clk_out_sleep??*/
 		rockchip,pd-gpio = <&gpio3 GPIO_D1 GPIO_ACTIVE_LOW>; /*XSHUTDOWN. While powerup, Where to pull it high?? rk_camera_module.c by pd-gpio?? this gpio is active_low and where set inactive*/
 		rockchip,camera-module-mclk-name = "clk_mipicsi_out";
 		rockchip,camera-module-facing = "back";
@@ -127,8 +127,8 @@
 	status = "okay";
 	isl29501@57{
 		compatible = "renesas,isl29501";
-		pinctrl-names = "default";
-		//pinctrl-0 = <&pinctrl_isl29501_cen &pinctrl_isl29501_irq &pinctrl_isl29501_ss>;
+		//pinctrl-names = "default";
+		pinctrl-1 = <&pinctrl_isl29501_cen &pinctrl_isl29501_irq &pinctrl_isl29501_ss>;
 		reg = <0x57>;
 		//enable-gpios = <&gpio0 GPIO_B3 GPIO_ACTIVE_LOW>; /* Chip Enable, active low */
 		//irq-gpios = <&gpio0 GPIO_A1 GPIO_ACTIVE_LOW>; /* IRQ GPIO, active low */
@@ -143,17 +143,17 @@
 	*GPIO0_A1/SDMMC0_DET-->IRQ0: need pinmux setting
 	*GPIO0_A5/CLK_WIFI_OUT -->SS0: 
 	*/
-	//gpio_isl29501_pins{
-		//pinctrl_isl29501_cen: isl29501_cen {
-		//	rockchip,pins = <0 GPIO_B3 RK_FUNC_GPIO &pcfg_pull_none>;
-		//};
-		//pinctrl_isl29501_irq: isl29501_irq {
-		//	rockchip,pins = <0 GPIO_A1 RK_FUNC_GPIO &pcfg_pull_none>;
-		//};
-		//pinctrl_isl29501_ss: isl29501_ss {
-		//	rockchip,pins = <0 GPIO_A5 RK_FUNC_GPIO &pcfg_pull_none>;
-		//};
-	//};
+	gpio_isl29501_pins{
+		pinctrl_isl29501_cen: isl29501_cen {
+			rockchip,pins = <0 GPIO_B3 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+		pinctrl_isl29501_irq: isl29501_irq {
+			rockchip,pins = <0 GPIO_A1 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+		pinctrl_isl29501_ss: isl29501_ss {
+			rockchip,pins = <0 GPIO_A5 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
 };
 
 &uart1 {

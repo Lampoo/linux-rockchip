@@ -130,9 +130,9 @@
 		//pinctrl-names = "default";
 		pinctrl-1 = <&pinctrl_isl29501_cen &pinctrl_isl29501_irq &pinctrl_isl29501_ss>;
 		reg = <0x57>;
-		//enable-gpios = <&gpio0 GPIO_B3 GPIO_ACTIVE_LOW>; /* Chip Enable, active low */
-		//irq-gpios = <&gpio0 GPIO_A1 GPIO_ACTIVE_LOW>; /* IRQ GPIO, active low */
-		//ss-gpios = <&gpio0 GPIO_A5 GPIO_ACTIVE_LOW>; /* SS GPIO, active HIGH->LOW edge */
+		enable-gpios = <&gpio0 GPIO_B3 GPIO_ACTIVE_LOW>; /* Chip Enable, active low */
+		irq-gpios = <&gpio0 GPIO_A1 GPIO_ACTIVE_LOW>; /* IRQ GPIO, active low */
+		ss-gpios = <&gpio0 GPIO_A5 GPIO_ACTIVE_LOW>; /* SS GPIO, active HIGH->LOW edge */
 			//enable-gpios = <&pioA 34 GPIO_ACTIVE_LOW>; /* Chip Enable, active low */
 			//irq-gpios = <&pioA 33 GPIO_ACTIVE_LOW>; /* IRQ GPIO, active low */
 			//ss-gpios = <&pioA 32 GPIO_ACTIVE_LOW>; /* SS GPIO, active HIGH->LOW edge */

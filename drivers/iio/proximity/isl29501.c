@@ -14,6 +14,7 @@
 #include <linux/of_device.h>
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
+#include <linux/of_gpio.h>
 
 #include <linux/iio/trigger_consumer.h>
 #include <linux/iio/buffer.h>
@@ -107,6 +108,9 @@ struct isl29501_private {
 	struct mutex lock;
 	/* Exact representation of correction coefficients. */
 	unsigned int shadow_coeffs[COEFF_MAX];
+	unsigned int enable_gpio;
+	unsigned int irq_gpio;
+	unsigned int ss_gpio;
 };
 enum isl29501_register_name {
 	REG_DISTANCE,
@@ -931,15 +935,64 @@ static const struct iio_info isl29501_info = {
 	.attrs = &isl29501_attribute_group,
 };
 
-static int isl29501_init_chip(struct isl29501_private *isl29501)
+static int isl29501_init_chip(struct isl29501_private *isl29501, struct device_node *np)
 {
-       int ret;
+	int ret = -1;
+	enum of_gpio_flags flags;
+	
+	//Chip enable GPIO, active low
+	isl29501->enable_gpio = of_get_named_gpio_flags(np, "enable-gpios", 0, &flags);
+	if (gpio_is_valid(isl29501->enable_gpio)) {
+		ret = gpio_request(isl29501->enable_gpio, "enable-gpios");
+		if (ret) {
+			dev_err(&isl29501->client->dev, "isl29501 enable-gpios request failure!\n");
+			return -1;
+		}
+		//Chip enable pin. Output Low to enable chip I2C intreface.
+		gpio_direction_output(isl29501->enable_gpio, 0);
+		dev_err(&isl29501->client->dev, "isl29501 enable-gpios request success. output low to enable chip\n");
+
+	} else {
+		dev_err(&isl29501->client->dev,"isl29501 enable-gpios invalid!\n");
+	}
+
+	//IRQ GPIO, active low
+	isl29501->irq_gpio = of_get_named_gpio_flags(np, "irq-gpios", 0, &flags);
+	if (gpio_is_valid(isl29501->irq_gpio)) {
+		ret = gpio_request(isl29501->irq_gpio, "irq-gpios");
+		if (ret) {
+			dev_err(&isl29501->client->dev, "isl29501 irq-gpios request failure!\n");
+			return -1;
+		}
+		gpio_direction_input(isl29501->irq_gpio);
+		dev_err(&isl29501->client->dev, "isl29501 irq-gpios request success. set input direction\n");
+
+	} else {
+		dev_err(&isl29501->client->dev,"isl29501 irq-gpios invalid!\n");
+	}
+
+	//SS(Sample start) GPIO, active HIGH->LOW edge
+	isl29501->ss_gpio = of_get_named_gpio_flags(np, "ss-gpios", 0, &flags);
+	if (gpio_is_valid(isl29501->ss_gpio)) {
+		ret = gpio_request(isl29501->ss_gpio, "ss-gpios");
+		if (ret) {
+			dev_err(&isl29501->client->dev, "isl29501 ss-gpios request failure!\n");
+			return -1;
+		}
+		//Single shot start pin. set to Low to start a measurment.
+		gpio_direction_output(isl29501->ss_gpio, 1);
+		dev_err(&isl29501->client->dev, "isl29501 ss-gpios request success. set output high\n");
+
+	} else {
+		dev_err(&isl29501->client->dev,"isl29501 ss-gpios invalid!\n");
+	}
 
 	ret = i2c_smbus_read_byte_data(isl29501->client, ISL29501_DEVICE_ID);
 	if (ret < 0) {
 		dev_err(&isl29501->client->dev, "Error reading device id\n");
 		return ret;
 	}
+
 
 	if (ret != ISL29501_ID) {
 		dev_err(&isl29501->client->dev,
@@ -981,6 +1034,8 @@ static int isl29501_probe(struct i2c_client *client,
 	struct isl29501_private *isl29501;
 	int ret;
 
+	struct device_node *np = client->dev.of_node;
+
 	dev_err(&client->dev, "isl29501_probe 0228\n");
 	indio_dev = iio_device_alloc(sizeof(*isl29501));
 	if (!indio_dev)
@@ -993,7 +1048,7 @@ static int isl29501_probe(struct i2c_client *client,
 
 	mutex_init(&isl29501->lock);
        
-	//ret = isl29501_init_chip(isl29501);
+	ret = isl29501_init_chip(isl29501, np);
     //if (ret < 0)
     //        return ret;
     //dev_err(&client->dev, "isl29501_init_chip(isl29501) pass\n");

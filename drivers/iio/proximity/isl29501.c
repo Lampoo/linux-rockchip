@@ -11,77 +11,81 @@
 #include <linux/module.h>
 #include <linux/i2c.h>
 #include <linux/err.h>
+//#include <linux/gpio/consumer.h>
+#include <linux/of_gpio.h>
+#include <linux/gpio.h>
 #include <linux/of_device.h>
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
-#include <linux/of_gpio.h>
+#include <linux/delay.h>
+
 
 #include <linux/iio/trigger_consumer.h>
 #include <linux/iio/buffer.h>
 #include <linux/iio/triggered_buffer.h>
 
 /* Control, setting and status registers */
-#define ISL29501_DEVICE_ID                     0x00
-#define ISL29501_ID                            0x0A
+#define ISL29501_DEVICE_ID			0x00
+#define ISL29501_ID				0x0A
 
 /* Sampling control registers */
-#define ISL29501_INTEGRATION_PERIOD            0x10
-#define ISL29501_SAMPLE_PERIOD                 0x11
+#define ISL29501_INTEGRATION_PERIOD		0x10
+#define ISL29501_SAMPLE_PERIOD			0x11
 
 /* Closed loop calibration registers */
-#define ISL29501_CROSSTALK_I_MSB               0x24
-#define ISL29501_CROSSTALK_I_LSB               0x25
-#define ISL29501_CROSSTALK_I_EXPONENT          0x26
-#define ISL29501_CROSSTALK_Q_MSB               0x27
-#define ISL29501_CROSSTALK_Q_LSB               0x28
-#define ISL29501_CROSSTALK_Q_EXPONENT          0x29
-#define ISL29501_CROSSTALK_GAIN_MSB            0x2A
-#define ISL29501_CROSSTALK_GAIN_LSB            0x2B
-#define ISL29501_MAGNITUDE_REF_EXP             0x2C
-#define ISL29501_MAGNITUDE_REF_MSB             0x2D
-#define ISL29501_MAGNITUDE_REF_LSB             0x2E
-#define ISL29501_PHASE_OFFSET_MSB              0x2F
-#define ISL29501_PHASE_OFFSET_LSB              0x30
+#define ISL29501_CROSSTALK_I_MSB		0x24
+#define ISL29501_CROSSTALK_I_LSB		0x25
+#define ISL29501_CROSSTALK_I_EXPONENT		0x26
+#define ISL29501_CROSSTALK_Q_MSB		0x27
+#define ISL29501_CROSSTALK_Q_LSB		0x28
+#define ISL29501_CROSSTALK_Q_EXPONENT		0x29
+#define ISL29501_CROSSTALK_GAIN_MSB		0x2A
+#define ISL29501_CROSSTALK_GAIN_LSB		0x2B
+#define ISL29501_MAGNITUDE_REF_EXP		0x2C
+#define ISL29501_MAGNITUDE_REF_MSB		0x2D
+#define ISL29501_MAGNITUDE_REF_LSB		0x2E
+#define ISL29501_PHASE_OFFSET_MSB		0x2F
+#define ISL29501_PHASE_OFFSET_LSB		0x30
 
 /* Analog control registers */
-#define ISL29501_DRIVER_RANGE                  0x90
-#define ISL29501_EMITTER_DAC                   0x91
+#define ISL29501_DRIVER_RANGE			0x90
+#define ISL29501_EMITTER_DAC			0x91
 
-#define ISL29501_COMMAND_REGISTER              0xB0
+#define ISL29501_COMMAND_REGISTER		0xB0
 
 /* Commands */
-#define ISL29501_EMUL_SAMPLE_START_PIN         0x49
-#define ISL29501_RESET_ALL_REGISTERS           0xD7
-#define ISL29501_RESET_INT_SM                  0xD1
+#define ISL29501_EMUL_SAMPLE_START_PIN		0x49
+#define ISL29501_RESET_ALL_REGISTERS		0xD7
+#define ISL29501_RESET_INT_SM			0xD1
 
 /* Ambiant light and temperature corrections */
-#define ISL29501_TEMP_REFERENCE                        0x31
-#define ISL29501_PHASE_EXPONENT                        0x33
-#define ISL29501_TEMP_COEFF_A                  0x34
-#define ISL29501_TEMP_COEFF_B                  0x39
-#define ISL29501_AMBIANT_COEFF_A               0x36
-#define ISL29501_AMBIANT_COEFF_B               0x3B
+#define ISL29501_TEMP_REFERENCE			0x31
+#define ISL29501_PHASE_EXPONENT			0x33
+#define ISL29501_TEMP_COEFF_A			0x34
+#define ISL29501_TEMP_COEFF_B			0x39
+#define ISL29501_AMBIANT_COEFF_A		0x36
+#define ISL29501_AMBIANT_COEFF_B		0x3B
 
 /* Data output registers */
-#define ISL29501_DISTANCE_MSB_DATA             0xD1
-#define ISL29501_DISTANCE_LSB_DATA             0xD2
-#define ISL29501_PRECISION_MSB                 0xD3
-#define ISL29501_PRECISION_LSB                 0xD4
-#define ISL29501_MAGNITUDE_EXPONENT            0xD5
-#define ISL29501_MAGNITUDE_MSB                 0xD6
-#define ISL29501_MAGNITUDE_LSB                 0xD7
-#define ISL29501_PHASE_MSB                     0xD8
-#define ISL29501_PHASE_LSB                     0xD9
-#define ISL29501_I_RAW_EXPONENT                        0xDA
-#define ISL29501_I_RAW_MSB                     0xDB
-#define ISL29501_I_RAW_LSB                     0xDC
-#define ISL29501_Q_RAW_EXPONENT                        0xDD
-#define ISL29501_Q_RAW_MSB                     0xDE
-#define ISL29501_Q_RAW_LSB                     0xDF
-#define ISL29501_DIE_TEMPERATURE               0xE2
-#define ISL29501_AMBIENT_LIGHT                 0xE3
-#define ISL29501_GAIN_MSB                      0xE6
-#define ISL29501_GAIN_LSB                      0xE7
+#define ISL29501_DISTANCE_MSB_DATA		0xD1
+#define ISL29501_DISTANCE_LSB_DATA		0xD2
+#define ISL29501_PRECISION_MSB			0xD3
+#define ISL29501_PRECISION_LSB			0xD4
+#define ISL29501_MAGNITUDE_EXPONENT		0xD5
+#define ISL29501_MAGNITUDE_MSB			0xD6
+#define ISL29501_MAGNITUDE_LSB			0xD7
+#define ISL29501_PHASE_MSB			0xD8
+#define ISL29501_PHASE_LSB			0xD9
+#define ISL29501_I_RAW_EXPONENT			0xDA
+#define ISL29501_I_RAW_MSB			0xDB
+#define ISL29501_I_RAW_LSB			0xDC
+#define ISL29501_Q_RAW_EXPONENT			0xDD
+#define ISL29501_Q_RAW_MSB			0xDE
+#define ISL29501_Q_RAW_LSB			0xDF
+#define ISL29501_DIE_TEMPERATURE		0xE2
+#define ISL29501_AMBIENT_LIGHT			0xE3
+#define ISL29501_GAIN_MSB			0xE6
+#define ISL29501_GAIN_LSB			0xE7
 
 #define ISL29501_MAX_EXP_VAL 15
 
@@ -137,8 +141,8 @@ enum isl29501_register_name {
 };
 
 struct isl29501_register_desc {
-       u8 msb;
-       u8 lsb;
+	u8 msb;
+	u8 lsb;
 };
 
 static const struct isl29501_register_desc isl29501_registers[] = {
@@ -199,6 +203,689 @@ static const struct isl29501_register_desc isl29501_registers[] = {
 		.lsb = ISL29501_EMITTER_DAC,
 	},
 };
+
+#if 1 /*porting*/
+//      register addresses
+#define REG501_ID                                       0x00
+#define REG501_MASTER_CTRL                      0x01
+#define REG501_STATUS                           0x02
+#define REG501_SAMPLE_TIME                      0x10
+#define REG501_SAMPLE_PERIOD            0x11
+#define REG501_SAMPLE_RANGE                     0x12
+#define REG501_SAMPLE_CONTROL           0x13
+#define REG501_AGC_CONTROL1                     0x17
+#define REG501_AGC_CONTROL2                     0x18
+#define REG501_AGC_CONTROL3                     0x19
+#define REG501_XTALK_I_EXP                      0x24
+#define REG501_XTALK_I_MSB                      0x25
+#define REG501_XTALK_I_LSB                      0x26
+#define REG501_XTALK_Q_EXP                      0x27
+#define REG501_XTALK_Q_MSB                      0x28
+#define REG501_XTALK_Q_LSB                      0x29
+#define REG501_XTALK_GAIN_MSB           0x2a
+#define REG501_XTALK_GAIN_LSB           0x2b
+#define REG501_MAG_REF_EXP                      0x2c
+#define REG501_MAG_REF_MSB                      0x2d
+#define REG501_MAG_REF_LSB                      0x2e
+#define REG501_DISTANCE_PHASE_MSB       0x2f
+#define REG501_DISTANCE_PHASE_LSB       0x30
+#define REG501_INTERRUPT_STATUS         0x58
+#define REG501_INTERRUPT_CONTROL        0x60
+#define REG501_DETECTION_CONTROL        0x62
+#define REG501_DETECTION1_CONTROL       0x63
+#define REG501_DETECTION2_CONTROL       0x64
+#define REG501_INTERRUPT_FLAG           0x69
+#define REG501_DETECTION_FLAG           0x6a
+#define REG501_DISTANCE_ZONE_BASE       0x70
+#define REG501_MAG_ZONE1_BASE           0x7C
+#define REG501_MAG_ZONE2_BASE           0x7e
+#define REG501_MAG_ZONE3_BASE           0x82
+#define REG501_DISTANCE_REF                     0x84
+#define REG501_MAG_REF                          0x86
+#define REG501_DRIVER_RANGE                     0x90
+#define REG501_EMITTER_CURRENT          0x91
+#define REG501_COMMAND_REG                      0xb0
+
+/* data read out section */
+#define REG501_READ_OUT_DATA_BASE       0xd0
+#define REG501_DATA_INVALID_FLAG        0xd0
+#define REG501_DISTANCE_READOUT_H       0xd1
+#define REG501_DISTANCE_READOUT_L       0xd2
+#define REG501_PRECISION_READOUT_H      0xd3
+#define REG501_PRECISION_READOUT_L      0xd4
+#define REG501_MAG_EXP_READOUT          0xf6
+#define REG501_MAG_READOUT_H            0xf7
+#define REG501_MAG_READOUT_L            0xf8
+#define REG501_PHASE_READOUT            0xd8
+#define REG501_IRAW_EXP_READOUT         0xda
+#define REG501_IRAW_READOUT                     0xdb
+#define REG501_QRAW_EXP_READOUT         0xdd
+#define REG501_QRAW_READOUT                     0xde
+#define REG501_VOLTAGE_BEFORE           0xe0
+#define REG501_VOLTAGE_AFTER            0xe1
+#define REG501_AFE_TEMP                         0xe2
+#define REG501_AMBIENT_ADC                      0xe3
+#define REG501_VGA1                                     0xe4
+#define REG501_VGA2                                     0xe5
+#define REG501_GAIN                                     0xe6
+#define REG501_I_ADC                            0xe8
+#define REG501_Q_ADC                            0xea
+
+typedef union
+{
+        struct m
+        {
+                uint8_t cali_flag; //[2:0] = phase|xtalk|mag ; 0x7 means all cailbration done.
+                uint8_t mag_ref_EXP;
+                uint8_t mag_ref_MSB;
+                uint8_t mag_ref_LSB;
+                uint8_t xtalk_i_MSB;
+                uint8_t xtalk_i_LSB;
+                uint8_t xtalk_q_MSB;
+                uint8_t xtalk_q_LSB;
+                uint8_t xtalk_i_EXP;
+                uint8_t xtalk_q_EXP;
+                uint8_t xtalk_gain_MSB;
+                uint8_t xtalk_gain_LSB;
+                uint8_t distance_phase_MSB;
+                uint8_t distance_phase_LSB;
+                uint8_t afe_temp;
+                uint8_t checksum;
+        }__attribute__((packed)) meaning;
+
+        uint8_t raw_data[sizeof(struct m)];
+
+}type_cali_data;
+
+typedef enum _REG501_IRQ_MODE
+{
+        MODE_NO_IRQ=0,
+        MODE_IRQ_DATA_READY=1,
+}REG501_IRQ_MODE;
+
+typedef struct RO_DATA
+{
+        uint8_t data_invalid_flag;
+        uint16_t distance;
+        uint16_t precision;
+        uint8_t magnitude_exp;
+        uint16_t magnitude;
+        uint16_t phase;
+        uint8_t i_raw_exp;
+        uint16_t i_raw;
+        uint8_t q_raw_exp;
+        uint16_t q_raw;
+        uint8_t voltage_before;
+        uint8_t voltage_after;
+        uint8_t afe_temp;
+        uint8_t ambient_adc;
+        uint8_t vga1;
+        uint8_t vga2;
+        uint16_t        gain;
+        uint16_t i_adc;
+        uint16_t q_adc;
+}RO_DATA;
+
+#define ABS(x) ( (x)>0?(x):-(x) )
+#define CALIFILE  "/data/test/califile"
+
+type_cali_data _cdata={0};
+struct file *cali_file = NULL;
+
+uint8_t drv_501_i2c_regset(struct isl29501_private *isl29501, uint8_t regaddr, uint8_t bitmask, uint8_t value)
+{
+        //Read first.
+        uint8_t read = 0;
+	s32 ret = 0;
+	uint8_t set = 0;
+
+	mutex_lock(&isl29501->lock);
+	ret = i2c_smbus_read_byte_data(isl29501->client, regaddr);
+	if(ret < 0)
+		goto err;
+	read = ret;	
+
+        set = (read & (~bitmask)) + ( bitmask & value);
+
+	ret = i2c_smbus_write_byte_data(isl29501->client, regaddr, set);
+	if(ret <0 )
+		goto err;
+
+	/*verify the writting*/
+	ret = i2c_smbus_read_byte_data(isl29501->client, regaddr);
+	if(ret < 0)
+		goto err;
+	if((ret !=  set) && (regaddr != REG501_COMMAND_REG)){ //COMMAND_REG do not support readback
+		pr_err("[debug] %s verify regaddr 0x%x writting error,w:0x%x,r:0x%x !!!!",__func__,regaddr,set,ret);
+	}
+	
+
+	mutex_unlock(&isl29501->lock);
+        return ret;
+err:
+	mutex_unlock(&isl29501->lock);
+	pr_err("[debug] %s write regaddr 0x%x error",__func__,regaddr);
+	return ret;
+}
+
+uint8_t drv_501_i2c_read(struct isl29501_private *isl29501, uint8_t regaddr, uint8_t* value)
+{
+	s32 ret = 0;
+
+	mutex_lock(&isl29501->lock);
+	ret = i2c_smbus_read_byte_data(isl29501->client, regaddr);
+	if (ret < 0)
+		goto err;
+	*value = ret;
+	mutex_unlock(&isl29501->lock);
+	return ret;
+err:
+	mutex_unlock(&isl29501->lock);
+	pr_err("[debug] %s error",__func__);
+	return ret;
+}
+
+uint8_t drv_501_soft_reset(struct isl29501_private *isl29501)
+{
+        //REG501_COMMAND_REG = 0xD7 ,Reset all Reg.
+        //REG501_COMMAND_REG = 0xD1 ,Resets internal state machine.
+        //REG501_COMMAND_REG = 0x49 ,start a measurment.
+        //Note: COMMAND_REG do not support readback. use I2C_Set_OneReg()
+	return drv_501_i2c_regset(isl29501,REG501_COMMAND_REG,0xff, 0xD7);
+}
+
+uint8_t drv_501_soft_ss_start(struct isl29501_private *isl29501)
+{
+        //REG501_COMMAND_REG = 0xD7 ,Reset all Reg.
+        //REG501_COMMAND_REG = 0xD1 ,Resets internal state machine.
+        //Note: COMMAND_REG do not support readback. use I2C_Set_OneReg()
+	//A soft-start can be initiated by writing 0xB0 to 0x49. This register bit emulates the single shot pin.
+	return drv_501_i2c_regset(isl29501,REG501_COMMAND_REG,0xff,0x49);
+}
+
+void drv_501_ss_trigger(struct isl29501_private *isl29501)
+{
+	gpio_direction_output(isl29501->ss_gpio,1);
+	gpio_direction_output(isl29501->ss_gpio,0);
+	msleep(10);
+	gpio_direction_output(isl29501->ss_gpio,1);
+	
+}
+
+
+uint16_t drv_501_wait_irq_pin(struct isl29501_private *isl29501, uint16_t timeout_ms)
+{
+        uint16_t wait_ms=0;
+
+	while(gpio_get_value(isl29501->irq_gpio) == 1){ //ACTIVE LOW
+		wait_ms +=1;
+		msleep(1);
+		if( wait_ms > timeout_ms ) return -1;
+	}
+
+        return wait_ms;
+}
+
+
+uint8_t drv_501_read_ro(struct isl29501_private *isl29501, RO_DATA* read_ro)
+{
+	uint8_t temp=0;
+
+	if(drv_501_i2c_read(isl29501, REG501_DATA_INVALID_FLAG,&temp) < 0) return -1;
+	read_ro->data_invalid_flag=temp;
+
+	if(drv_501_i2c_read(isl29501, REG501_DISTANCE_READOUT_H,&temp) < 0) return -1;
+	read_ro->distance=(temp<<8);
+
+	if(drv_501_i2c_read(isl29501, REG501_DISTANCE_READOUT_L,&temp) < 0) return -1;
+	read_ro->distance+=temp;
+
+	if(drv_501_i2c_read(isl29501, REG501_PRECISION_READOUT_H,&temp) < 0) return -1;
+	read_ro->precision=(temp<<8);
+
+	if(drv_501_i2c_read(isl29501, REG501_PRECISION_READOUT_L,&temp) < 0) return -1;
+	read_ro->precision+=temp;
+
+	if(drv_501_i2c_read(isl29501, REG501_MAG_EXP_READOUT,&temp) < 0) return -1;
+	read_ro->magnitude_exp=temp;
+
+	if(drv_501_i2c_read(isl29501, REG501_MAG_READOUT_H,&temp) < 0) return -1;
+	read_ro->magnitude=(temp<<8);
+	if(drv_501_i2c_read(isl29501, REG501_MAG_READOUT_L,&temp) < 0) return -1;
+	read_ro->magnitude+=temp;
+
+	if(drv_501_i2c_read(isl29501, REG501_PHASE_READOUT,&temp) < 0) return -1;
+	read_ro->phase=(temp<<8);
+	if(drv_501_i2c_read(isl29501, REG501_PHASE_READOUT+1,&temp) < 0) return -1;
+	read_ro->phase+=temp;
+
+	if(drv_501_i2c_read(isl29501, REG501_IRAW_EXP_READOUT,&temp) < 0) return -1;
+	read_ro->i_raw_exp=temp;
+
+	if(drv_501_i2c_read(isl29501, REG501_IRAW_READOUT,&temp) < 0) return -1;
+	read_ro->i_raw=(temp<<8);
+	if(drv_501_i2c_read(isl29501, REG501_IRAW_READOUT+1,&temp) < 0) return -1;
+	read_ro->i_raw+=temp;
+
+	if(drv_501_i2c_read(isl29501, REG501_QRAW_EXP_READOUT,&temp) < 0) return -1;
+	read_ro->q_raw_exp=temp;
+	
+	if(drv_501_i2c_read(isl29501, REG501_QRAW_READOUT,&temp) < 0) return -1;
+	read_ro->q_raw=(temp<<8);
+	if(drv_501_i2c_read(isl29501, REG501_QRAW_READOUT+1,&temp) < 0) return -1;
+	read_ro->q_raw+=temp;
+
+	if(drv_501_i2c_read(isl29501, REG501_VOLTAGE_BEFORE,&temp) < 0) return -1;
+	read_ro->voltage_before=temp;
+
+	if(drv_501_i2c_read(isl29501, REG501_VOLTAGE_AFTER,&temp) < 0) return -1;
+	read_ro->voltage_after=temp;
+
+	if(drv_501_i2c_read(isl29501, REG501_AFE_TEMP,&temp) < 0) return -1;
+	read_ro->afe_temp=temp;
+
+	if(drv_501_i2c_read(isl29501, REG501_AMBIENT_ADC,&temp) < 0) return -1;
+	read_ro->ambient_adc=temp;
+
+	if(drv_501_i2c_read(isl29501, REG501_VGA1,&temp) < 0) return -1;
+	read_ro->vga1=temp;
+
+	if(drv_501_i2c_read(isl29501, REG501_VGA2,&temp) < 0) return -1;
+	read_ro->vga2=temp;
+
+	if(drv_501_i2c_read(isl29501, REG501_GAIN,&temp) < 0) return -1;
+	read_ro->gain=(temp<<8);
+	if(drv_501_i2c_read(isl29501, REG501_GAIN+1,&temp) < 0) return -1;
+	read_ro->gain+=temp;
+
+	if(drv_501_i2c_read(isl29501, REG501_I_ADC,&temp) < 0) return -1;
+	read_ro->i_adc=(temp<<8);
+	if(drv_501_i2c_read(isl29501, REG501_I_ADC+1,&temp) < 0) return -1;
+	read_ro->i_adc+=temp;
+
+	if(drv_501_i2c_read(isl29501, REG501_Q_ADC,&temp) < 0) return -1;
+	read_ro->q_adc=(temp<<8);
+	if(drv_501_i2c_read(isl29501, REG501_Q_ADC+1,&temp) < 0) return -1;
+	read_ro->q_adc+=temp;
+
+        return 0;
+}
+
+uint8_t drv_501_set_irq_mode(struct isl29501_private *isl29501, REG501_IRQ_MODE mode)
+{
+	if(drv_501_i2c_regset(isl29501, REG501_INTERRUPT_CONTROL,0x7,mode) < 0) return -1;
+	return 0;
+}
+
+uint8_t drv_501_irq_soft_check(struct isl29501_private *isl29501)
+{
+	uint8_t temp=0;
+	if(drv_501_i2c_read(isl29501, REG501_INTERRUPT_FLAG,&temp) < 0) return -1;
+	if( (temp & 0x1) ==1 ){
+		return 0;
+	}else{
+		return -1;
+	}
+	return -1;
+}
+
+uint8_t drv_501_irq_clean(struct isl29501_private *isl29501)
+{
+	uint8_t temp=0;
+	if(drv_501_i2c_read(isl29501, REG501_INTERRUPT_FLAG,&temp) < 0) return -1;
+	return 0;
+}
+
+uint8_t drv_501_init_cailbration_magnitude(struct isl29501_private *isl29501)
+{
+	//sample_len=71.5us*2^SAMPLE_TIME[3:0],max=145.6ms;  sample_num=SAMPLE_TIME[7:4],0 means collect 1 sample each measuremrnt.
+	//0x09 = 71.5us*2^9=71*512=36ms
+	if(drv_501_i2c_regset(isl29501, REG501_SAMPLE_TIME,0xff,0x09) < 0 ) return -1;
+	//Time of each sample 450us*SAMPLE_PERIOD+1; 0x6E=110*450us=49ms, 0x64=100*450us=450ms
+	if(drv_501_i2c_regset(isl29501, REG501_SAMPLE_PERIOD,0xff,0x6e) < 0 ) return -1;
+	//[0]=1 ADC single shot mode. [4]=1 Set to Cailbration mode.
+	if(drv_501_i2c_regset(isl29501, REG501_SAMPLE_CONTROL,0xff,0x61) < 0 ) return -1;
+	//AGC setting form vendor code.
+	if(drv_501_i2c_regset(isl29501, REG501_AGC_CONTROL2,0xff,0x1B) < 0 ) return -1;
+	if(drv_501_i2c_regset(isl29501, REG501_AGC_CONTROL3,0xff,0x23) < 0 ) return -1;
+	//Emitter Curren= (REG501_DRIVER_RANGE/15) * (REG501_EMITTER_CURRENT/255)*255
+	//For example : 0x0d=221mA,0x06=100mA,0x0a = 167mA
+	if(drv_501_i2c_regset(isl29501, REG501_DRIVER_RANGE,0xf,0x0d) < 0 ) return -1;
+	if(drv_501_i2c_regset(isl29501, REG501_EMITTER_CURRENT,0xff,0xff) < 0 ) return -1;
+	drv_501_set_irq_mode(isl29501,MODE_NO_IRQ);
+	return 0;
+}
+	
+	
+uint8_t drv_501_init_measurement_setting(struct isl29501_private *isl29501)
+{
+	int ret = 0;
+	//sample_len=71.5us*2^SAMPLE_TIME[3:0],max=145.6ms;  sample_num=SAMPLE_TIME[7:4],0 means collect 1 sample each measuremrnt.
+	//0x09 = 71.5us*2^9=71*512=36ms 0x0b=145.6ms
+	/*if(drv_501_i2c_regset(isl29501, REG501_SAMPLE_TIME,0xff,0x09)  < 0 ) return -1;*/
+	if(drv_501_i2c_regset(isl29501, REG501_SAMPLE_TIME, 0xff, 0x09) < 0) return -1;
+
+	//Time of each sample 450us*SAMPLE_PERIOD+1; 0x6E=110*450us=49ms, 0x64=100*450us=450ms
+	/*if(drv_501_i2c_regset(isl29501, REG501_SAMPLE_PERIOD,0xff,0x6e)  < 0 ) return -1;*/
+	if(drv_501_i2c_regset(isl29501, REG501_SAMPLE_PERIOD, 0xff, 0x6e) < 0) return -1;
+
+	//[0]=1 ADC single shot mode. [4]=0 Set to Measurement mode.
+	/*if(drv_501_i2c_regset(isl29501, REG501_SAMPLE_CONTROL,0xff,0x7D)  < 0 ) return -1;*/
+	/*jchen?? why use 0x7D. But the distance output is 0 if 0x6D*/
+	if(drv_501_i2c_regset(isl29501, REG501_SAMPLE_CONTROL, 0xff, 0x7D) < 0) return -1;
+
+	//AGC setting form vendor code.
+	/*if(drv_501_i2c_regset(isl29501, REG501_AGC_CONTROL2,0xff,0x1B)  < 0 ) return -1;
+ 	if(drv_501_i2c_regset(isl29501, REG501_AGC_CONTROL3,0xff,0x23)  < 0 ) return -1;*/
+	if(drv_501_i2c_regset(isl29501, REG501_AGC_CONTROL2,0xff,0x1B) < 0) return -1;
+	if(drv_501_i2c_regset(isl29501, REG501_AGC_CONTROL3,0xff,0x23) < 0) return -1;
+
+	//Emitter Curren= (REG501_DRIVER_RANGE/15) * (REG501_EMITTER_CURRENT/255)*255
+	//For example : 0x0d=221mA,0x06=100mA,0x0a = 167mA
+	/*if(drv_501_i2c_regset(isl29501, REG501_DRIVER_RANGE,0xf,0x0d)  < 0 ) return -1;
+	if(drv_501_i2c_regset(isl29501, REG501_EMITTER_CURRENT,0xff,0xff)  < 0 ) return -1;*/
+	if(drv_501_i2c_regset(isl29501, REG501_DRIVER_RANGE,0xf,0x0d) < 0) return -1;
+	if(drv_501_i2c_regset(isl29501, REG501_EMITTER_CURRENT,0xff,0xff) < 0) return -1;
+
+	/*drv_501_Set_IRQ_Mode(MODE_NO_IRQ);*/
+	if(drv_501_i2c_regset(isl29501, REG501_INTERRUPT_CONTROL,0x7, 0) < 0) return -1; /*N0 IRQ*/
+
+	return ret;
+}
+
+uint8_t drv_501_singleshot_capture(struct isl29501_private *isl29501, RO_DATA* ro_data)
+{
+	if(drv_501_set_irq_mode(isl29501,MODE_IRQ_DATA_READY) < 0) return -1;
+	if(drv_501_irq_clean(isl29501) < 0) return -1;
+	if(drv_501_soft_ss_start(isl29501) < 0) return -1;
+	drv_501_wait_irq_pin(isl29501,200);
+	if(drv_501_read_ro(isl29501,ro_data) < 0) return -1;
+	if(drv_501_set_irq_mode(isl29501,MODE_NO_IRQ) < 0) return -1;
+	return 0;
+}
+
+uint8_t drv_501_measure_test(struct isl29501_private *isl29501, uint16_t *distance, uint16_t *precision)
+{
+	RO_DATA ro_data;
+
+	//pr_err("[debug] %s \n",__func__); 
+	if(drv_501_init_measurement_setting(isl29501) < 0) return -1;
+
+	if(drv_501_singleshot_capture(isl29501, &ro_data) < 0) return -1;	
+	
+	*distance = ro_data.distance;
+	*precision = ro_data.precision;
+	//pr_err("[debug] %s test dist=%d(%d) precision=%d(%d) data_invalid:0x%x\n",__func__,ro_data.distance,*distance,ro_data.precision,*precision,ro_data.data_invalid_flag); /*ro_data.distance/19.68f ?*/
+        return 0;
+}
+
+void drv_501_update_checksum(type_cali_data* cali_data)
+{
+	uint8_t sum=0;
+	uint8_t i = 0;
+
+	for(i=0;i<sizeof(cali_data->raw_data)-1;i++){
+		sum += cali_data->raw_data[i];
+	}
+	cali_data->meaning.checksum = sum;
+
+	for(i = 0; i < sizeof(cali_data->raw_data); i++){
+		pr_err("raw_data[%d]=0x%x\n",i,cali_data->raw_data[i]);
+	}
+}
+
+uint8_t drv_501_check_chipstatus(struct isl29501_private *isl29501, uint8_t* read)
+{
+	int ret = 0;
+	ret = drv_501_i2c_read(isl29501, REG501_STATUS,read);
+	if(ret < 0){
+		pr_err("[debug] %s, read REG501_STATUS err",__func__);
+		return ret;
+	}
+	return ret;
+}
+
+uint8_t drv_501_calibrate_data_check(type_cali_data* cali_data)
+{
+        //check the sum.
+	uint8_t sum=0;
+	uint8_t i = 0;
+	for(i=0;i<sizeof(cali_data->raw_data)-1;i++){
+		sum += cali_data->raw_data[i];
+	}
+
+	//Data sum check passed and all 3 calibration is vaild.
+	if(cali_data->meaning.checksum == sum && cali_data->meaning.cali_flag == 0x7){
+		return 0;
+	}
+
+	return -1;
+}
+
+uint8_t drv_501_calibrate_Magnitude(struct isl29501_private *isl29501, type_cali_data* cali_data)
+{
+	RO_DATA ro_data;
+
+	if(drv_501_init_cailbration_magnitude(isl29501) < 0) return -1;
+
+	if(drv_501_singleshot_capture(isl29501, &ro_data) < 0 ) return -1;
+
+	if(drv_501_i2c_regset(isl29501,REG501_MAG_REF_EXP,0xff,ro_data.magnitude_exp) < 0 ) return -1;
+	if(drv_501_i2c_regset(isl29501,REG501_MAG_REF_MSB,0xff,ro_data.magnitude>>8) < 0 ) return -1;
+	if(drv_501_i2c_regset(isl29501,REG501_MAG_REF_LSB,0xff,ro_data.magnitude&0xff) < 0 ) return -1;
+
+	cali_data->meaning.mag_ref_EXP = ro_data.magnitude_exp;
+	cali_data->meaning.mag_ref_MSB = ro_data.magnitude>>8;
+	cali_data->meaning.mag_ref_LSB = ro_data.magnitude&0xff;
+	cali_data->meaning.cali_flag |=  0x01;
+	drv_501_update_checksum(cali_data);
+
+	pr_err("Calibrate Magnitude done.\n");
+	return 0;
+}
+
+uint8_t drv_501_calibrate_xtalk(struct isl29501_private *isl29501, type_cali_data* cali_data)
+{
+	//must be power of 2 number. becase we use bit shift to divide the sum.
+	uint8_t Loop_cnt=32;
+	uint32_t i = 0;
+
+	uint8_t i_exp_base=0;
+	uint8_t q_exp_base=0;
+	uint32_t gain_sum=0;
+
+	//each time i_exp and q_exp may be different. fineout an i_exp_base and q_exp_base.
+	uint8_t i_exp_base_B=0;
+	uint8_t q_exp_base_B=0;
+	uint8_t i_B=0;
+ 	uint8_t q_B=0;
+
+	uint32_t i_sum=0;
+	uint32_t q_sum=0;
+	uint8_t sample=0;
+	uint8_t time=0;
+
+	RO_DATA ro_data;
+
+	pr_err("Calibrate Xtalk Start...\n");
+	if(drv_501_init_measurement_setting(isl29501) < 0) return -1;
+	if(drv_501_singleshot_capture(isl29501, &ro_data)< 0 ) return -1;
+
+	i_exp_base = ro_data.i_raw_exp;
+	q_exp_base = ro_data.q_raw_exp;
+
+	// x_exp_base_B is a backup value. if it is more ofen. we let it be base value.
+        for(i=0;i<Loop_cnt;i++){
+		msleep(5);
+		if(drv_501_singleshot_capture(isl29501, &ro_data)< 0 ) return -1;
+		if(i_exp_base != ro_data.i_raw_exp) {i_exp_base_B=ro_data.i_raw_exp; i_B++; }
+		if(q_exp_base != ro_data.q_raw_exp) {q_exp_base_B=ro_data.q_raw_exp; q_B++;}
+        }
+
+	// But all i_exp and q_exp will different in +-1. if not. means the value is unstable.
+	if( ((i_exp_base_B !=0) && ABS(i_exp_base_B - i_exp_base) > 1)  || \
+		((q_exp_base_B !=0) && ABS(q_exp_base_B - q_exp_base) > 1 ) ){
+		pr_err("Xtalk data unstable.\n");
+		return -1;
+	}
+
+	//more then 50% sample with bacisl29501, kup value. we let it be base value.
+	if(i_B>(Loop_cnt>>1)) i_exp_base=i_exp_base_B;
+	if(q_B>(Loop_cnt>>1)) q_exp_base=q_exp_base_B;
+
+	pr_err("i_exp_base=%d.\n",ro_data.i_raw_exp);
+	pr_err("q_exp_base=%d.\n",ro_data.q_raw_exp);
+
+	while(sample<Loop_cnt){
+		msleep(5);
+        	memset(&ro_data, 0, sizeof(ro_data));
+		if(drv_501_singleshot_capture(isl29501,&ro_data)< 0 ) return -1;
+
+		//only collect same exp sample.
+		if(ro_data.i_raw_exp==i_exp_base && ro_data.q_raw_exp==q_exp_base){
+			sample++;
+			i_sum+=ro_data.i_raw;
+			q_sum+=ro_data.q_raw;
+			gain_sum += ro_data.gain;
+		}
+		time++;
+		//timeout. still no enough sample.
+		if(time > (Loop_cnt<<2)) {pr_err("time out.\n"); return -1;}
+		//debug
+		if(time==1){
+			pr_err("i_raw=%d.\n",ro_data.i_raw);
+			pr_err("q_raw=%d.\n",ro_data.q_raw);
+			pr_err("gain=%d.\n",ro_data.gain);
+		}
+	}
+
+	pr_err("try=%d.\n",time);
+
+	i_sum>>=5;
+	q_sum>>=5;
+	gain_sum>>=5;
+
+	if(drv_501_i2c_regset(isl29501, REG501_XTALK_I_MSB,0xff,(uint16_t)i_sum>>8)< 0 ) return -1;
+	if(drv_501_i2c_regset(isl29501, REG501_XTALK_I_LSB,0xff,(uint16_t)i_sum&0xff)< 0 ) return -1;
+
+	if(drv_501_i2c_regset(isl29501, REG501_XTALK_Q_MSB,0xff,(uint16_t)q_sum>>8)< 0 ) return -1;
+	if(drv_501_i2c_regset(isl29501, REG501_XTALK_Q_LSB,0xff,(uint16_t)q_sum&0xff)< 0 ) return -1;
+
+	if(drv_501_i2c_regset(isl29501, REG501_XTALK_I_EXP,0xff,(uint8_t)i_exp_base)< 0 ) return -1;
+	if(drv_501_i2c_regset(isl29501, REG501_XTALK_Q_EXP,0xff,(uint8_t)q_exp_base)< 0 ) return -1;
+
+	if(drv_501_i2c_regset(isl29501, REG501_XTALK_GAIN_MSB,0xff,(uint16_t)gain_sum>>8)< 0 ) return -1;
+	if(drv_501_i2c_regset(isl29501, REG501_XTALK_GAIN_LSB,0xff,(uint16_t)gain_sum&0xff)< 0 ) return -1;
+
+
+	cali_data->meaning.xtalk_i_MSB = (uint16_t)i_sum>>8;
+	cali_data->meaning.xtalk_i_LSB = (uint16_t)i_sum&0xff;
+	cali_data->meaning.xtalk_q_MSB = (uint16_t)q_sum>>8;
+	cali_data->meaning.xtalk_q_LSB = (uint16_t)q_sum&0xff;
+	cali_data->meaning.xtalk_i_EXP = (uint8_t)i_exp_base;
+	cali_data->meaning.xtalk_q_EXP = (uint8_t)q_exp_base;
+	cali_data->meaning.xtalk_gain_MSB = (uint16_t)gain_sum>>8;
+	cali_data->meaning.xtalk_gain_LSB = (uint16_t)gain_sum&0xff;
+
+	cali_data->meaning.cali_flag |=  0x02;
+	drv_501_update_checksum(cali_data);
+
+	pr_err("avg i_exp=%d.\n",i_exp_base);
+	pr_err("avg q_exp=%d.\n",q_exp_base);
+	pr_err("avg i_raw=%d.\n",(int)i_sum);
+	pr_err("avg q_raw=%d.\n",(int)q_sum);
+	pr_err("avg gain=%d.\n",(int)gain_sum);
+	pr_err("Calibrate_Xtalk Done.\n");
+
+	return 0;
+}
+
+//TODO: This step should adding a temperature compensation.
+uint8_t drv_501_calibrate_distance(struct isl29501_private *isl29501, type_cali_data* cali_data)
+{
+	//must be power of 2 number. becase we use bit shift to divide the sum.
+	uint8_t Loop_cnt=64;
+	uint32_t i = 0;
+	uint16_t ref_dist_cm=20;
+	uint32_t phase_sum=0;
+
+	pr_err("Calibrate Distance Start...\n");
+
+	if(drv_501_init_measurement_setting(isl29501)  < 0) return -1;
+
+	for(i=0;i<Loop_cnt;i++){
+		RO_DATA ro_data;
+		if(drv_501_singleshot_capture(isl29501, &ro_data) < 0 ) return -1;
+
+		phase_sum += ro_data.phase;
+
+		//debug
+                if(i==0){
+			pr_err("phase=%d.\n",ro_data.phase);
+		}
+	}
+
+	phase_sum>>=6;
+	pr_err("avg phase=%d.\n",(int)phase_sum);
+
+	phase_sum = phase_sum-((((uint32_t)ref_dist_cm)*65536/3330));
+
+	pr_err("Correction phase=%d.\n",(int)phase_sum);
+
+	if(drv_501_i2c_regset(isl29501, REG501_DISTANCE_PHASE_MSB,0xff,(uint16_t)phase_sum>>8) < 0 ) return -1;
+	if(drv_501_i2c_regset(isl29501, REG501_DISTANCE_PHASE_LSB,0xff,(uint16_t)phase_sum&0xff) < 0 ) return -1;
+
+	cali_data->meaning.distance_phase_MSB = (uint16_t)phase_sum>>8;
+	cali_data->meaning.distance_phase_LSB = (uint16_t)phase_sum&0xff;
+
+	cali_data->meaning.cali_flag |=  0x04;
+
+	drv_501_update_checksum(cali_data);
+
+	pr_err("Calibrate Distance Done.\n");
+
+	return 0;
+}
+
+
+uint8_t drv_501_setup_cali_data(struct isl29501_private *isl29501, type_cali_data* cali_data)
+{
+	if(drv_501_calibrate_data_check(cali_data) < 0) return -1;
+
+	if(cali_data->meaning.cali_flag & 0x01){
+		if(drv_501_i2c_regset(isl29501,REG501_MAG_REF_EXP,0xff,cali_data->meaning.mag_ref_EXP) < 0 ) return -1;
+		if(drv_501_i2c_regset(isl29501,REG501_MAG_REF_MSB,0xff,cali_data->meaning.mag_ref_MSB) < 0 ) return -1;
+		if(drv_501_i2c_regset(isl29501,REG501_MAG_REF_LSB,0xff,cali_data->meaning.mag_ref_LSB) < 0 ) return -1;
+		pr_err("[debug] %s set mag done.\n",__func__);
+	}
+
+	if(cali_data->meaning.cali_flag & 0x02){
+		if(drv_501_i2c_regset(isl29501,REG501_XTALK_I_MSB,0xff,cali_data->meaning.xtalk_i_MSB) < 0 ) return -1;
+		if(drv_501_i2c_regset(isl29501,REG501_XTALK_I_LSB,0xff,cali_data->meaning.xtalk_i_LSB) < 0 ) return -1;
+	
+		if(drv_501_i2c_regset(isl29501,REG501_XTALK_Q_MSB,0xff,cali_data->meaning.xtalk_q_MSB) < 0 ) return -1;
+		if(drv_501_i2c_regset(isl29501,REG501_XTALK_Q_LSB,0xff,cali_data->meaning.xtalk_q_LSB) < 0 ) return -1;
+
+		if(drv_501_i2c_regset(isl29501,REG501_XTALK_I_EXP,0xff,cali_data->meaning.xtalk_i_EXP) < 0 ) return -1;
+		if(drv_501_i2c_regset(isl29501,REG501_XTALK_Q_EXP,0xff,cali_data->meaning.xtalk_q_EXP) < 0 ) return -1;
+
+		if(drv_501_i2c_regset(isl29501,REG501_XTALK_GAIN_MSB,0xff,cali_data->meaning.xtalk_gain_MSB) < 0 ) return -1;
+		if(drv_501_i2c_regset(isl29501,REG501_XTALK_GAIN_LSB,0xff,cali_data->meaning.xtalk_gain_LSB) < 0 ) return -1;
+		pr_err("[debug] %s set xtalk done.\n",__func__);
+	}
+	
+	if(cali_data->meaning.cali_flag & 0x04){
+		if(drv_501_i2c_regset(isl29501,REG501_DISTANCE_PHASE_MSB,0xff,cali_data->meaning.distance_phase_MSB) < 0 ) return -1;
+		if(drv_501_i2c_regset(isl29501,REG501_DISTANCE_PHASE_LSB,0xff,cali_data->meaning.distance_phase_LSB) < 0 ) return -1;
+		pr_err("[debug] %s set phase done.\n",__func__);
+	}
+
+	return 0;
+}
+
+
+#endif
+
 
 static int isl29501_register_read(struct isl29501_private *isl29501,
 				  enum isl29501_register_name name,
@@ -270,14 +957,15 @@ err:
 }
 
 static ssize_t isl29501_read_ext(struct iio_dev *indio_dev,
-                                uintptr_t private,
-                                const struct iio_chan_spec *chan,
-                                char *buf)
+				 uintptr_t private,
+				 const struct iio_chan_spec *chan,
+				 char *buf)
 {
 	struct isl29501_private *isl29501 = iio_priv(indio_dev);
 	enum isl29501_register_name reg = private;
 	int ret;
 	u32 value, gain, coeff, exp;
+	uint16_t distance = 0, precision = 0;
 
 	switch (reg) {
 	case REG_GAIN:
@@ -302,6 +990,37 @@ static ssize_t isl29501_read_ext(struct iio_dev *indio_dev,
 
 		value = coeff << exp;
 		break;
+#if 1
+	case CALIBRATE_MAGNITUDE:
+		pr_err("[debug] %s CALIBRATE_MAGNITUDE\n",__func__);
+		ret = drv_501_calibrate_Magnitude(isl29501, &_cdata);
+		if (ret < 0)
+			return ret;
+		value = 0;
+		break;
+	case CALIBRATE_XTALK:
+		pr_err("[debug] %s CALIBRATE_XTALK\n",__func__);
+		ret = drv_501_calibrate_xtalk(isl29501, &_cdata);
+		if (ret < 0)
+			return ret;
+		value = 0;
+		break;
+	case CALIBRATE_DISTANCE:
+		pr_err("[debug] %s CALIBRATE_DISTANCE\n",__func__);
+		ret = drv_501_calibrate_distance(isl29501, &_cdata);
+		if (ret < 0)
+			return ret;
+		value = 0;
+		break;
+	case DISTANCE_PRECISION:
+		//pr_err("[debug] %s DISTANCE_PRECISION",__func__);
+		ret = drv_501_measure_test(isl29501, &distance, &precision);
+		if(ret < 0)
+			return ret;
+		value = (((uint32_t)distance) << 16) + (uint32_t)precision;	
+		//pr_err("[debug]1 %s value:%d distance: %d   precision: %d \n",__func__,value, (value & 0xffff0000) >> 16, value & 0xffff);
+		break;
+#endif
 	default:
 		return -EINVAL;
 	}
@@ -310,8 +1029,8 @@ static ssize_t isl29501_read_ext(struct iio_dev *indio_dev,
 }
 
 static int isl29501_set_shadow_coeff(struct isl29501_private *isl29501,
-                                    enum isl29501_register_name reg,
-                                    unsigned int val)
+				     enum isl29501_register_name reg,
+				     unsigned int val)
 {
 	enum isl29501_correction_coeff coeff;
 
@@ -500,7 +1219,7 @@ static const struct iio_chan_spec_ext_info isl29501_ext_info[] = {
 	_ISL29501_EXT_INFO("calib_xtalk", CALIBRATE_XTALK),
 	_ISL29501_EXT_INFO("calib_distance", CALIBRATE_DISTANCE),
 	_ISL29501_EXT_INFO("distance_precision", DISTANCE_PRECISION),
-       { },
+	{ },
 };
 
 #define ISL29501_DISTANCE_SCAN_INDEX 0
@@ -629,8 +1348,8 @@ static const int isl29501_int_time[][2] = {
 };
 
 static int isl29501_get_raw(struct isl29501_private *isl29501,
-                           const struct iio_chan_spec *chan,
-                           int *raw)
+			    const struct iio_chan_spec *chan,
+			    int *raw)
 {
 	int ret;
 
@@ -938,6 +1657,7 @@ static const struct iio_info isl29501_info = {
 static int isl29501_init_chip(struct isl29501_private *isl29501, struct device_node *np)
 {
 	int ret = -1;
+	uint8_t sta=0;
 	enum of_gpio_flags flags;
 	
 	//Chip enable GPIO, active low
@@ -1005,7 +1725,99 @@ static int isl29501_init_chip(struct isl29501_private *isl29501, struct device_n
 	if (ret < 0) {
 		return ret;
 	}
+#if 1
+	if(drv_501_soft_reset(isl29501) < 0){
+		pr_err("isl29501 Reset fail.!!");
+	}
+	if (drv_501_init_measurement_setting(isl29501) < 0)
+        {
+                pr_err("isl29501 measure setting done.\n");
+        }
+        if (drv_501_check_chipstatus(isl29501, &sta) < 0)
+        {
+                pr_err("isl29501 status=%d.\n",sta);
+        }
+#if 0
+	if(cali_file == NULL) {
+                cali_file = filp_open(CALIFILE, O_RDWR | O_CREAT, 0644);
+		if (IS_ERR(cali_file)) {
+                	pr_err("[debug] %s error occured while opening file %s,!!!\n", __func__,CALIFILE);
+			cali_file == NULL;
+                	//return -1;
+		}
+	}
+#endif
+        memset(&_cdata.raw_data,0,sizeof(_cdata.raw_data));
+#if 0
+	if(cali_file != NULL){
+		fs = get_fs();
+		set_fs(KERNEL_DS);
+		pos = 0;
+		if(vfs_read(cali_file, _cdata.raw_data, sizeof(_cdata.raw_data), &pos) != sizeof(_cdata.raw_data)){
+			pr_err("[debug] %s read cali_file %s error, use default calibration data",__func__,CALIFILE);
+        		//Flash_pull(FLASH_ZONE_1,sizeof(_cdata.raw_data),_cdata.raw_data);
+			_cdata.raw_data[0] = 0x7;  //cali_flag
+			_cdata.raw_data[1] = 0x7;  //mag_ref_EXP
+			_cdata.raw_data[2] = 0xbd; //mag_ref_MSB
+			_cdata.raw_data[3] = 0x12; //mag_ref_LSB
+			_cdata.raw_data[4] = 0x98; //xtalk_i_MSB
+			_cdata.raw_data[5] = 0xbc; //xtalk_i_LSB
+			_cdata.raw_data[6] = 0x4a; //xtalk_q_MSB
+			_cdata.raw_data[7] = 0x83; //xtalk_q_LSB
+			_cdata.raw_data[8] = 0x46; //xtalk_i_EXP
+			_cdata.raw_data[9] = 0x47; //xtalk_q_EXP
+			_cdata.raw_data[10] = 0xff; //xtalk_gain_MSB
+			_cdata.raw_data[11] = 0x0; //xtalk_gain_LSB
+			_cdata.raw_data[12] = 0x10; //distance_phase_MSB
+			_cdata.raw_data[13] = 0x3c; //distance_phase_LSB
+			_cdata.raw_data[14] = 0; //afe_temp
+			_cdata.raw_data[15] = 0xd6; //afe_temp
+		}else{
+			pr_err("[debug] %s read cali_file %s success, use default calibration data",__func__,CALIFILE);
+			for(i = 0; i < sizeof(_cdata.raw_data); i++){
+				pr_err("[debug]:_cdata.raw_data[%d]=0x%d",i,_cdata.raw_data[i]);
+			}
+			pr_err("[debug] %s write the default calibration data to %s",__func__,CALIFILE);
+			pos =0;
+    			vfs_write(cali_file,  _cdata.raw_data, sizeof(_cdata.raw_data), &pos);
+		}
 
+		set_fs(fs);
+	}else{
+#endif
+        	//Flash_pull(FLASH_ZONE_1,sizeof(_cdata.raw_data),_cdata.raw_data);
+		pr_err("[debug] %s no cali_file %s available, use default calibration data",__func__,CALIFILE);
+		_cdata.raw_data[0] = 0x7;  //cali_flag
+		_cdata.raw_data[1] = 0x7;  //mag_ref_EXP
+		_cdata.raw_data[2] = 0xa6;//0xcd; //mag_ref_MSB
+		_cdata.raw_data[3] = 0x5e;//0x2c; //mag_ref_LSB
+		_cdata.raw_data[4] = 0x5a;//0x55; //xtalk_i_MSB
+		_cdata.raw_data[5] = 0x73;//0x5a; //xtalk_i_LSB
+		_cdata.raw_data[6] = 0x41;//0x7d; //xtalk_q_MSB
+		_cdata.raw_data[7] = 0x5a;//0x63; //xtalk_q_LSB
+		_cdata.raw_data[8] = 0x45;//0x46; //xtalk_i_EXP
+		_cdata.raw_data[9] = 0x48;//0x47; //xtalk_q_EXP
+		_cdata.raw_data[10] = 0xff; //xtalk_gain_MSB
+		_cdata.raw_data[11] = 0x0; //xtalk_gain_LSB
+		_cdata.raw_data[12] = 0xf;//0x11; //distance_phase_MSB
+		_cdata.raw_data[13] = 0xca;//0x6c; //distance_phase_LSB
+		_cdata.raw_data[14] = 0; //afe_temp
+		_cdata.raw_data[15] = 0xdf;//0x9f; //afe_temp
+#if 0
+	}
+#endif
+
+        if(drv_501_calibrate_data_check(&_cdata) == 0)
+        {
+                pr_err("[debug] %s check cali data done.\n",__func__);
+          	if(drv_501_setup_cali_data(isl29501,&_cdata) == 0) pr_err("[debug] %s set cali data done.\n",__func__);
+        }
+        else
+        {
+                memset(&_cdata.raw_data,0,sizeof(_cdata.raw_data));
+                pr_err("No vaild cali data yet.!!!\n");
+        }
+#endif
 	return isl29501_begin_acquisition(isl29501);
 }
 
@@ -1049,9 +1861,9 @@ static int isl29501_probe(struct i2c_client *client,
 	mutex_init(&isl29501->lock);
        
 	ret = isl29501_init_chip(isl29501, np);
-    //if (ret < 0)
-    //        return ret;
-    //dev_err(&client->dev, "isl29501_init_chip(isl29501) pass\n");
+    	if (ret < 0)
+            return ret;
+    	dev_err(&client->dev, "isl29501_init_chip(isl29501) pass\n");
 	indio_dev->modes = INDIO_DIRECT_MODE;
 	indio_dev->dev.parent = &client->dev;
 	indio_dev->channels = isl29501_channels;
@@ -1059,16 +1871,17 @@ static int isl29501_probe(struct i2c_client *client,
 	indio_dev->name = client->name;
 	indio_dev->info = &isl29501_info;
 
-    ret = iio_triggered_buffer_setup(indio_dev,
+	ret = iio_triggered_buffer_setup(indio_dev,
                                               iio_pollfunc_store_time,
                                              isl29501_trigger_handler,
                                              NULL);
-    if (ret < 0) {
+	if (ret < 0) {
            dev_err(&client->dev, "unable to setup iio triggered buffer\n");
            return ret;
 	}
-
-    return iio_device_register(indio_dev);
+	
+	dev_err(&client->dev, "[debug] isc29501: setup iio triggered buffer !!\n");
+	return iio_device_register(indio_dev);
 }
 
 static const struct i2c_device_id isl29501_id[] = {

@@ -77,7 +77,7 @@
 };
 
 &i2c1 {
-	// OmniVision OV9282
+	// OmniVision OV7251
 	status = "okay";
 	ov7251: camera-module@60 {
 		status = "okay";

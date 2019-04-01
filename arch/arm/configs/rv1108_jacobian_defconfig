@@ -3,6 +3,7 @@
 # Linux/arm 3.10.104 Kernel Configuration
 #
 CONFIG_ARM=y
+CONFIG_ARM_HAS_SG_CHAIN=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
 CONFIG_HAVE_PROC_CPU=y
 CONFIG_STACKTRACE_SUPPORT=y
@@ -637,7 +638,7 @@ CONFIG_REGMAP=y
 CONFIG_REGMAP_I2C=y
 CONFIG_REGMAP_MMIO=y
 CONFIG_REGMAP_IRQ=y
-# CONFIG_DMA_SHARED_BUFFER is not set
+CONFIG_DMA_SHARED_BUFFER=y
 CONFIG_DMA_CMA=y
 
 #
@@ -1083,6 +1084,7 @@ CONFIG_GPIO_RK816=y
 CONFIG_POWER_SUPPLY=y
 # CONFIG_POWER_SUPPLY_DEBUG is not set
 # CONFIG_PDA_POWER is not set
+# CONFIG_GENERIC_ADC_BATTERY is not set
 # CONFIG_TEST_POWER is not set
 # CONFIG_BATTERY_DS2780 is not set
 # CONFIG_BATTERY_DS2781 is not set
@@ -1103,6 +1105,7 @@ CONFIG_POWER_SUPPLY=y
 # CONFIG_CW2015_BATTERY is not set
 # CONFIG_BATTERY_GOLDFISH is not set
 # CONFIG_BATTERY_RK816 is not set
+# CONFIG_RV1108_POWER is not set
 # CONFIG_CHARGER_DISPLAY is not set
 # CONFIG_POWER_RESET is not set
 # CONFIG_POWER_RESET_RESTART is not set
@@ -1234,7 +1237,146 @@ CONFIG_REGULATOR_RK816=y
 # CONFIG_REGULATOR_TPS65023 is not set
 # CONFIG_REGULATOR_TPS6507X is not set
 # CONFIG_REGULATOR_TPS6524X is not set
-# CONFIG_MEDIA_SUPPORT is not set
+CONFIG_MEDIA_SUPPORT=y
+
+#
+# Multimedia core support
+#
+CONFIG_MEDIA_CAMERA_SUPPORT=y
+# CONFIG_MEDIA_ANALOG_TV_SUPPORT is not set
+# CONFIG_MEDIA_DIGITAL_TV_SUPPORT is not set
+# CONFIG_MEDIA_RADIO_SUPPORT is not set
+# CONFIG_MEDIA_RC_SUPPORT is not set
+CONFIG_MEDIA_CONTROLLER=y
+CONFIG_VIDEO_DEV=y
+CONFIG_VIDEO_V4L2_SUBDEV_API=y
+CONFIG_VIDEO_V4L2=y
+# CONFIG_VIDEO_ADV_DEBUG is not set
+# CONFIG_VIDEO_FIXED_MINOR_RANGES is not set
+CONFIG_VIDEOBUF_GEN=y
+CONFIG_VIDEOBUF_VMALLOC=y
+CONFIG_VIDEOBUF_DMA_CONTIG=y
+CONFIG_VIDEOBUF2_CORE=y
+CONFIG_VIDEOBUF2_MEMOPS=y
+CONFIG_VIDEOBUF2_VMALLOC=y
+CONFIG_VIDEO_V4L2_INT_DEVICE=y
+# CONFIG_TTPCI_EEPROM is not set
+
+#
+# Media drivers
+#
+CONFIG_V4L_PLATFORM_DRIVERS=y
+# CONFIG_VIDEO_TIMBERDALE is not set
+# CONFIG_VIDEO_RK_CIF_CIF10 is not set
+# CONFIG_VIDEO_CVBSIN is not set
+# CONFIG_VIDEO_CIF1TO4 is not set
+# CONFIG_VIDEO_NVP6124 is not set
+CONFIG_SOC_CAMERA=y
+CONFIG_SOC_CAMERA_PLATFORM=y
+# CONFIG_VIDEO_SH_MOBILE_CSI2 is not set
+# CONFIG_VIDEO_SH_MOBILE_CEU is not set
+CONFIG_VIDEO_RK_CIF_ISP11=y
+# CONFIG_V4L_MEM2MEM_DRIVERS is not set
+# CONFIG_V4L_TEST_DRIVERS is not set
+
+#
+# Supported MMC/SDIO adapters
+#
+
+#
+# Media ancillary drivers (tuners, sensors, i2c, frontends)
+#
+CONFIG_MEDIA_SUBDRV_AUTOSELECT=y
+
+#
+# Audio decoders, processors and mixers
+#
+
+#
+# RDS decoders
+#
+
+#
+# Video decoders
+#
+
+#
+# Video and audio decoders
+#
+
+#
+# Video encoders
+#
+
+#
+# Camera sensor devices
+#
+
+#
+# Flash devices
+#
+
+#
+# Video improvement chips
+#
+
+#
+# Miscelaneous helper chips
+#
+
+#
+# Sensors used on soc_camera driver
+#
+
+#
+# soc_camera sensor drivers
+#
+# CONFIG_SOC_CAMERA_IMX074 is not set
+# CONFIG_SOC_CAMERA_MT9M001 is not set
+# CONFIG_SOC_CAMERA_MT9M111 is not set
+# CONFIG_SOC_CAMERA_MT9T031 is not set
+# CONFIG_SOC_CAMERA_MT9T112 is not set
+# CONFIG_SOC_CAMERA_MT9V022 is not set
+# CONFIG_SOC_CAMERA_OV2640 is not set
+# CONFIG_SOC_CAMERA_OV5642 is not set
+# CONFIG_SOC_CAMERA_OV6650 is not set
+# CONFIG_SOC_CAMERA_OV772X is not set
+# CONFIG_SOC_CAMERA_OV9640 is not set
+# CONFIG_SOC_CAMERA_OV9740 is not set
+# CONFIG_SOC_CAMERA_RJ54N1 is not set
+# CONFIG_SOC_CAMERA_TW9910 is not set
+# CONFIG_VIDEO_OV8858 is not set
+# CONFIG_VIDEO_OV2710 is not set
+# CONFIG_VIDEO_OV4689 is not set
+# CONFIG_VIDEO_AR0330CS is not set
+# CONFIG_VIDEO_IMX323 is not set
+CONFIG_VIDEO_OV7251BW=y
+# CONFIG_CAMERA_IRCUTTER is not set
+# CONFIG_VIDEO_IMX258 is not set
+# CONFIG_VIDEO_XC9080_HM2131 is not set
+# CONFIG_VIDEO_IMX291 is not set
+# CONFIG_VIDEO_GC2023 is not set
+# CONFIG_VIDEO_OV2718 is not set
+# CONFIG_VIDEO_GC2145 is not set
+# CONFIG_VIDEO_IMX327 is not set
+# CONFIG_VIDEO_S5K4H8 is not set
+# CONFIG_VCM_VM149C is not set
+# CONFIG_VCM_GT9760S is not set
+# CONFIG_VIDEO_OV5695 is not set
+
+#
+# Tools to develop new frontends
+#
+# CONFIG_DVB_DUMMY_FE is not set
+# CONFIG_CAMSYS_DRV is not set
+CONFIG_ROCK_CHIP_SOC_CAMERA=y
+
+#
+# rockchip camera sensor interface driver
+#
+CONFIG_ROCKCHIP_CAMERA_SENSOR_INTERFACE=y
+# CONFIG_RK30_CAMERA_ONEFRAME is not set
+CONFIG_RK30_CAMERA_PINGPONG=y
 
 #
 # Graphics support
@@ -1382,6 +1524,7 @@ CONFIG_USB_G_ANDROID=y
 # CONFIG_USB_G_MULTI is not set
 # CONFIG_USB_G_HID is not set
 # CONFIG_USB_G_DBGP is not set
+# CONFIG_USB_G_WEBCAM is not set
 # CONFIG_USB_CSW_HACK is not set
 # CONFIG_USB_MSC_PROFILING is not set
 
@@ -1513,6 +1656,106 @@ CONFIG_DMA_OF=y
 CONFIG_STAGING=y
 # CONFIG_ECHO is not set
 # CONFIG_COMEDI is not set
+
+#
+# IIO staging drivers
+#
+
+#
+# Accelerometers
+#
+# CONFIG_ADIS16201 is not set
+# CONFIG_ADIS16203 is not set
+# CONFIG_ADIS16204 is not set
+# CONFIG_ADIS16209 is not set
+# CONFIG_ADIS16220 is not set
+# CONFIG_ADIS16240 is not set
+# CONFIG_LIS3L02DQ is not set
+# CONFIG_SCA3000 is not set
+
+#
+# Analog to digital converters
+#
+# CONFIG_AD7291 is not set
+# CONFIG_AD7606 is not set
+# CONFIG_AD799X is not set
+# CONFIG_AD7780 is not set
+# CONFIG_AD7816 is not set
+# CONFIG_AD7192 is not set
+# CONFIG_AD7280 is not set
+
+#
+# Analog digital bi-direction converters
+#
+# CONFIG_ADT7316 is not set
+
+#
+# Capacitance to digital converters
+#
+# CONFIG_AD7150 is not set
+# CONFIG_AD7152 is not set
+# CONFIG_AD7746 is not set
+
+#
+# Direct Digital Synthesis
+#
+# CONFIG_AD5930 is not set
+# CONFIG_AD9832 is not set
+# CONFIG_AD9834 is not set
+# CONFIG_AD9850 is not set
+# CONFIG_AD9852 is not set
+# CONFIG_AD9910 is not set
+# CONFIG_AD9951 is not set
+
+#
+# Digital gyroscope sensors
+#
+# CONFIG_ADIS16060 is not set
+# CONFIG_ADIS16130 is not set
+# CONFIG_ADIS16260 is not set
+
+#
+# Network Analyzer, Impedance Converters
+#
+# CONFIG_AD5933 is not set
+# CONFIG_INV_MPU_IIO is not set
+
+#
+# Light sensors
+#
+# CONFIG_SENSORS_ISL29018 is not set
+# CONFIG_SENSORS_ISL29028 is not set
+# CONFIG_TSL2583 is not set
+# CONFIG_TSL2x7x is not set
+
+#
+# Magnetometer sensors
+#
+# CONFIG_SENSORS_HMC5843 is not set
+
+#
+# Active energy metering IC
+#
+# CONFIG_ADE7753 is not set
+# CONFIG_ADE7754 is not set
+# CONFIG_ADE7758 is not set
+# CONFIG_ADE7759 is not set
+# CONFIG_ADE7854 is not set
+
+#
+# Resolver to digital converters
+#
+# CONFIG_AD2S90 is not set
+# CONFIG_AD2S1200 is not set
+# CONFIG_AD2S1210 is not set
+
+#
+# Triggers - standalone
+#
+# CONFIG_IIO_PERIODIC_RTC_TRIGGER is not set
+# CONFIG_IIO_GPIO_TRIGGER is not set
+# CONFIG_IIO_SYSFS_TRIGGER is not set
+# CONFIG_IIO_SIMPLE_DUMMY is not set
 # CONFIG_FT1000 is not set
 
 #
@@ -1520,7 +1763,7 @@ CONFIG_STAGING=y
 #
 # CONFIG_TOUCHSCREEN_CLEARPAD_TM1217 is not set
 # CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4 is not set
-# CONFIG_STAGING_MEDIA is not set
+CONFIG_STAGING_MEDIA=y
 
 #
 # Android
@@ -1532,7 +1775,14 @@ CONFIG_ANDROID_LOGGER=y
 # CONFIG_ANDROID_LOW_MEMORY_KILLER is not set
 # CONFIG_ANDROID_INTF_ALARM_DEV is not set
 # CONFIG_SYNC is not set
-# CONFIG_ION is not set
+CONFIG_ION=y
+# CONFIG_ION_TEST is not set
+# CONFIG_ION_DUMMY is not set
+CONFIG_ION_ROCKCHIP=y
+CONFIG_ION_CMA_HIGHMEM=y
+CONFIG_ION_ROCKCHIP_SNAPSHOT=y
+CONFIG_ION_SNAPSHOT_BUF_SHIFT=18
+# CONFIG_ION_POOL_CACHE_POLICY is not set
 CONFIG_FIQ_DEBUGGER=y
 # CONFIG_FIQ_DEBUGGER_NO_SLEEP is not set
 # CONFIG_FIQ_DEBUGGER_WAKEUP_IRQ_ALWAYS_ON is not set
@@ -1576,7 +1826,109 @@ CONFIG_ROCKCHIP_VENDOR_STORAGE=y
 # CONFIG_PM_DEVFREQ is not set
 # CONFIG_EXTCON is not set
 # CONFIG_MEMORY is not set
-# CONFIG_IIO is not set
+CONFIG_IIO=y
+CONFIG_IIO_BUFFER=y
+# CONFIG_IIO_BUFFER_CB is not set
+CONFIG_IIO_KFIFO_BUF=y
+CONFIG_IIO_TRIGGERED_BUFFER=y
+CONFIG_IIO_TRIGGER=y
+CONFIG_IIO_CONSUMERS_PER_TRIGGER=2
+
+#
+# Accelerometers
+#
+# CONFIG_KXSD9 is not set
+# CONFIG_IIO_ST_ACCEL_3AXIS is not set
+
+#
+# Analog to digital converters
+#
+# CONFIG_AD7266 is not set
+# CONFIG_AD7298 is not set
+# CONFIG_AD7923 is not set
+# CONFIG_AD7791 is not set
+# CONFIG_AD7793 is not set
+# CONFIG_AD7476 is not set
+# CONFIG_AD7887 is not set
+# CONFIG_EXYNOS_ADC is not set
+# CONFIG_MAX1363 is not set
+# CONFIG_TI_ADC081C is not set
+# CONFIG_ROCKCHIP_ADC is not set
+
+#
+# Amplifiers
+#
+# CONFIG_AD8366 is not set
+
+#
+# Hid Sensor IIO Common
+#
+
+#
+# Digital to analog converters
+#
+# CONFIG_AD5064 is not set
+# CONFIG_AD5360 is not set
+# CONFIG_AD5380 is not set
+# CONFIG_AD5421 is not set
+# CONFIG_AD5624R_SPI is not set
+# CONFIG_AD5446 is not set
+# CONFIG_AD5449 is not set
+# CONFIG_AD5504 is not set
+# CONFIG_AD5755 is not set
+# CONFIG_AD5764 is not set
+# CONFIG_AD5791 is not set
+# CONFIG_AD5686 is not set
+# CONFIG_MAX517 is not set
+# CONFIG_MCP4725 is not set
+
+#
+# Frequency Synthesizers DDS/PLL
+#
+
+#
+# Clock Generator/Distribution
+#
+# CONFIG_AD9523 is not set
+
+#
+# Phase-Locked Loop (PLL) frequency synthesizers
+#
+# CONFIG_ADF4350 is not set
+
+#
+# Digital gyroscope sensors
+#
+# CONFIG_ADIS16080 is not set
+# CONFIG_ADIS16136 is not set
+# CONFIG_ADXRS450 is not set
+# CONFIG_IIO_ST_GYRO_3AXIS is not set
+# CONFIG_ITG3200 is not set
+
+#
+# Inertial measurement units
+#
+# CONFIG_ADIS16400 is not set
+# CONFIG_ADIS16480 is not set
+# CONFIG_INV_MPU6050_IIO is not set
+
+#
+# Light sensors
+#
+# CONFIG_ADJD_S311 is not set
+# CONFIG_SENSORS_TSL2563 is not set
+# CONFIG_VCNL4000 is not set
+
+#
+# Magnetometer sensors
+#
+# CONFIG_AK8975 is not set
+# CONFIG_IIO_ST_MAGN_3AXIS is not set
+
+#
+# Proximity sensors
+#
+CONFIG_ISL29501=y
 # CONFIG_PWM is not set
 CONFIG_IRQCHIP=y
 CONFIG_ARM_GIC=y

@@ -99,7 +99,7 @@
 /* Base sensor configs */
 /* ======================================================================== */
 /* MCLK:24MHz  1920x1080  30fps   mipi 1lane   800Mbps/lane */
-static struct ov_camera_module_reg OV7251_init_tab_640_480_100fps[] = {
+static struct ov_camera_module_reg OV7251_init_tab_320_240_60fps[] = {
 	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x0100, 0x00},/* software sleep */
 	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x0103, 0x01},/* software reset */
 	{OV_CAMERA_MODULE_REG_TYPE_TIMEOUT, 0x0000, 10},
@@ -168,14 +168,14 @@ static struct ov_camera_module_reg OV7251_init_tab_640_480_100fps[] = {
 	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3805, 0x8b},/* x end L */
 	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3806, 0x01},/* y end H */
 	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3807, 0xeb},/* y end L */
-	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3808, 0x02},/* isp x output size H */
-	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3809, 0x80},/* isp x output size L */
-	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x380a, 0x01},/* isp y output size H */
-	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x380b, 0xe0},/* isp y output size L */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3808, 0x01/*0x02*/},/* isp x output size H */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3809, 0x40/*0x80*/},/* isp x output size L */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x380a, 0x00/*0x01*/},/* isp y output size H */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x380b, 0xf0/*0xe0*/},/* isp y output size L */
 	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x380c, 0x03},/* HTS H */
 	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x380d, 0xa0},/* HTS L */
-	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x380e, 0x02},/* VTS H */
-	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x380f, 0x04},/* VTS L */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x380e, 0x03/*0x02*/},/* VTS H */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x380f, 0x5c/*0x04*/},/* VTS L */
 	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3810, 0x00},/* ISP x win offset H */
 	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3811, 0x02},/* ISP x win offset L  */
 	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3812, 0x00},/* ISP y win offset H */
@@ -248,10 +248,10 @@ static struct ov_camera_module_reg OV7251_init_tab_640_480_100fps[] = {
 /* ======================================================================== */
 static struct ov_camera_module_config OV7251_configs[] = {
 	{
-		.name = "640x480_100fps",
+		.name = "320x240_60fps",
 		.frm_fmt = {
-			.width = 640,
-			.height = 480,
+			.width = 320,
+			.height = 240,
 			.code = V4L2_MBUS_FMT_Y10_1X10
 		},
 		.frm_intrvl = {
@@ -263,8 +263,8 @@ static struct ov_camera_module_config OV7251_configs[] = {
 		.auto_exp_enabled = false,
 		.auto_gain_enabled = false,
 		.auto_wb_enabled = false,
-		.reg_table = (void *)OV7251_init_tab_640_480_100fps,
-		.reg_table_num_entries = ARRAY_SIZE(OV7251_init_tab_640_480_100fps),
+		.reg_table = (void *)OV7251_init_tab_320_240_60fps,
+		.reg_table_num_entries = ARRAY_SIZE(OV7251_init_tab_320_240_60fps),
 		.v_blanking_time_us = 3078,
 		.ignore_measurement_check = 1,
 		PLTFRM_CAM_ITF_MIPI_CFG(0, 1, 640, 24000000)

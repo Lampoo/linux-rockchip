@@ -1787,22 +1787,61 @@ static int isl29501_init_chip(struct isl29501_private *isl29501, struct device_n
 #endif
         	//Flash_pull(FLASH_ZONE_1,sizeof(_cdata.raw_data),_cdata.raw_data);
 		pr_err("[debug] %s no cali_file %s available, use default calibration data",__func__,CALIFILE);
+#if 0 //at the board at ASMA5D2 Platform
 		_cdata.raw_data[0] = 0x7;  //cali_flag
-		_cdata.raw_data[1] = 0x7;  //mag_ref_EXP
-		_cdata.raw_data[2] = 0xa6;//0xcd; //mag_ref_MSB
-		_cdata.raw_data[3] = 0x5e;//0x2c; //mag_ref_LSB
-		_cdata.raw_data[4] = 0x5a;//0x55; //xtalk_i_MSB
-		_cdata.raw_data[5] = 0x73;//0x5a; //xtalk_i_LSB
-		_cdata.raw_data[6] = 0x41;//0x7d; //xtalk_q_MSB
-		_cdata.raw_data[7] = 0x5a;//0x63; //xtalk_q_LSB
-		_cdata.raw_data[8] = 0x45;//0x46; //xtalk_i_EXP
-		_cdata.raw_data[9] = 0x48;//0x47; //xtalk_q_EXP
-		_cdata.raw_data[10] = 0xff; //xtalk_gain_MSB
-		_cdata.raw_data[11] = 0x0; //xtalk_gain_LSB
-		_cdata.raw_data[12] = 0xf;//0x11; //distance_phase_MSB
-		_cdata.raw_data[13] = 0xca;//0x6c; //distance_phase_LSB
+		_cdata.raw_data[1] = 0x7;         //mag_ref_EXP 0x2c
+		_cdata.raw_data[2] = 0xa6;//0xcd; //mag_ref_MSB 0x2d
+		_cdata.raw_data[3] = 0x5e;//0x2c; //mag_ref_LSB 0x2e
+		_cdata.raw_data[4] = 0x5a;//0x55; //xtalk_i_MSB 0x25
+		_cdata.raw_data[5] = 0x73;//0x5a; //xtalk_i_LSB 0x26
+		_cdata.raw_data[6] = 0x41;//0x7d; //xtalk_q_MSB 0x28
+		_cdata.raw_data[7] = 0x5a;//0x63; //xtalk_q_LSB 0x29
+		_cdata.raw_data[8] = 0x45;//0x46; //xtalk_i_EXP 0x24
+		_cdata.raw_data[9] = 0x48;//0x47; //xtalk_q_EXP 0x27
+		_cdata.raw_data[10] = 0xff;       //xtalk_gain_MSB 0x2a
+		_cdata.raw_data[11] = 0x0;        //xtalk_gain_LSB 0x2b
+		_cdata.raw_data[12] = 0xf;//0x11; //distance_phase_MSB 0x2f
+		_cdata.raw_data[13] = 0xca;//0x6c;//distance_phase_LSB 0x30
 		_cdata.raw_data[14] = 0; //afe_temp
 		_cdata.raw_data[15] = 0xdf;//0x9f; //afe_temp
+#else
+                _cdata.raw_data[0] = 0x7;  //cali_flag
+                _cdata.raw_data[1] = 0x7;         //mag_ref_EXP 0x2c
+                _cdata.raw_data[2] = 0x9c;//0xcd; //mag_ref_MSB 0x2d
+                _cdata.raw_data[3] = 0x7e;//0x2c; //mag_ref_LSB 0x2e
+                _cdata.raw_data[4] = 0x53;//0x55; //xtalk_i_MSB 0x25
+                _cdata.raw_data[5] = 0xd3;//0x5a; //xtalk_i_LSB 0x26
+                _cdata.raw_data[6] = 0x4e;//0x7d; //xtalk_q_MSB 0x28
+                _cdata.raw_data[7] = 0xb7;//0x63; //xtalk_q_LSB 0x29
+                _cdata.raw_data[8] = 0x45;//0x46; //xtalk_i_EXP 0x24
+                _cdata.raw_data[9] = 0x47;//0x47; //xtalk_q_EXP 0x27
+                _cdata.raw_data[10] = 0xff;       //xtalk_gain_MSB 0x2a
+                _cdata.raw_data[11] = 0x0;        //xtalk_gain_LSB 0x2b
+                _cdata.raw_data[12] = 0x11;//0x11; //distance_phase_MSB 0x2f
+                _cdata.raw_data[13] = 0xd;//0x6c;//distance_phase_LSB 0x30
+                _cdata.raw_data[14] = 0; //afe_temp
+                _cdata.raw_data[15] = 0xfc;//0x9f; //afe_temp
+
+#if 0
+<3>[  208.513500] raw_data[0]=0x7
+<3>[  208.513761] raw_data[1]=0x7
+<3>[  208.514016] raw_data[2]=0x9c
+<3>[  208.514282] raw_data[3]=0x7e
+<3>[  208.514547] raw_data[4]=0x53
+<3>[  208.514812] raw_data[5]=0xd3
+<3>[  208.515076] raw_data[6]=0x4e
+<3>[  208.515406] raw_data[7]=0xb7
+<3>[  208.515673] raw_data[8]=0x45
+<3>[  208.515939] raw_data[9]=0x47
+<3>[  208.516204] raw_data[10]=0xff
+<3>[  208.516479] raw_data[11]=0x0
+<3>[  208.516744] raw_data[12]=0x11
+<3>[  208.517009] raw_data[13]=0xd
+<3>[  208.517275] raw_data[14]=0x0
+<3>[  208.517539] raw_data[15]=0xfc
+
+#endif	
+#endif
 #if 0
 	}
 #endif

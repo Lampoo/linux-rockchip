@@ -2113,9 +2113,10 @@ static int rockchip_pinctrl_parse_groups(struct device_node *np,
 	/* we do not check return since it's safe node passed down */
 	size /= sizeof(*list);
 	if (!size || size % 1) {
-		dev_err(info->dev, "wrong pins number or pins and configs should be by 1\n");
+		dev_err(info->dev, "jchen,pinctrl-rockchip.c:  wrong pins number or pins and configs should be by 1\n");
 		return -EINVAL;
 	}
+	dev_err(info->dev, "jchen,pinctrl-rockchip.c:  right pins number or pins and configs should be by 1\n");
 
 	grp->npins = size / 1;
 

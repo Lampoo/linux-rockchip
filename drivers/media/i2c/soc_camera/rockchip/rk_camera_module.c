@@ -207,6 +207,8 @@ static int pltfrm_camera_module_init_gpio(
 		dev_get_platdata(&client->dev);
 	int i = 0;
 
+	pltfrm_camera_module_pr_err(
+			    sd,"jchen pltfrm_camera_module_init_gpio");
 	ret = pltfrm_camera_module_set_pinctrl_state(sd, pdata->pins_default);
 	if (IS_ERR_VALUE(ret))
 		goto err;
@@ -229,9 +231,9 @@ static int pltfrm_camera_module_init_gpio(
 				pdata->fl_ctrl.fl_init_status = 1;
 			}
 
-			pltfrm_camera_module_pr_debug(
+			pltfrm_camera_module_pr_err(
 			    sd,
-				"requesting GPIO #%d ('%s')\n",
+				"jchen requesting GPIO #%d ('%s')\n",
 				pdata->gpios[i].pltfrm_gpio,
 				pdata->gpios[i].label);
 			ret = gpio_request_one(
@@ -263,10 +265,13 @@ static int pltfrm_camera_module_init_gpio(
 			}
 
 			if (pdata->gpios[i].label ==
-				PLTFRM_CAMERA_MODULE_PIN_PD)
+				PLTFRM_CAMERA_MODULE_PIN_PD){
 				ret = pltfrm_camera_module_set_pin_state(sd,
 					pdata->gpios[i].label,
 					PLTFRM_CAMERA_MODULE_PIN_STATE_INACTIVE);
+				pltfrm_camera_module_pr_err(sd,
+							"jchen: PLTFRM_CAMERA_MODULE_PIN_PD(XSHUTDOWN) set %s INACTIVE ",pdata->gpios[i].label);
+			}
 			else if (pdata->gpios[i].label ==
 				PLTFRM_CAMERA_MODULE_PIN_RESET)
 				ret = pltfrm_camera_module_set_pin_state(sd,
@@ -341,19 +346,22 @@ static struct pltfrm_camera_module_data *pltfrm_camera_module_get_data(
 	ret = of_property_read_string(np, OF_CAMERA_MODULE_MCLK_NAME, &str);
 	if (ret) {
 		pltfrm_camera_module_pr_warn(sd,
-			"cannot not get %s property of node %s, maybe external mclk\n",
+			"jchen cannot not get %s property of node %s, maybe external mclk\n",
 			OF_CAMERA_MODULE_MCLK_NAME,
 			np->name);
 	} else {
 		pdata->mclk = devm_clk_get(&client->dev, str);
 		if (IS_ERR_OR_NULL(pdata->mclk)) {
 			pltfrm_camera_module_pr_err(sd,
-				"cannot not get clk_mipicsi_out property of node %s\n",
+				"jchen cannot not get clk_mipicsi_out property of node %s\n",
 				np->name);
 			ret = -ENODEV;
 			goto err;
 		}
 	}
+	
+	pltfrm_camera_module_pr_err(sd,
+				"jchen get clk_mipicsi_out property of node %s\n", np->name);
 
 	ret = of_property_read_string(np, "rockchip,camera-module-facing", &str);
 	if (ret) {
@@ -1547,18 +1555,24 @@ int pltfrm_camera_module_set_pm_state(
 			cfg_para.cfg_para = (void *)&data_rate;
 			(soc_cfg->soc_cfg)(&cfg_para);
 
-			if (!IS_ERR_OR_NULL(pdata->mclk))
+			if (!IS_ERR_OR_NULL(pdata->mclk)){
 				clk_set_rate(pdata->mclk, itf_cfg.mclk_hz);
+				pltfrm_camera_module_pr_err(sd,"jchen: clk_set_rate(pdata->mclk, itf_cfg.mclk_hz(%d)",itf_cfg.mclk_hz);
+			}
 		} else {
 			pltfrm_camera_module_pr_err(sd,
-				"PLTFRM_CIFCAM_G_ITF_CFG failed,"
+				"jchen PLTFRM_CIFCAM_G_ITF_CFG failed,"
 				"mclk set 24m default.\n");
-			if (!IS_ERR_OR_NULL(pdata->mclk))
+			if (!IS_ERR_OR_NULL(pdata->mclk)){
 				clk_set_rate(pdata->mclk, 24000000);
+				pltfrm_camera_module_pr_err(sd,"jchen: clk_set_rate(pdata->mclk, itf_cfg.mclk_hz 24M");
+			}
 		}
 
-		if (!IS_ERR_OR_NULL(pdata->mclk))
+		if (!IS_ERR_OR_NULL(pdata->mclk)){
 			clk_prepare_enable(pdata->mclk);
+			pltfrm_camera_module_pr_err(sd,"jchen: clk_prepare_enable");
+		}
 
 		pltfrm_camera_module_set_pin_state(
 			sd,
@@ -1632,7 +1646,7 @@ int pltfrm_camera_module_set_pin_state(
 				gpio_val = (pdata->gpios[i].active_low ==
 					OF_GPIO_ACTIVE_LOW) ? 1 : 0;
 			gpio_set_value(pdata->gpios[i].pltfrm_gpio, gpio_val);
-			pltfrm_camera_module_pr_debug(sd,
+			pltfrm_camera_module_pr_err(sd,
 				"set GPIO #%d ('%s') to %s\n",
 				pdata->gpios[i].pltfrm_gpio,
 				pdata->gpios[i].label,

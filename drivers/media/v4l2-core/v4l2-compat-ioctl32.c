@@ -972,6 +972,7 @@ static long do_video_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 	case VIDIOC_G_FMT:
 	case VIDIOC_S_FMT:
 	case VIDIOC_TRY_FMT:
+		printk(KERN_ERR "jchen, S_FMT");
 		err = put_v4l2_format32(&karg.v2f, up);
 		break;
 

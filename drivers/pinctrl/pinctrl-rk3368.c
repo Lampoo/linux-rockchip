@@ -1540,7 +1540,7 @@ static int rockchip_pinctrl_parse_groups(struct device_node *np,
 	int i, j;
 	int ret;
 
-	dev_dbg(info->dev, "group(%d): %s\n", index, np->name);
+	dev_err(info->dev, "jchen group(%d): %s\n", index, np->name);
 
 	/* Initialise group */
 	grp->name = np->name;
@@ -1554,7 +1554,7 @@ static int rockchip_pinctrl_parse_groups(struct device_node *np,
 	size /= sizeof(*list);
 	if (!size || size % 4) {
 		dev_err(info->dev,
-			"wrong pins number or pins and configs should be by 4\n");
+			"jchen: pinctrl-rk3368.c: wrong pins number or pins and configs should be by 4\n");
 		return -EINVAL;
 	}
 

@@ -121,8 +121,8 @@ static int dt_to_map_one_config(struct pinctrl *p, const char *statename,
 	for (;;) {
 		np_pctldev = of_get_next_parent(np_pctldev);
 		if (!np_pctldev || of_node_is_root(np_pctldev)) {
-			dev_info(p->dev, "could not find pctldev for node %s, deferring probe\n",
-				np_config->full_name);
+			dev_info(p->dev, "could not find pctldev for node %s, deferring probe, jchen %d, %d\n",
+				np_config->full_name, !np_pctldev, of_node_is_root(np_pctldev)) ;
 			of_node_put(np_pctldev);
 			/* OK let's just assume this will appear later then */
 			return -EPROBE_DEFER;

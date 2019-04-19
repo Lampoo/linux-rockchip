@@ -1128,11 +1128,14 @@ static int v4l_s_fmt(const struct v4l2_ioctl_ops *ops,
 	bool is_rx = vfd->vfl_dir != VFL_DIR_TX;
 	bool is_tx = vfd->vfl_dir != VFL_DIR_RX;
 
+	printk(KERN_ERR "jchen v4l_s_fmt p->type:%s, %d",p->type,p->type);	
 	switch (p->type) {
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
+		printk(KERN_ERR "jchen 0 v4l_s_fmt V4L2_BUF_TYPE_VIDEO_CAPTURE , ops->vidioc_s_fmt_vid_cap: 0x%p\n",ops->vidioc_s_fmt_vid_cap);	
 		if (unlikely(!is_rx || !is_vid || !ops->vidioc_s_fmt_vid_cap))
 			break;
 		CLEAR_AFTER_FIELD(p, fmt.pix);
+		printk(KERN_ERR "jchen v4l_s_fmt V4L2_BUF_TYPE_VIDEO_CAPTURE , ops->vidioc_s_fmt_vid_cap: 0x%p\n",ops->vidioc_s_fmt_vid_cap);	
 		return ops->vidioc_s_fmt_vid_cap(file, fh, arg);
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE:
 		if (unlikely(!is_rx || !is_vid || !ops->vidioc_s_fmt_vid_cap_mplane))
@@ -1498,8 +1501,9 @@ static int v4l_g_parm(const struct v4l2_ioctl_ops *ops,
 	struct video_device *vfd = video_devdata(file);
 	struct v4l2_streamparm *p = arg;
 	v4l2_std_id std;
+	printk(KERN_ERR "jchen0 v4l_g_parm p->type:%s, %d, check_fmt",p->type,p->type);
 	int ret = check_fmt(file, p->type);
-
+	printk(KERN_ERR "jchen v4l_g_parm p->type:%s, %d, check_fmt return %d",p->type,p->type, ret);
 	if (ret)
 		return ret;
 	if (ops->vidioc_g_parm)
@@ -1521,8 +1525,10 @@ static int v4l_s_parm(const struct v4l2_ioctl_ops *ops,
 				struct file *file, void *fh, void *arg)
 {
 	struct v4l2_streamparm *p = arg;
+	printk(KERN_ERR "jchen0 v4l_s_parm p->type:%s, %d, check_fmt",p->type,p->type);
 	int ret = check_fmt(file, p->type);
-
+	printk(KERN_ERR "jchen0 v4l_s_parm p->type:%s, %d, check_fmt, ret: %d \n",p->type,p->type,ret);
+	
 	return ret ? ret : ops->vidioc_s_parm(file, fh, p);
 }
 

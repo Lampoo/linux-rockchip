@@ -98,7 +98,7 @@
 /* ======================================================================== */
 /* Base sensor configs */
 /* ======================================================================== */
-/* MCLK:24MHz  1920x1080  30fps   mipi 1lane   800Mbps/lane */
+/* MCLK:24MHz  320x240  60fps   mipi 1lane   800Mbps/lane */
 static struct ov_camera_module_reg OV7251_init_tab_320_240_60fps[] = {
 	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x0100, 0x00},/* software sleep */
 	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x0103, 0x01},/* software reset */
@@ -246,6 +246,157 @@ static struct ov_camera_module_reg OV7251_init_tab_320_240_60fps[] = {
 };
 
 /* ======================================================================== */
+/* Base sensor configs */
+/* ======================================================================== */
+/* MCLK:24MHz  640x480  30fps   mipi 1lane   800Mbps/lane */
+static struct ov_camera_module_reg OV7251_init_tab_640_480_30fps[] = {
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x0100, 0x00},/* software sleep */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x0103, 0x01},/* software reset */
+	{OV_CAMERA_MODULE_REG_TYPE_TIMEOUT, 0x0000, 10},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3001, 0x62},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3005, 0x00},/* SDA output, vsync output, pwm output, strobe output */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3012, 0xc0},/* mipi_ictl */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3013, 0xd2},/* drive strength = 0x01, bypass latch of hs_enable */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3014, 0x04},/* MIPI enable */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3016, 0x10},/* sclk control */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3017, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3018, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x301a, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x301b, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x301c, 0x20},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3023, 0x05},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3037, 0xf0},/* sclk control */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3098, 0x04},/* PLL */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3099, 0x28},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x309a, 0x05},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x309b, 0x04},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x30b0, 0x0a},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x30b1, 0x01},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x30b3, 0x64},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x30b4, 0x03},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x30b5, 0x05},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3106, 0xda},/* PLL */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3500, 0x00},/* exposure H */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3501, 0x1f},/* exposure M */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3502, 0x80},/* exposure L */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3503, 0x07},/* Manual AGC, Manual AEC */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3509, 0x10},/* choose linear gain */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x350b, 0x10},/* gain L */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3600, 0x1c},/* analog control */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3602, 0x62},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3620, 0xb7},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3622, 0x04},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3626, 0x21},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3627, 0x30},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3630, 0x44},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3631, 0x35},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3634, 0x60},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3636, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3662, 0x01},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3663, 0x70},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3664, 0xf0},/* analog control */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3666, 0x0a},/* FSIN/VSYNC */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3669, 0x1a},/* analog control */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x366a, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x366b, 0x50},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3673, 0x01},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3674, 0xff},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3675, 0x03},/* analog control */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3705, 0xc1},/* sensor control */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3709, 0x40},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x373c, 0x08},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3742, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3757, 0xb3},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3788, 0x00},/* sensor control */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x37a8, 0x01},/* fifo control */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x37a9, 0xc0},/* fifo control */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3800, 0x00},/* x start H */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3801, 0x04},/* x start L */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3802, 0x00},/* y start H */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3803, 0x04},/* y start L */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3804, 0x02},/* x end H */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3805, 0x8b},/* x end L */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3806, 0x01},/* y end H */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3807, 0xeb},/* y end L */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3808, 0x02},/* isp x output size H */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3809, 0x80},/* isp x output size L */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x380a, 0x01},/* isp y output size H */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x380b, 0xe0},/* isp y output size L */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x380c, 0x03},/* HTS H */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x380d, 0xa0},/* HTS L */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x380e, 0x06/*0x02*/},/* VTS H */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x380f, 0xbc/*0x04*/},/* VTS L */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3810, 0x00},/* ISP x win offset H */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3811, 0x02},/* ISP x win offset L  */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3812, 0x00},/* ISP y win offset H */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3813, 0x02},/* ISP y win offset L */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3814, 0x11},/* x inc */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3815, 0x11},/* y inc */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3820, 0x40},/* vflip_blc */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3821, 0x00},/* hbin disable */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x382f, 0x0e},/* timing control */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3832, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3833, 0x05},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3834, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3835, 0x0c},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3837, 0x00},/* timing control */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3b80, 0x00},/* PWM and strobe control */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3b81, 0xa5},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3b82, 0x10},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3b83, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3b84, 0x08},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3b85, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3b86, 0x01},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3b87, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3b88, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3b89, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3b8a, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3b8b, 0x05},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3b8c, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3b8d, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3b8e, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3b8f, 0x1a},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3b94, 0x05},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3b95, 0xf2},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3b96, 0x40},/* PWM and strobe control */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3c00, 0x89},/* low power mode control */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3c01, 0x63},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3c02, 0x01},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3c03, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3c04, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3c05, 0x03},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3c06, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3c07, 0x06},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3c0c, 0x01},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3c0d, 0xd0},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3c0e, 0x02},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x3c0f, 0x04},/* low power mode control */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x4001, 0x42},/* BLC control */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x4004, 0x04},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x4005, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x404e, 0x01},/* BLC control */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x4241, 0x00},/* frame on number */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x4242, 0x00},/* frame off number */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x4300, 0xff},/* data max H */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x4301, 0x00},/* data min H */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x4501, 0x48},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x4600, 0x00},/* vfifo read start H */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x4601, 0x4e},/* vfifo read start L */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x4801, 0x0f},/* MIPI control */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x4806, 0x0f},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x4819, 0xaa},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x4823, 0x3e},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x4837, 0x19},/* MIPI control */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x4a0d, 0x00},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x4a47, 0x7f},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x4a49, 0xf0},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x4a4b, 0x30},
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x5000, 0x85},/* bc_en, blc_en */
+	{OV_CAMERA_MODULE_REG_TYPE_DATA, 0x5001, 0x80} /* latch_en */
+};
+
+
+/* ======================================================================== */
 static struct ov_camera_module_config OV7251_configs[] = {
 	{
 		.name = "320x240_60fps",
@@ -265,6 +416,28 @@ static struct ov_camera_module_config OV7251_configs[] = {
 		.auto_wb_enabled = false,
 		.reg_table = (void *)OV7251_init_tab_320_240_60fps,
 		.reg_table_num_entries = ARRAY_SIZE(OV7251_init_tab_320_240_60fps),
+		.v_blanking_time_us = 3078,
+		.ignore_measurement_check = 1,
+		PLTFRM_CAM_ITF_MIPI_CFG(0, 1, 640, 24000000)
+	},
+	{
+		.name = "640x480_30fps",
+		.frm_fmt = {
+			.width = 640,
+			.height = 480,
+			.code = V4L2_MBUS_FMT_Y10_1X10
+		},
+		.frm_intrvl = {
+			.interval = {
+				.numerator = 1,
+				.denominator = 30
+			}
+		},
+		.auto_exp_enabled = false,
+		.auto_gain_enabled = false,
+		.auto_wb_enabled = false,
+		.reg_table = (void *)OV7251_init_tab_640_480_30fps,
+		.reg_table_num_entries = ARRAY_SIZE(OV7251_init_tab_640_480_30fps),
 		.v_blanking_time_us = 3078,
 		.ignore_measurement_check = 1,
 		PLTFRM_CAM_ITF_MIPI_CFG(0, 1, 640, 24000000)

@@ -411,8 +411,8 @@ static struct ov_camera_module_config OV7251_configs[] = {
 				.denominator = 100
 			}
 		},
-		.auto_exp_enabled = false,
-		.auto_gain_enabled = false,
+		.auto_exp_enabled = true,
+		.auto_gain_enabled = true,
 		.auto_wb_enabled = false,
 		.reg_table = (void *)OV7251_init_tab_320_240_60fps,
 		.reg_table_num_entries = ARRAY_SIZE(OV7251_init_tab_320_240_60fps),
@@ -433,8 +433,8 @@ static struct ov_camera_module_config OV7251_configs[] = {
 				.denominator = 30
 			}
 		},
-		.auto_exp_enabled = false,
-		.auto_gain_enabled = false,
+		.auto_exp_enabled = true,
+		.auto_gain_enabled = true,
 		.auto_wb_enabled = false,
 		.reg_table = (void *)OV7251_init_tab_640_480_30fps,
 		.reg_table_num_entries = ARRAY_SIZE(OV7251_init_tab_640_480_30fps),
@@ -549,7 +549,7 @@ static int OV7251_auto_adjust_fps(struct ov_camera_module *cam_mod,
 	if (IS_ERR_VALUE(ret)) {
 		ov_camera_module_pr_err(cam_mod, "failed with error (%d)\n", ret);
 	} else {
-		ov_camera_module_pr_debug(cam_mod, "updated vts = 0x%x,vts_min=0x%x\n", vts, cam_mod->vts_min);
+		ov_camera_module_pr_err(cam_mod, "updated vts = 0x%x,vts_min=0x%x\n", vts, cam_mod->vts_min);
 		cam_mod->vts_cur = vts;
 	}
 
@@ -590,11 +590,16 @@ static int OV7251_write_aec(struct ov_camera_module *cam_mod)
 {
 	int ret = 0;
 
-	ov_camera_module_pr_debug(cam_mod,
-		"exp_time = %d lines, gain = %d, flash_mode = %d\n",
+	ov_camera_module_pr_err(cam_mod,
+		"jchen exp_time = %d lines, gain = %d, gain_percent = %d vts_value= 0x%d flash_mode = %d\n",
 		cam_mod->exp_config.exp_time,
 		cam_mod->exp_config.gain,
+		cam_mod->exp_config.gain_percent,
+		cam_mod->exp_config.vts_value,
 		cam_mod->exp_config.flash_mode);
+
+	cam_mod->exp_config.gain_percent = 100; //hard code gain_percent 100% for rv1108 optical flow
+
 
 	/*
 	 * if the sensor is already streaming, write to shadow registers,
@@ -608,13 +613,16 @@ static int OV7251_write_aec(struct ov_camera_module *cam_mod)
 		a_gain = a_gain * cam_mod->exp_config.gain_percent / 100;
 
 		mutex_lock(&cam_mod->lock);
+		ov_camera_module_pr_err(cam_mod, "jchen: set a_gain:0x%x,set exp_time:0x%x,set exp_config.vts_value:0x%x\n",a_gain,exp_time,cam_mod->exp_config.vts_value);
 		ret = ov_camera_module_write_reg(cam_mod,
 			OV7251_AEC_GROUP_UPDATE_ADDRESS,
 			OV7251_AEC_GROUP_UPDATE_START_DATA);
-
-		if (!IS_ERR_VALUE(ret) && cam_mod->auto_adjust_fps)
+		if (!IS_ERR_VALUE(ret) && cam_mod->auto_adjust_fps){
 			ret |= OV7251_auto_adjust_fps(cam_mod,
 					cam_mod->exp_config.exp_time);
+			ov_camera_module_pr_err(cam_mod, "jchen: set OV7251_auto_adjust_fps\n");
+		}
+
 		ret |= ov_camera_module_write_reg(cam_mod,
 			OV7251_AEC_PK_LONG_GAIN_HIGH_REG,
 			OV7251_FETCH_MSB_GAIN(a_gain));
@@ -631,15 +639,17 @@ static int OV7251_write_aec(struct ov_camera_module *cam_mod)
 			OV7251_AEC_PK_LONG_EXPO_1ST_REG,
 			OV7251_FETCH_1ST_BYTE_EXP(exp_time));
 
-		if (!cam_mod->auto_adjust_fps)
+		if (!cam_mod->auto_adjust_fps){
 			ret |= OV7251_set_vts(cam_mod, cam_mod->exp_config.vts_value);
-
+		}
 		ret |= ov_camera_module_write_reg(cam_mod,
 			OV7251_AEC_GROUP_UPDATE_ADDRESS,
 			OV7251_AEC_GROUP_UPDATE_END_DATA);
 		ret |= ov_camera_module_write_reg(cam_mod,
 			OV7251_AEC_GROUP_UPDATE_ADDRESS,
 			OV7251_AEC_GROUP_UPDATE_END_LAUNCH);
+        	ov_camera_module_pr_err(cam_mod, "jchen: write AEC registers done gain:0x%x, expo:0x%x\n", a_gain, exp_time);
+
 		mutex_unlock(&cam_mod->lock);
 	}
 
@@ -868,7 +878,7 @@ static int OV7251_s_ctrl(struct ov_camera_module *cam_mod, u32 ctrl_id)
 {
 	int ret = 0;
 
-	ov_camera_module_pr_debug(cam_mod, "\n");
+	ov_camera_module_pr_err(cam_mod, "jchen OV7251_s_ctrl\n");
 
 	switch (ctrl_id) {
 	case V4L2_CID_GAIN:
@@ -918,7 +928,7 @@ static int OV7251_start_streaming(struct ov_camera_module *cam_mod)
 {
 	int ret = 0;
 
-	ov_camera_module_pr_debug(cam_mod, "active config=%s\n", cam_mod->active_config->name);
+	ov_camera_module_pr_err(cam_mod, "active config=%s\n", cam_mod->active_config->name);
 
 	ret = OV7251_g_VTS(cam_mod, &cam_mod->vts_min);
 	if (IS_ERR_VALUE(ret))
@@ -931,7 +941,6 @@ static int OV7251_start_streaming(struct ov_camera_module *cam_mod)
 	mutex_unlock(&cam_mod->lock);
 	if (IS_ERR_VALUE(ret))
 		goto err;
-
 	return 0;
 err:
 	ov_camera_module_pr_err(cam_mod, "failed with error (%d)\n",
